@@ -1,0 +1,61 @@
+{
+  "extra_monthly_budget": 5000,
+  "properties": [
+    {
+      "name": "Lisa Ln (Cedar Hill)",
+      "balance": 200841.83,
+      "annual_interest_rate": 0.0275,
+      "monthly_payment": 939.67,
+      "monthly_rent": 3590,
+      "monthly_expenses": 1077
+    },
+    {
+      "name": "Brookwood (Duncanville)",
+      "balance": 367904.27,
+      "annual_interest_rate": 0.0425,
+      "monthly_payment": 1936.67,
+      "monthly_rent": 6200,
+      "monthly_expenses": 1860
+    },
+    {
+      "name": "Ridge Rock (Duncanville)",
+      "balance": 402799.55,
+      "annual_interest_rate": 0.0655,
+      "monthly_payment": 2595.45,
+      "monthly_rent": 5740,
+      "monthly_expenses": 1722
+    },
+    {
+      "name": "Wendy (Irving)",
+      "balance": 409329.95,
+      "annual_interest_rate": 0.06375,
+      "monthly_payment": 2663.3,
+      "monthly_rent": 5470,
+      "monthly_expenses": 1641
+    },
+    {
+      "name": "Park Blvd (Plano, projected post-move-out)",
+      "balance": 468576.65,
+      "annual_interest_rate": 0.06625,
+      "monthly_payment": 3011.06,
+      "monthly_rent": 5800,
+      "monthly_expenses": 1740
+    },
+    {
+      "name": "DeSoto Duplex A (financed)",
+      "balance": 270000,
+      "annual_interest_rate": 0.06625,
+      "monthly_payment": 1728.84,
+      "monthly_rent": 3600,
+      "monthly_expenses": 1080
+    },
+    {
+      "name": "DeSoto Duplex B (0% seller-financed)",
+      "balance": 440000,
+      "annual_interest_rate": 0.0,
+      "monthly_payment": 1833.33,
+      "monthly_rent": 3600,
+      "monthly_expenses": 1080
+    }
+  ]
+}
