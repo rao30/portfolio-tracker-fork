@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import type { Property } from '../lib/types';
+import type { Property, PropertyDraft } from '../lib/types';
 import { formatCurrency, formatPercent, propertyColor } from '../lib/format';
+import { AddPropertyModal } from './AddPropertyModal';
 
 interface PropertyTableProps {
   properties: Property[];
   onUpdate: (index: number, field: keyof Property, value: string) => void;
-  onAdd: () => void;
+  onAdd: (property: PropertyDraft) => void;
   onRemove: (index: number) => void;
 }
 
@@ -106,6 +107,9 @@ export function PropertyTable({
   onAdd,
   onRemove,
 }: PropertyTableProps) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const lastProperty = properties[properties.length - 1];
+
   const totals = properties.reduce(
     (acc, p) => ({
       balance: acc.balance + p.balance,
@@ -129,8 +133,8 @@ export function PropertyTable({
         <h3 className="text-sm font-semibold text-slate-200">Portfolio</h3>
         <button
           type="button"
-          onClick={onAdd}
-          className="rounded-lg border border-white/10 px-2 py-1 text-xs text-slate-300 hover:bg-white/5"
+          onClick={() => setModalOpen(true)}
+          className="rounded-lg border border-cyan-500/30 bg-cyan-600/20 px-3 py-1.5 text-xs font-medium text-cyan-200 hover:bg-cyan-600/30"
         >
           + Add property
         </button>
@@ -205,6 +209,13 @@ export function PropertyTable({
           </tr>
         </tfoot>
       </table>
+
+      <AddPropertyModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onAdd={onAdd}
+        template={lastProperty}
+      />
     </div>
   );
 }

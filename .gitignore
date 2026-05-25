@@ -9,6 +9,7 @@ dist-ssr
 # Environment
 .env
 .env.*
+!.env.example
 
 # Editor
 .vscode/*

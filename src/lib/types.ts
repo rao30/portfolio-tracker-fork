@@ -13,6 +13,9 @@ export interface Property {
   annualExpenseInflationRate?: number;
 }
 
+/** Fields required when adding a new property via the UI. */
+export type PropertyDraft = Property;
+
 export interface MonthSnapshot {
   month: number;
   totalBalance: number;

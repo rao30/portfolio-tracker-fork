@@ -18,7 +18,7 @@
     {
       "name": "Brookwood (Duncanville)",
       "balance": 367904.27,
-      "market_value": 550000,
+      "market_value": 400000,
       "annual_interest_rate": 0.0425,
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 1936.67,
@@ -28,7 +28,7 @@
     {
       "name": "Ridge Rock (Duncanville)",
       "balance": 402799.55,
-      "market_value": 620000,
+      "market_value": 450000,
       "annual_interest_rate": 0.0655,
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 2595.45,
@@ -38,7 +38,7 @@
     {
       "name": "Wendy (Irving)",
       "balance": 409329.95,
-      "market_value": 630000,
+      "market_value": 460000,
       "annual_interest_rate": 0.06375,
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 2663.3,
@@ -48,7 +48,7 @@
     {
       "name": "Park Blvd (Plano, projected post-move-out)",
       "balance": 468576.65,
-      "market_value": 720000,
+      "market_value": 500000,
       "annual_interest_rate": 0.06625,
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 3011.06,
