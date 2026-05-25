@@ -23,7 +23,11 @@ function getSupabase() {
 }
 
 export function isCloudStorageEnabled() {
-  return Boolean(getSupabase());
+  const url = process.env.SUPABASE_URL;
+  const key =
+    process.env.SUPABASE_SECRET_KEY ??
+    process.env.SUPABASE_SERVICE_ROLE_KEY;
+  return Boolean(url && key);
 }
 
 async function readSeedFile() {
