@@ -74,6 +74,86 @@
       "monthly_payment": 1833.33,
       "monthly_rent": 3600,
       "monthly_expenses": 1080
+    },
+    {
+      "name": "116/118 Shadybrook Dr (conventional)",
+      "balance": 360000,
+      "market_value": 360000,
+      "annual_interest_rate": 0.06625,
+      "annual_appreciation_rate": 0.03,
+      "monthly_payment": 2305.12,
+      "monthly_rent": 3600,
+      "monthly_expenses": 1080
+    },
+    {
+      "name": "144/146 Shadybrook Dr (0% seller-financed, 5yr balloon)",
+      "balance": 460000,
+      "market_value": 460000,
+      "annual_interest_rate": 0.0,
+      "annual_appreciation_rate": 0.03,
+      "monthly_payment": 1916.67,
+      "monthly_rent": 3600,
+      "monthly_expenses": 1080
+    },
+    {
+      "name": "141/143 Shadybrook Dr (conventional)",
+      "balance": 360000,
+      "market_value": 360000,
+      "annual_interest_rate": 0.06625,
+      "annual_appreciation_rate": 0.03,
+      "monthly_payment": 2305.12,
+      "monthly_rent": 3600,
+      "monthly_expenses": 1080
+    },
+    {
+      "name": "125/127 Larchbrook Dr (0% seller-financed, 5yr balloon)",
+      "balance": 472000,
+      "market_value": 472000,
+      "annual_interest_rate": 0.0,
+      "annual_appreciation_rate": 0.03,
+      "monthly_payment": 1966.67,
+      "monthly_rent": 3600,
+      "monthly_expenses": 1080
+    },
+    {
+      "name": "120/122 Idlecreek Dr (conventional)",
+      "balance": 372000,
+      "market_value": 372000,
+      "annual_interest_rate": 0.06625,
+      "annual_appreciation_rate": 0.03,
+      "monthly_payment": 2381.96,
+      "monthly_rent": 3600,
+      "monthly_expenses": 1080
+    },
+    {
+      "name": "800/802 Summit Dr (0% seller-financed, 5yr balloon)",
+      "balance": 472000,
+      "market_value": 472000,
+      "annual_interest_rate": 0.0,
+      "annual_appreciation_rate": 0.03,
+      "monthly_payment": 1966.67,
+      "monthly_rent": 3600,
+      "monthly_expenses": 1080
+    },
+    {
+      "name": "804/806 Summit Dr (conventional)",
+      "balance": 372000,
+      "market_value": 372000,
+      "annual_interest_rate": 0.06625,
+      "annual_appreciation_rate": 0.03,
+      "monthly_payment": 2381.96,
+      "monthly_rent": 3600,
+      "monthly_expenses": 1080
+    },
+    {
+      "name": "1419/1421 Deborah Dr (0% seller-financed, 5yr balloon)",
+      "balance": 380000,
+      "market_value": 380000,
+      "annual_interest_rate": 0.0,
+      "annual_appreciation_rate": 0.03,
+      "monthly_payment": 1583.33,
+      "monthly_rent": 3600,
+      "monthly_expenses": 1080
     }
   ]
 }
