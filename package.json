@@ -9,7 +9,9 @@
     "dev": "vite",
     "dev:server": "node server.js",
     "dev:all": "concurrently -n vite,api -c cyan,magenta \"vite\" \"node server.js\"",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
+    "typecheck": "tsc -b",
+    "check": "npm run typecheck && npm test",
     "start": "node server.js",
     "preview": "vite preview",
     "test": "vitest run",
@@ -21,12 +23,13 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.106.2",
     "express": "^4.19.2",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "recharts": "^2.15.0"
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.15.0",
     "@types/node": "^25.9.1",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",

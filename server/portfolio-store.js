@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { readFile } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import ws from 'ws';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORTFOLIO_ROW_ID = 'default';
@@ -17,6 +18,7 @@ function getSupabase() {
   if (!supabase) {
     supabase = createClient(url, key, {
       auth: { persistSession: false, autoRefreshToken: false },
+      realtime: { transport: ws },
     });
   }
   return supabase;
