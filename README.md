@@ -17,7 +17,7 @@ Open the dev server URL (usually `http://localhost:5173`). The dashboard loads [
 
 **Option A — commit JSON**
 
-Edit [`public/data/portfolio.json`](public/data/portfolio.json) directly (snake_case fields). Commit and push; GitHub Pages redeploys on `main`.
+Edit [`public/data/portfolio.json`](public/data/portfolio.json) directly (snake_case fields). Commit and push; the site redeploys automatically on `main`.
 
 **Option B — UI + export**
 
