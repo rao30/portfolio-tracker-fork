@@ -1,4 +1,5 @@
 import express from 'express';
+import { existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import {
@@ -74,10 +75,24 @@ app.put('/api/portfolio', async (req, res) => {
 });
 
 const distDir = path.join(__dirname, 'dist');
+const indexHtml = path.join(distDir, 'index.html');
+
+if (!existsSync(indexHtml)) {
+  console.error(
+    `Missing ${indexHtml}. The build step must run before start (npm run build).`,
+  );
+  process.exit(1);
+}
+
 app.use(express.static(distDir));
 
 app.get('*', (_req, res) => {
-  res.sendFile(path.join(distDir, 'index.html'));
+  res.sendFile(indexHtml, (err) => {
+    if (err) {
+      console.error('sendFile failed:', err);
+      res.status(500).send('Failed to load app');
+    }
+  });
 });
 
 app.listen(port, host, () => {
