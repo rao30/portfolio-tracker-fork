@@ -64,13 +64,25 @@ Every push to `main` triggers a new deploy — no GitHub Actions workflow or ext
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `SUPABASE_URL` | Yes (for cloud save) | Project URL, e.g. `https://xxxx.supabase.co` |
-| `SUPABASE_SERVICE_ROLE_KEY` | Yes (for cloud save) | Service role key (server only — **Settings → API** in Supabase) |
+| `SUPABASE_SECRET_KEY` | Yes (for cloud save) | `sb_secret_...` from Supabase **Settings → API Keys** (preferred) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Alt | Legacy service role JWT if you have not migrated to secret keys yet |
 | `PORTFOLIO_WRITE_KEY` | No | If set, PUT `/api/portfolio` requires `Authorization: Bearer <key>` |
 | `VITE_PORTFOLIO_WRITE_KEY` | No | Build-time copy of write key (only if using write protection) |
 
 Copy from [`.env.example`](.env.example). Without Supabase vars, the app still runs using `public/data/portfolio.json` and browser `localStorage`.
 
 **Important:** Do not set a manual `PORT` variable in Railway unless you change the app to match. The server listens on Railway's injected `$PORT` at `0.0.0.0`, which lets Railway auto-detect the target port for your domain.
+
+### Deploy troubleshooting
+
+If the deploy fails at **build** with `tsc: not found` or `vite: not found`, Railway installed production-only dependencies. This repo includes [`nixpacks.toml`](nixpacks.toml) so `npm ci --include=dev` runs before `npm run build`.
+
+If the deploy fails at **healthcheck**, confirm the build succeeded (`dist/index.html` exists) and the service exposes `/api/health`. Check deploy logs for `Missing dist/index.html`.
+
+| Variable | Accepts |
+|----------|---------|
+| `SUPABASE_SECRET_KEY` | New `sb_secret_...` key (preferred) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Legacy service role JWT (still works) |
 
 ### Local dev with cloud sync
 

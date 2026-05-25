@@ -1,0 +1,11 @@
+# Railway/Nixpacks: install devDependencies so `tsc` and `vite` exist for the build phase.
+# With NODE_ENV=production, default install omits devDeps and `npm run build` fails.
+
+[phases.install]
+cmds = ["npm ci --include=dev"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm start"
