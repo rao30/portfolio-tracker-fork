@@ -2,18 +2,27 @@ import { useMemo, useState } from 'react';
 import { BalanceChart } from './components/BalanceChart';
 import { CashflowChart } from './components/CashflowChart';
 import { Controls } from './components/Controls';
+import { GoalTracker } from './components/GoalTracker';
 import { Header } from './components/Header';
+import { IncomeVsExpenseChart } from './components/IncomeVsExpenseChart';
 import { InterestChart } from './components/InterestChart';
 import { KpiCards } from './components/KpiCards';
+import { NetWorthChart } from './components/NetWorthChart';
 import { PayoffTimeline } from './components/PayoffTimeline';
+import { PropertyInsights } from './components/PropertyInsights';
 import { PropertyTable } from './components/PropertyTable';
+import { ScenarioControls } from './components/ScenarioControls';
 import { StrategyComparison } from './components/StrategyComparison';
+import { WealthCompositionChart } from './components/WealthCompositionChart';
 import {
   compareStrategies,
-  simulateSnowball,
-  STRATEGIES,
+  computePropertyInsights,
+  runSimulation,
+  SCENARIO_PRESETS,
+  snapshotAtMonth,
   type StrategyId,
 } from './lib/snowball';
+import type { ScenarioConfig } from './lib/types';
 import { usePortfolio } from './lib/usePortfolio';
 
 function App() {
@@ -23,6 +32,7 @@ function App() {
     error,
     source,
     setBudget,
+    updatePortfolioSetting,
     updateProperty,
     addProperty,
     removeProperty,
@@ -31,6 +41,8 @@ function App() {
   } = usePortfolio();
 
   const [activeStrategy, setActiveStrategy] = useState<StrategyId>('highestRate');
+  const [scenario, setScenario] = useState<ScenarioConfig>(SCENARIO_PRESETS[0]);
+  const [equityHorizon, setEquityHorizon] = useState(120);
 
   const budgetMax = useMemo(() => {
     if (!portfolio) return 20000;
@@ -38,43 +50,61 @@ function App() {
     return Math.max(20000, Math.round(piSum * 2));
   }, [portfolio]);
 
-  const { comparisons, activeResult, baselineResult } = useMemo(() => {
-    if (!portfolio) {
-      return {
-        comparisons: [],
-        activeResult: null,
-        baselineResult: null,
+  const { comparisons, activeResult, baselineResult, baseCaseResult, propertyInsights, scenarioDelta } =
+    useMemo(() => {
+      if (!portfolio) {
+        return {
+          comparisons: [],
+          activeResult: null,
+          baselineResult: null,
+          baseCaseResult: null,
+          propertyInsights: [],
+          scenarioDelta: null,
+        };
+      }
+
+      const simOpts = {
+        annualRentGrowthRate: portfolio.annualRentGrowthRate,
+        annualExpenseInflationRate: portfolio.annualExpenseInflationRate,
+        reinvestSurplus: portfolio.reinvestSurplus,
+        monthlyReserveTarget: portfolio.monthlyReserveTarget,
       };
-    }
 
-    const comparisons = compareStrategies(portfolio.properties, {
-      extraMonthlyBudget: portfolio.extraMonthlyBudget,
-      includeBaseline: true,
-    });
-
-    const baseline =
-      comparisons.find((r) => r.strategy === 'baseline') ??
-      simulateSnowball(portfolio.properties, {
-        payoffOrder: portfolio.properties.map((p) => p.name),
-        extraMonthlyBudget: 0,
-        snowballCashflow: false,
-        strategyName: 'baseline',
-      });
-
-    const active =
-      comparisons.find((r) => r.strategy === activeStrategy) ??
-      simulateSnowball(portfolio.properties, {
-        payoffOrder: STRATEGIES[activeStrategy](portfolio.properties),
+      const comparisons = compareStrategies(portfolio.properties, {
         extraMonthlyBudget: portfolio.extraMonthlyBudget,
-        strategyName: activeStrategy,
+        includeBaseline: true,
+        simulationOptions: simOpts,
       });
 
-    return {
-      comparisons,
-      activeResult: active,
-      baselineResult: baseline,
-    };
-  }, [portfolio, activeStrategy]);
+      const baseCaseResult = runSimulation(portfolio, activeStrategy, SCENARIO_PRESETS[0]);
+      const activeResult = runSimulation(portfolio, activeStrategy, scenario);
+      const baselineResult = runSimulation(portfolio, 'baseline', scenario);
+
+      const propertyInsights = computePropertyInsights(
+        portfolio.properties,
+        activeResult.order,
+      );
+
+      let scenarioDelta: { monthsDelta: number; equityDelta: number } | null = null;
+      if (scenario.id !== 'base') {
+        const baseAt180 = snapshotAtMonth(baseCaseResult, 180);
+        const scenarioAt180 = snapshotAtMonth(activeResult, 180);
+        scenarioDelta = {
+          monthsDelta: activeResult.monthsToPayoff - baseCaseResult.monthsToPayoff,
+          equityDelta:
+            (scenarioAt180?.totalEquity ?? 0) - (baseAt180?.totalEquity ?? 0),
+        };
+      }
+
+      return {
+        comparisons,
+        activeResult,
+        baselineResult,
+        baseCaseResult,
+        propertyInsights,
+        scenarioDelta,
+      };
+    }, [portfolio, activeStrategy, scenario]);
 
   if (loading) {
     return (
@@ -84,7 +114,7 @@ function App() {
     );
   }
 
-  if (error || !portfolio || !activeResult || !baselineResult) {
+  if (error || !portfolio || !activeResult || !baselineResult || !baseCaseResult) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4 text-red-400">
         {error ?? 'Failed to load portfolio'}
@@ -104,11 +134,64 @@ function App() {
         budget={portfolio.extraMonthlyBudget}
         budgetMax={budgetMax}
         strategy={activeStrategy}
+        annualRentGrowthRate={portfolio.annualRentGrowthRate}
+        annualExpenseInflationRate={portfolio.annualExpenseInflationRate}
+        reinvestSurplus={portfolio.reinvestSurplus}
+        monthlyReserveTarget={portfolio.monthlyReserveTarget}
         onBudgetChange={setBudget}
         onStrategyChange={setActiveStrategy}
+        onPortfolioSettingChange={updatePortfolioSetting}
       />
 
-      <KpiCards active={activeResult} baseline={baselineResult} />
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <ScenarioControls
+            portfolio={portfolio}
+            scenarioId={scenario.id}
+            onScenarioChange={setScenario}
+          />
+        </div>
+        <div className="glass-card flex items-center gap-3 p-4">
+          <label htmlFor="equity-horizon" className="text-sm text-slate-300">
+            Equity KPI horizon
+          </label>
+          <select
+            id="equity-horizon"
+            value={equityHorizon}
+            onChange={(e) => setEquityHorizon(Number(e.target.value))}
+            className="flex-1 rounded-lg border border-white/10 bg-slate-900/80 px-2 py-1 text-sm text-slate-100"
+          >
+            <option value={60}>5 years</option>
+            <option value={120}>10 years</option>
+            <option value={180}>15 years</option>
+          </select>
+        </div>
+      </div>
+
+      <KpiCards
+        active={activeResult}
+        baseline={baselineResult}
+        properties={portfolio.properties}
+        equityHorizon={equityHorizon}
+      />
+
+      <NetWorthChart
+        result={activeResult}
+        baseline={scenario.id !== 'base' ? baseCaseResult : null}
+      />
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <WealthCompositionChart result={activeResult} />
+        <IncomeVsExpenseChart result={activeResult} />
+      </div>
+
+      <GoalTracker
+        portfolio={portfolio}
+        active={activeResult}
+        baseline={baselineResult}
+        strategyId={activeStrategy}
+        scenarioDelta={scenarioDelta}
+      />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <StrategyComparison
@@ -125,6 +208,8 @@ function App() {
         <InterestChart active={activeResult} baseline={baselineResult} />
         <CashflowChart result={activeResult} />
       </div>
+
+      <PropertyInsights insights={propertyInsights} result={activeResult} />
 
       <PropertyTable
         properties={portfolio.properties}

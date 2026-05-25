@@ -13,8 +13,21 @@ type EditableField = keyof Property;
 
 function fieldDisplay(p: Property, field: EditableField): string {
   if (field === 'name') return p.name;
-  if (field === 'annualInterestRate') return formatPercent(p.annualInterestRate);
-  if (field === 'balance' || field === 'monthlyPayment' || field === 'monthlyRent' || field === 'monthlyExpenses') {
+  if (
+    field === 'annualInterestRate' ||
+    field === 'annualAppreciationRate' ||
+    field === 'annualRentGrowthRate' ||
+    field === 'annualExpenseInflationRate'
+  ) {
+    return formatPercent(p[field] ?? 0);
+  }
+  if (
+    field === 'balance' ||
+    field === 'marketValue' ||
+    field === 'monthlyPayment' ||
+    field === 'monthlyRent' ||
+    field === 'monthlyExpenses'
+  ) {
     return formatCurrency(p[field]);
   }
   return String(p[field]);
@@ -22,8 +35,9 @@ function fieldDisplay(p: Property, field: EditableField): string {
 
 function rawValue(p: Property, field: EditableField): string {
   if (field === 'name') return p.name;
-  if (field === 'annualInterestRate') return String(p.annualInterestRate);
-  return String(p[field]);
+  const val = p[field];
+  if (val === undefined) return '';
+  return String(val);
 }
 
 interface EditableCellProps {
@@ -70,7 +84,7 @@ function EditableCell({ value, display, onCommit, mono }: EditableCellProps) {
       }}
       className={`w-full text-left text-xs hover:text-cyan-300 ${mono ? 'font-mono tabular-nums' : ''}`}
     >
-      {display}
+      {display || '—'}
     </button>
   );
 }
@@ -78,7 +92,9 @@ function EditableCell({ value, display, onCommit, mono }: EditableCellProps) {
 const COLUMNS: { key: EditableField; label: string; mono?: boolean }[] = [
   { key: 'name', label: 'Property' },
   { key: 'balance', label: 'Balance', mono: true },
+  { key: 'marketValue', label: 'Value', mono: true },
   { key: 'annualInterestRate', label: 'Rate', mono: true },
+  { key: 'annualAppreciationRate', label: 'Appr.', mono: true },
   { key: 'monthlyPayment', label: 'P&I', mono: true },
   { key: 'monthlyRent', label: 'Rent', mono: true },
   { key: 'monthlyExpenses', label: 'Expenses', mono: true },
@@ -93,11 +109,18 @@ export function PropertyTable({
   const totals = properties.reduce(
     (acc, p) => ({
       balance: acc.balance + p.balance,
+      marketValue: acc.marketValue + p.marketValue,
       monthlyPayment: acc.monthlyPayment + p.monthlyPayment,
       monthlyRent: acc.monthlyRent + p.monthlyRent,
       monthlyExpenses: acc.monthlyExpenses + p.monthlyExpenses,
     }),
-    { balance: 0, monthlyPayment: 0, monthlyRent: 0, monthlyExpenses: 0 },
+    {
+      balance: 0,
+      marketValue: 0,
+      monthlyPayment: 0,
+      monthlyRent: 0,
+      monthlyExpenses: 0,
+    },
   );
 
   return (
@@ -112,7 +135,7 @@ export function PropertyTable({
           + Add property
         </button>
       </div>
-      <table className="w-full min-w-[640px] text-left text-sm">
+      <table className="w-full min-w-[900px] text-left text-sm">
         <thead>
           <tr className="border-b border-white/10 text-xs text-slate-400">
             <th className="pb-2 pr-2 w-6" />
@@ -164,6 +187,10 @@ export function PropertyTable({
             <td className="pt-2 font-mono tabular-nums">
               {formatCurrency(totals.balance)}
             </td>
+            <td className="pt-2 font-mono tabular-nums">
+              {formatCurrency(totals.marketValue)}
+            </td>
+            <td className="pt-2">—</td>
             <td className="pt-2">—</td>
             <td className="pt-2 font-mono tabular-nums">
               {formatCurrency(totals.monthlyPayment)}

@@ -41,6 +41,23 @@ export function formatPercent(rate: number): string {
   }).format(rate);
 }
 
+/** Format LTV as a percentage (0–100+). */
+export function formatLtv(ltv: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'percent',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 1,
+  }).format(ltv);
+}
+
+/** Compact currency for chart axes. */
+export function formatCurrencyCompact(value: number): string {
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1000) return `$${(value / 1000).toFixed(0)}k`;
+  return `$${value}`;
+}
+
 /** Format months as a human-readable duration. */
 export function formatMonths(months: number): string {
   if (months < 12) return `${months} mo`;

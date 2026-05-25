@@ -6,12 +6,20 @@ const STORAGE_KEY = 'rental-snowball-portfolio';
 
 export type DataSource = 'file' | 'local';
 
+export type PortfolioSettingKey =
+  | 'extraMonthlyBudget'
+  | 'annualRentGrowthRate'
+  | 'annualExpenseInflationRate'
+  | 'reinvestSurplus'
+  | 'monthlyReserveTarget';
+
 export interface UsePortfolioResult {
   portfolio: Portfolio | null;
   loading: boolean;
   error: string | null;
   source: DataSource;
   setBudget: (budget: number) => void;
+  updatePortfolioSetting: (field: PortfolioSettingKey, value: number | boolean) => void;
   updateProperty: (index: number, field: keyof Property, value: string) => void;
   addProperty: () => void;
   removeProperty: (index: number) => void;
@@ -96,6 +104,14 @@ export function usePortfolio(): UsePortfolioResult {
     [portfolio, persist],
   );
 
+  const updatePortfolioSetting = useCallback(
+    (field: PortfolioSettingKey, value: number | boolean) => {
+      if (!portfolio) return;
+      persist({ ...portfolio, [field]: value }, true);
+    },
+    [portfolio, persist],
+  );
+
   const updateProperty = useCallback(
     (index: number, field: keyof Property, value: string) => {
       if (!portfolio) return;
@@ -121,7 +137,9 @@ export function usePortfolio(): UsePortfolioResult {
       {
         name: 'New Property',
         balance: 100000,
+        marketValue: 150000,
         annualInterestRate: 0.05,
+        annualAppreciationRate: 0.03,
         monthlyPayment: 500,
         monthlyRent: 1500,
         monthlyExpenses: 450,
@@ -180,6 +198,7 @@ export function usePortfolio(): UsePortfolioResult {
     error,
     source,
     setBudget,
+    updatePortfolioSetting,
     updateProperty,
     addProperty,
     removeProperty,

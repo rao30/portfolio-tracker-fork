@@ -14,7 +14,9 @@ const fixture: Property[] = [
   {
     name: 'HighRate',
     balance: 100000,
+    marketValue: 160000,
     annualInterestRate: 0.08,
+    annualAppreciationRate: 0.03,
     monthlyPayment: 800,
     monthlyRent: 1500,
     monthlyExpenses: 450,
@@ -22,7 +24,9 @@ const fixture: Property[] = [
   {
     name: 'LowRate',
     balance: 50000,
+    marketValue: 90000,
     annualInterestRate: 0.03,
+    annualAppreciationRate: 0.03,
     monthlyPayment: 400,
     monthlyRent: 900,
     monthlyExpenses: 270,
@@ -30,7 +34,9 @@ const fixture: Property[] = [
   {
     name: 'Small',
     balance: 10000,
+    marketValue: 25000,
     annualInterestRate: 0.05,
+    annualAppreciationRate: 0.03,
     monthlyPayment: 200,
     monthlyRent: 600,
     monthlyExpenses: 180,
@@ -194,7 +200,9 @@ describe('simulateSnowball', () => {
     {
       name: 'Only',
       balance: 12000,
+      marketValue: 20000,
       annualInterestRate: 0,
+      annualAppreciationRate: 0.03,
       monthlyPayment: 1000,
       monthlyRent: 2000,
       monthlyExpenses: 600,
@@ -330,6 +338,32 @@ describe('simulateSnowball', () => {
     ).toThrow(/non-negative/);
   });
 
+  it('tracks equity growth in history', () => {
+    const r = simulateSnowball(fixture, {
+      payoffOrder: STRATEGIES.highestRate(fixture),
+      extraMonthlyBudget: 1000,
+    });
+    const first = r.history[0];
+    const last = r.history[r.history.length - 1];
+    expect(first.totalEquity).toBeGreaterThan(0);
+    expect(last.totalEquity).toBeGreaterThan(first.totalEquity);
+    expect(last.totalBalance).toBeLessThanOrEqual(0.01);
+    expect(r.finalEquity).toBeCloseTo(last.totalEquity, 0);
+  });
+
+  it('accumulates cash reserves when not reinvesting', () => {
+    const r = simulateSnowball(single, {
+      payoffOrder: ['Only'],
+      extraMonthlyBudget: 0,
+      snowballCashflow: false,
+      reinvestSurplus: false,
+      monthlyReserveTarget: 0,
+    });
+    const last = r.history[r.history.length - 1];
+    expect(last.cashReserveBalance).toBeGreaterThan(0);
+    expect(last.netWorth).toBeGreaterThan(last.totalEquity);
+  });
+
   it('throws when simulation does not converge', () => {
     expect(() =>
       simulateSnowball(fixture, {
@@ -420,6 +454,7 @@ describe('normalizePortfolio', () => {
         {
           name: 'Test',
           balance: 100,
+          market_value: 150,
           annual_interest_rate: 0.05,
           monthly_payment: 10,
           monthly_rent: 20,
@@ -437,7 +472,9 @@ describe('seed portfolio integration', () => {
     {
       name: 'Lisa Ln (Cedar Hill)',
       balance: 200841.83,
+      marketValue: 320000,
       annualInterestRate: 0.0275,
+      annualAppreciationRate: 0.03,
       monthlyPayment: 939.67,
       monthlyRent: 3590,
       monthlyExpenses: 1077,
@@ -445,7 +482,9 @@ describe('seed portfolio integration', () => {
     {
       name: 'Brookwood (Duncanville)',
       balance: 367904.27,
+      marketValue: 550000,
       annualInterestRate: 0.0425,
+      annualAppreciationRate: 0.03,
       monthlyPayment: 1936.67,
       monthlyRent: 6200,
       monthlyExpenses: 1860,
@@ -453,7 +492,9 @@ describe('seed portfolio integration', () => {
     {
       name: 'Ridge Rock (Duncanville)',
       balance: 402799.55,
+      marketValue: 620000,
       annualInterestRate: 0.0655,
+      annualAppreciationRate: 0.03,
       monthlyPayment: 2595.45,
       monthlyRent: 5740,
       monthlyExpenses: 1722,
@@ -461,7 +502,9 @@ describe('seed portfolio integration', () => {
     {
       name: 'Wendy (Irving)',
       balance: 409329.95,
+      marketValue: 630000,
       annualInterestRate: 0.06375,
+      annualAppreciationRate: 0.03,
       monthlyPayment: 2663.3,
       monthlyRent: 5470,
       monthlyExpenses: 1641,
@@ -469,7 +512,9 @@ describe('seed portfolio integration', () => {
     {
       name: SEED_PROPERTY_NAMES.parkBlvd,
       balance: 468576.65,
+      marketValue: 720000,
       annualInterestRate: 0.06625,
+      annualAppreciationRate: 0.03,
       monthlyPayment: 3011.06,
       monthlyRent: 5800,
       monthlyExpenses: 1740,
@@ -477,7 +522,9 @@ describe('seed portfolio integration', () => {
     {
       name: 'DeSoto Duplex A (financed)',
       balance: 270000,
+      marketValue: 420000,
       annualInterestRate: 0.06625,
+      annualAppreciationRate: 0.03,
       monthlyPayment: 1728.84,
       monthlyRent: 3600,
       monthlyExpenses: 1080,
@@ -485,7 +532,9 @@ describe('seed portfolio integration', () => {
     {
       name: SEED_PROPERTY_NAMES.desotoB,
       balance: 440000,
+      marketValue: 560000,
       annualInterestRate: 0,
+      annualAppreciationRate: 0.03,
       monthlyPayment: 1833.33,
       monthlyRent: 3600,
       monthlyExpenses: 1080,

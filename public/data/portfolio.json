@@ -1,10 +1,16 @@
 {
   "extra_monthly_budget": 5000,
+  "annual_rent_growth_rate": 0.025,
+  "annual_expense_inflation_rate": 0.02,
+  "reinvest_surplus": false,
+  "monthly_reserve_target": 0,
   "properties": [
     {
       "name": "Lisa Ln (Cedar Hill)",
       "balance": 200841.83,
+      "market_value": 320000,
       "annual_interest_rate": 0.0275,
+      "annual_appreciation_rate": 0.03,
       "monthly_payment": 939.67,
       "monthly_rent": 3590,
       "monthly_expenses": 1077
@@ -12,7 +18,9 @@
     {
       "name": "Brookwood (Duncanville)",
       "balance": 367904.27,
+      "market_value": 550000,
       "annual_interest_rate": 0.0425,
+      "annual_appreciation_rate": 0.03,
       "monthly_payment": 1936.67,
       "monthly_rent": 6200,
       "monthly_expenses": 1860
@@ -20,7 +28,9 @@
     {
       "name": "Ridge Rock (Duncanville)",
       "balance": 402799.55,
+      "market_value": 620000,
       "annual_interest_rate": 0.0655,
+      "annual_appreciation_rate": 0.03,
       "monthly_payment": 2595.45,
       "monthly_rent": 5740,
       "monthly_expenses": 1722
@@ -28,7 +38,9 @@
     {
       "name": "Wendy (Irving)",
       "balance": 409329.95,
+      "market_value": 630000,
       "annual_interest_rate": 0.06375,
+      "annual_appreciation_rate": 0.03,
       "monthly_payment": 2663.3,
       "monthly_rent": 5470,
       "monthly_expenses": 1641
@@ -36,7 +48,9 @@
     {
       "name": "Park Blvd (Plano, projected post-move-out)",
       "balance": 468576.65,
+      "market_value": 720000,
       "annual_interest_rate": 0.06625,
+      "annual_appreciation_rate": 0.03,
       "monthly_payment": 3011.06,
       "monthly_rent": 5800,
       "monthly_expenses": 1740
@@ -44,7 +58,9 @@
     {
       "name": "DeSoto Duplex A (financed)",
       "balance": 270000,
+      "market_value": 420000,
       "annual_interest_rate": 0.06625,
+      "annual_appreciation_rate": 0.03,
       "monthly_payment": 1728.84,
       "monthly_rent": 3600,
       "monthly_expenses": 1080
@@ -52,7 +68,9 @@
     {
       "name": "DeSoto Duplex B (0% seller-financed)",
       "balance": 440000,
+      "market_value": 560000,
       "annual_interest_rate": 0.0,
+      "annual_appreciation_rate": 0.03,
       "monthly_payment": 1833.33,
       "monthly_rent": 3600,
       "monthly_expenses": 1080
