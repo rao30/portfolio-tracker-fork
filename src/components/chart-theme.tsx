@@ -1,4 +1,6 @@
-import type { ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
+
+export const ChartVariantContext = createContext<'card' | 'flat'>('card');
 import { buildTimelineTicks, monthInYear, yearFromMonth } from '../lib/format';
 
 export const chartColors = {
@@ -106,14 +108,27 @@ interface ChartCardProps {
   title: string;
   children: ReactNode;
   className?: string;
+  /** Flat sections use dividers inside one surface instead of nested cards. */
+  variant?: 'card' | 'flat';
 }
 
-/** Glass card wrapper for Recharts visualizations. */
-export function ChartCard({ title, children, className = '' }: ChartCardProps) {
+/** Wrapper for Recharts visualizations. */
+export function ChartCard({
+  title,
+  children,
+  className = '',
+  variant: variantProp,
+}: ChartCardProps) {
+  const variant = variantProp ?? useContext(ChartVariantContext);
+  const shell =
+    variant === 'flat'
+      ? `section-divider px-3 py-4 sm:px-4 ${className}`
+      : `glass-card p-4 ${className}`;
+
   return (
-    <div className={`glass-card p-4 ${className}`}>
+    <div className={shell}>
       <h3 className="mb-3 text-sm font-semibold text-slate-200">{title}</h3>
-      <div className="h-64 w-full min-w-0 sm:h-72">{children}</div>
+      <div className="h-56 w-full min-w-0 sm:h-64 lg:h-72">{children}</div>
     </div>
   );
 }
