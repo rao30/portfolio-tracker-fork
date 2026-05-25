@@ -1,3 +1,4 @@
+import { closeMonthFromYear } from './format';
 import type {
   MonthSnapshot,
   Portfolio,
@@ -45,6 +46,8 @@ export interface SimulationOptions {
   pauseExtraMonths?: number;
   /** Lump-sum extra principal applied in month 1 to the first active target. */
   initialLumpSum?: number;
+  /** If true, return history even when balances remain after maxMonths. */
+  allowUnresolved?: boolean;
 }
 
 interface SimState {
@@ -58,6 +61,72 @@ interface SimState {
   rentGrowth: number;
   expenseInflation: number;
   appreciation: number;
+  closeMonth: number;
+  balloonMonths?: number;
+  originalBalance: number;
+  originalMarketValue: number;
+  originalRent: number;
+  originalExpenses: number;
+}
+
+function isPropertyOwned(state: SimState, month: number): boolean {
+  return month >= state.closeMonth;
+}
+
+function monthsOnLoan(state: SimState, month: number): number {
+  return month - state.closeMonth + 1;
+}
+
+function scheduledPaymentForMonth(state: SimState, month: number): number {
+  if (!isPropertyOwned(state, month) || state.balance <= BALANCE_EPSILON) {
+    return 0;
+  }
+  if (
+    state.balloonMonths != null &&
+    monthsOnLoan(state, month) > state.balloonMonths
+  ) {
+    return 0;
+  }
+  return state.monthlyPayment;
+}
+
+function isBalloonDue(state: SimState, month: number): boolean {
+  return (
+    state.balloonMonths != null &&
+    isPropertyOwned(state, month) &&
+    monthsOnLoan(state, month) === state.balloonMonths &&
+    state.balance > BALANCE_EPSILON
+  );
+}
+
+function allLoansResolved(states: SimState[], month: number): boolean {
+  return states.every(
+    (s) => isPropertyOwned(s, month) && s.balance <= BALANCE_EPSILON,
+  );
+}
+
+function activateProperty(state: SimState): void {
+  state.balance = state.originalBalance;
+  state.marketValue = state.originalMarketValue;
+  state.monthlyRent = state.originalRent;
+  state.monthlyExpenses = state.originalExpenses;
+}
+
+function applyExtraToNames(
+  states: SimState[],
+  names: string[],
+  amount: number,
+): number {
+  let remaining = amount;
+  for (const name of names) {
+    if (remaining <= 0) break;
+    const target = states.find((s) => s.name === name);
+    if (!target || target.balance <= BALANCE_EPSILON) continue;
+    const before = target.balance;
+    target.balance = applyExtraPrincipal(target.balance, remaining);
+    remaining -= before - target.balance;
+  }
+  return amount - remaining;
 }
 
 /** Apply one month of scheduled P&I plus optional extra principal. */
@@ -114,8 +183,9 @@ function monthlyGrowthFactor(annualRate: number): number {
   return Math.pow(1 + annualRate, 1 / 12);
 }
 
-function compoundGrowth(states: SimState[]): void {
+function compoundGrowth(states: SimState[], month: number): void {
   for (const s of states) {
+    if (!isPropertyOwned(s, month)) continue;
     s.marketValue *= monthlyGrowthFactor(s.appreciation);
     s.monthlyRent *= monthlyGrowthFactor(s.rentGrowth);
     s.monthlyExpenses *= monthlyGrowthFactor(s.expenseInflation);
@@ -135,32 +205,45 @@ function initSimStates(
   const vacancy = options.vacancyRate ?? 0;
   const rateShock = options.rateShock ?? 0;
 
-  return properties.map((p) => ({
-    name: p.name,
-    balance: p.balance,
-    marketValue: p.marketValue,
-    monthlyRent: p.monthlyRent * (1 - vacancy),
-    monthlyExpenses: p.monthlyExpenses,
-    monthlyPayment: p.monthlyPayment,
-    annualInterestRate: p.annualInterestRate + rateShock,
-    rentGrowth: p.annualRentGrowthRate ?? portfolioRentGrowth,
-    expenseInflation: p.annualExpenseInflationRate ?? portfolioExpenseInflation,
-    appreciation: p.annualAppreciationRate,
-  }));
+  return properties.map((p) => {
+    const closeMonth = p.closeMonth ?? 1;
+    const activeAtStart = closeMonth <= 1;
+    const originalRent = p.monthlyRent * (1 - vacancy);
+    return {
+      name: p.name,
+      balance: activeAtStart ? p.balance : 0,
+      marketValue: activeAtStart ? p.marketValue : 0,
+      monthlyRent: activeAtStart ? originalRent : 0,
+      monthlyExpenses: activeAtStart ? p.monthlyExpenses : 0,
+      monthlyPayment: p.monthlyPayment,
+      annualInterestRate: p.annualInterestRate + rateShock,
+      rentGrowth: p.annualRentGrowthRate ?? portfolioRentGrowth,
+      expenseInflation: p.annualExpenseInflationRate ?? portfolioExpenseInflation,
+      appreciation: p.annualAppreciationRate,
+      closeMonth,
+      balloonMonths: p.balloonMonths,
+      originalBalance: p.balance,
+      originalMarketValue: p.marketValue,
+      originalRent,
+      originalExpenses: p.monthlyExpenses,
+    };
+  });
 }
 
-function computeMonthlyCashflow(states: SimState[]): number {
+function computeMonthlyCashflow(states: SimState[], month: number): number {
   return states.reduce((sum, s) => {
+    if (!isPropertyOwned(s, month)) return sum;
     const netRent = s.monthlyRent - s.monthlyExpenses;
     if (s.balance <= BALANCE_EPSILON) return sum + netRent;
-    return sum + (netRent - s.monthlyPayment);
+    const pi = scheduledPaymentForMonth(s, month);
+    return sum + (netRent - pi);
   }, 0);
 }
 
-function computeMonthlyPi(states: SimState[]): number {
+function computeMonthlyPi(states: SimState[], month: number): number {
   return states.reduce((sum, s) => {
-    if (s.balance <= BALANCE_EPSILON) return sum;
-    return sum + s.monthlyPayment;
+    if (!isPropertyOwned(s, month) || s.balance <= BALANCE_EPSILON) return sum;
+    return sum + scheduledPaymentForMonth(s, month);
   }, 0);
 }
 
@@ -183,6 +266,7 @@ function buildEquitySnapshot(
   monthlyCashflow: number,
   target: string | null,
   paidOffThisMonth: string[],
+  balloonDueThisMonth: string[],
   cumulativeRent: number,
   cumulativeExpenses: number,
   cumulativeCashflow: number,
@@ -212,6 +296,7 @@ function buildEquitySnapshot(
     monthlyCashflow,
     targetProperty: target,
     paidOffThisMonth,
+    balloonDueThisMonth,
     balancesByName,
     valuesByName,
     equityByName,
@@ -219,9 +304,15 @@ function buildEquitySnapshot(
     totalPropertyValue,
     totalLiabilities: totalBalance,
     netWorth: totalEquity + cashReserve,
-    monthlyRent: states.reduce((s, p) => s + p.monthlyRent, 0),
-    monthlyExpenses: states.reduce((s, p) => s + p.monthlyExpenses, 0),
-    monthlyPi: computeMonthlyPi(states),
+    monthlyRent: states.reduce(
+      (sum, p) => sum + (isPropertyOwned(p, month) ? p.monthlyRent : 0),
+      0,
+    ),
+    monthlyExpenses: states.reduce(
+      (sum, p) => sum + (isPropertyOwned(p, month) ? p.monthlyExpenses : 0),
+      0,
+    ),
+    monthlyPi: computeMonthlyPi(states, month),
     cumulativeRentCollected: cumulativeRent,
     cumulativeExpenses: cumulativeExpenses,
     cashReserveBalance: cashReserve,
@@ -278,11 +369,16 @@ function validatePayoffOrder(payoffOrder: string[], propertyNames: Set<string>):
 function findTarget(
   payoffOrder: string[],
   states: SimState[],
+  month: number,
 ): string | null {
   return (
     payoffOrder.find((name) => {
       const s = states.find((p) => p.name === name);
-      return s && s.balance > BALANCE_EPSILON;
+      return (
+        s &&
+        isPropertyOwned(s, month) &&
+        s.balance > BALANCE_EPSILON
+      );
     }) ?? null
   );
 }
@@ -329,6 +425,7 @@ export function simulateSnowball(
 
   const history: MonthSnapshot[] = [];
   const payoffSchedule: Record<string, number> = {};
+  const balloonPayoffSchedule: Record<string, number> = {};
   let totalInterestPaid = 0;
   let totalExtraPaid = 0;
   let cashReserve = 0;
@@ -338,17 +435,23 @@ export function simulateSnowball(
 
   for (let month = 1; month <= maxMonths; month += 1) {
     if (month > 1) {
-      compoundGrowth(states);
+      compoundGrowth(states, month);
     }
 
-    const activeCount = states.filter((s) => s.balance > BALANCE_EPSILON).length;
-    if (activeCount === 0) break;
+    for (const s of states) {
+      if (month === s.closeMonth && s.closeMonth > 1) {
+        activateProperty(s);
+      }
+    }
+
+    if (allLoansResolved(states, month)) break;
 
     const effectiveBudget = month <= pauseExtraMonths ? 0 : extraMonthlyBudget;
     let extraPool = effectiveBudget;
 
     if (snowballCashflow) {
       for (const s of states) {
+        if (!isPropertyOwned(s, month)) continue;
         if (s.balance <= BALANCE_EPSILON) {
           extraPool += s.monthlyPayment;
         }
@@ -360,7 +463,13 @@ export function simulateSnowball(
       initialLumpSum = 0;
     }
 
-    const target = findTarget(options.payoffOrder, states);
+    const target = findTarget(options.payoffOrder, states, month);
+    const balloonDueNames = states
+      .filter((s) => isBalloonDue(s, month))
+      .map((s) => s.name);
+    const balloonPriority = options.payoffOrder.filter((n) =>
+      balloonDueNames.includes(n),
+    );
 
     let monthInterest = 0;
     let monthPrincipal = 0;
@@ -369,32 +478,22 @@ export function simulateSnowball(
 
     for (const s of states) {
       const startBal = s.balance;
-      if (startBal <= BALANCE_EPSILON) continue;
+      if (!isPropertyOwned(s, month) || startBal <= BALANCE_EPSILON) continue;
 
+      const payment = scheduledPaymentForMonth(s, month);
       const result = amortizeOneMonth({
         balance: startBal,
         annualInterestRate: s.annualInterestRate,
-        scheduledPayment: s.monthlyPayment,
+        scheduledPayment: payment,
         extraPayment: 0,
         propertyName: s.name,
       });
 
-      let newBal = result.balance;
+      s.balance = result.balance;
       monthInterest += result.interestPaid;
       monthPrincipal += result.principalPaid;
 
-      if (s.name === target && extraPool > 0) {
-        const beforeExtra = newBal;
-        newBal = applyExtraPrincipal(newBal, extraPool);
-        const applied = beforeExtra - newBal;
-        monthExtra += applied;
-        monthPrincipal += applied;
-        extraPool = 0;
-      }
-
-      s.balance = newBal;
-
-      if (newBal <= BALANCE_EPSILON && startBal > BALANCE_EPSILON) {
+      if (result.paidOff && startBal > BALANCE_EPSILON) {
         paidOffThisMonth.push(s.name);
         if (!(s.name in payoffSchedule)) {
           payoffSchedule[s.name] = month;
@@ -402,10 +501,50 @@ export function simulateSnowball(
       }
     }
 
-    cumulativeRent += states.reduce((sum, s) => sum + s.monthlyRent, 0);
-    cumulativeExpenses += states.reduce((sum, s) => sum + s.monthlyExpenses, 0);
+    if (balloonPriority.length > 0 && extraPool > 0) {
+      const applied = applyExtraToNames(states, balloonPriority, extraPool);
+      monthExtra += applied;
+      monthPrincipal += applied;
+      extraPool -= applied;
 
-    let monthlyCashflow = computeMonthlyCashflow(states);
+      for (const name of balloonPriority) {
+        const s = states.find((p) => p.name === name);
+        if (s && s.balance <= BALANCE_EPSILON && !(name in balloonPayoffSchedule)) {
+          balloonPayoffSchedule[name] = month;
+        }
+      }
+    }
+
+    if (target && extraPool > 0) {
+      const applied = applyExtraToNames(states, [target], extraPool);
+      monthExtra += applied;
+      monthPrincipal += applied;
+      extraPool = 0;
+    }
+
+    for (const s of states) {
+      if (
+        s.balance <= BALANCE_EPSILON &&
+        isPropertyOwned(s, month) &&
+        !paidOffThisMonth.includes(s.name)
+      ) {
+        paidOffThisMonth.push(s.name);
+        if (!(s.name in payoffSchedule)) {
+          payoffSchedule[s.name] = month;
+        }
+      }
+    }
+
+    cumulativeRent += states.reduce(
+      (sum, st) => sum + (isPropertyOwned(st, month) ? st.monthlyRent : 0),
+      0,
+    );
+    cumulativeExpenses += states.reduce(
+      (sum, st) => sum + (isPropertyOwned(st, month) ? st.monthlyExpenses : 0),
+      0,
+    );
+
+    let monthlyCashflow = computeMonthlyCashflow(states, month);
     const capexDeduction = computeCapexDeduction(states, capexRate, capexFlat);
     monthlyCashflow -= capexDeduction;
 
@@ -417,7 +556,7 @@ export function simulateSnowball(
     if (surplus > 0) {
       if (reinvestSurplus) {
         const balancesBeforeReinvest = new Map(states.map((s) => [s.name, s.balance]));
-        const currentTarget = findTarget(options.payoffOrder, states);
+        const currentTarget = findTarget(options.payoffOrder, states, month);
         const surplusReinvested = applyExtraToTarget(states, currentTarget, surplus);
         monthExtra += surplusReinvested;
         monthPrincipal += surplusReinvested;
@@ -453,18 +592,21 @@ export function simulateSnowball(
         monthlyCashflow,
         target,
         paidOffThisMonth,
+        balloonDueNames,
         cumulativeRent,
         cumulativeExpenses,
         cumulativeCashflow,
       ),
     );
 
-    const totalBalance = states.reduce((s, p) => s + p.balance, 0);
-    if (totalBalance <= BALANCE_EPSILON) break;
+    if (allLoansResolved(states, month)) break;
   }
 
-  const remaining = states.some((s) => s.balance > BALANCE_EPSILON);
-  if (remaining) {
+  const lastSimMonth = history[history.length - 1]?.month ?? 0;
+  const remaining = states.some(
+    (s) => s.closeMonth <= lastSimMonth && s.balance > BALANCE_EPSILON,
+  );
+  if (remaining && !options.allowUnresolved) {
     throw new Error(
       `Simulation did not converge within ${maxMonths} months`,
     );
@@ -489,6 +631,7 @@ export function simulateSnowball(
     totalExtraPaid,
     finalMonthlyCashflow,
     payoffSchedule,
+    balloonPayoffSchedule,
     history,
     finalEquity,
     finalNetWorth: lastSnapshot?.netWorth ?? finalEquity,
@@ -868,6 +1011,10 @@ export function normalizePortfolio(raw: unknown): Portfolio {
   const reinvestSurplus = obj.reinvest_surplus === true;
   const monthlyReserveTarget =
     typeof obj.monthly_reserve_target === 'number' ? obj.monthly_reserve_target : 0;
+  const simulationAnchorYear =
+    typeof obj.simulation_anchor_year === 'number'
+      ? obj.simulation_anchor_year
+      : 2026;
 
   const properties: Property[] = obj.properties.map((item, i) => {
     if (!item || typeof item !== 'object') {
@@ -925,6 +1072,17 @@ export function normalizePortfolio(raw: unknown): Portfolio {
       prop.annualExpenseInflationRate = p.annual_expense_inflation_rate;
     }
 
+    if (typeof p.close_month === 'number') {
+      prop.closeMonth = p.close_month;
+    } else if (typeof p.close_year === 'number') {
+      prop.closeMonth = closeMonthFromYear(p.close_year, simulationAnchorYear);
+      prop.closeYear = p.close_year;
+    }
+
+    if (typeof p.balloon_months === 'number') {
+      prop.balloonMonths = p.balloon_months;
+    }
+
     return prop;
   });
 
@@ -934,6 +1092,7 @@ export function normalizePortfolio(raw: unknown): Portfolio {
     annualExpenseInflationRate,
     reinvestSurplus,
     monthlyReserveTarget,
+    simulationAnchorYear,
     properties,
   };
 }
@@ -944,6 +1103,7 @@ export function denormalizePortfolio(
 ): import('./types').PortfolioFile {
   return {
     extra_monthly_budget: portfolio.extraMonthlyBudget,
+    simulation_anchor_year: portfolio.simulationAnchorYear,
     annual_rent_growth_rate: portfolio.annualRentGrowthRate,
     annual_expense_inflation_rate: portfolio.annualExpenseInflationRate,
     reinvest_surplus: portfolio.reinvestSurplus,
@@ -964,6 +1124,14 @@ export function denormalizePortfolio(
       }
       if (p.annualExpenseInflationRate !== undefined) {
         file.annual_expense_inflation_rate = p.annualExpenseInflationRate;
+      }
+      if (p.closeYear !== undefined) {
+        file.close_year = p.closeYear;
+      } else if (p.closeMonth !== undefined && p.closeMonth > 1) {
+        file.close_month = p.closeMonth;
+      }
+      if (p.balloonMonths !== undefined) {
+        file.balloon_months = p.balloonMonths;
       }
       return file;
     }),

@@ -11,6 +11,12 @@ export interface Property {
   annualRentGrowthRate?: number;
   /** Override portfolio default expense inflation for this property. */
   annualExpenseInflationRate?: number;
+  /** Simulation month when the loan begins (default 1 = already owned). */
+  closeMonth?: number;
+  /** Calendar year of closing; converted using portfolio simulationAnchorYear. */
+  closeYear?: number;
+  /** Months after close when remaining balance is due in full (seller balloon). */
+  balloonMonths?: number;
 }
 
 /** Fields required when adding a new property via the UI. */
@@ -25,6 +31,8 @@ export interface MonthSnapshot {
   monthlyCashflow: number;
   targetProperty: string | null;
   paidOffThisMonth: string[];
+  /** Properties with a balloon payment due this month (after scheduled P&I). */
+  balloonDueThisMonth: string[];
   balancesByName: Record<string, number>;
   valuesByName: Record<string, number>;
   equityByName: Record<string, number>;
@@ -49,6 +57,8 @@ export interface SimulationResult {
   totalExtraPaid: number;
   finalMonthlyCashflow: number;
   payoffSchedule: Record<string, number>;
+  /** Month when each balloon was fully satisfied (if applicable). */
+  balloonPayoffSchedule: Record<string, number>;
   history: MonthSnapshot[];
   /** Equity at debt-free month. */
   finalEquity: number;
@@ -67,10 +77,15 @@ export interface PropertyFile {
   monthly_expenses: number;
   annual_rent_growth_rate?: number;
   annual_expense_inflation_rate?: number;
+  close_month?: number;
+  close_year?: number;
+  balloon_months?: number;
 }
 
 export interface PortfolioFile {
   extra_monthly_budget: number;
+  /** Calendar year for simulation month 1 (default 2026). */
+  simulation_anchor_year?: number;
   annual_rent_growth_rate?: number;
   annual_expense_inflation_rate?: number;
   reinvest_surplus?: boolean;
@@ -84,6 +99,8 @@ export interface Portfolio {
   annualExpenseInflationRate: number;
   reinvestSurplus: boolean;
   monthlyReserveTarget: number;
+  /** Calendar year represented by simulation month 1. */
+  simulationAnchorYear: number;
   properties: Property[];
 }
 
