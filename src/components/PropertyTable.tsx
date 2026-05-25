@@ -8,6 +8,7 @@ interface PropertyTableProps {
   onUpdate: (index: number, field: keyof Property, value: string) => void;
   onAdd: (property: PropertyDraft) => void;
   onRemove: (index: number) => void;
+  mobileCards?: boolean;
 }
 
 type EditableField = keyof Property;
@@ -101,11 +102,77 @@ const COLUMNS: { key: EditableField; label: string; mono?: boolean }[] = [
   { key: 'monthlyExpenses', label: 'Expenses', mono: true },
 ];
 
+const MOBILE_FIELDS: { key: EditableField; label: string }[] = [
+  { key: 'balance', label: 'Balance' },
+  { key: 'marketValue', label: 'Value' },
+  { key: 'annualInterestRate', label: 'Rate' },
+  { key: 'monthlyPayment', label: 'P&I' },
+  { key: 'monthlyRent', label: 'Rent' },
+  { key: 'monthlyExpenses', label: 'Expenses' },
+];
+
+function PropertyCard({
+  property,
+  index,
+  onUpdate,
+  onRemove,
+  canRemove,
+}: {
+  property: Property;
+  index: number;
+  onUpdate: (index: number, field: keyof Property, value: string) => void;
+  onRemove: (index: number) => void;
+  canRemove: boolean;
+}) {
+  return (
+    <article className="section-divider px-3 py-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span
+            className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+            style={{ backgroundColor: propertyColor(property.name) }}
+          />
+          <EditableCell
+            value={rawValue(property, 'name')}
+            display={property.name}
+            onCommit={(v) => onUpdate(index, 'name', v)}
+          />
+        </div>
+        <button
+          type="button"
+          onClick={() => onRemove(index)}
+          disabled={!canRemove}
+          className="shrink-0 text-xs text-red-400 disabled:opacity-30"
+          aria-label="Remove property"
+        >
+          Remove
+        </button>
+      </div>
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+        {MOBILE_FIELDS.map((field) => (
+          <div key={field.key}>
+            <dt className="text-slate-500">{field.label}</dt>
+            <dd className="mt-0.5 font-mono tabular-nums text-slate-200">
+              <EditableCell
+                value={rawValue(property, field.key)}
+                display={fieldDisplay(property, field.key)}
+                onCommit={(v) => onUpdate(index, field.key, v)}
+                mono
+              />
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </article>
+  );
+}
+
 export function PropertyTable({
   properties,
   onUpdate,
   onAdd,
   onRemove,
+  mobileCards = false,
 }: PropertyTableProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const lastProperty = properties[properties.length - 1];
@@ -127,18 +194,72 @@ export function PropertyTable({
     },
   );
 
+  const header = (
+    <div className="mb-3 flex items-center justify-between">
+      <h3 className="text-sm font-semibold text-slate-200">Portfolio</h3>
+      <button
+        type="button"
+        onClick={() => setModalOpen(true)}
+        className="rounded-lg border border-cyan-500/30 bg-cyan-600/20 px-3 py-1.5 text-xs font-medium text-cyan-200 hover:bg-cyan-600/30"
+      >
+        + Add property
+      </button>
+    </div>
+  );
+
+  if (mobileCards) {
+    return (
+      <div className="app-surface overflow-hidden">
+        <div className="border-b border-white/10 px-3 pt-3">{header}</div>
+        {properties.map((p, i) => (
+          <PropertyCard
+            key={`${p.name}-${i}`}
+            property={p}
+            index={i}
+            onUpdate={onUpdate}
+            onRemove={onRemove}
+            canRemove={properties.length > 1}
+          />
+        ))}
+        <div className="grid grid-cols-2 gap-2 border-t border-white/10 bg-white/[0.02] px-3 py-3 text-xs text-slate-400">
+          <div>
+            <p>Total balance</p>
+            <p className="font-mono text-sm tabular-nums text-slate-200">
+              {formatCurrency(totals.balance)}
+            </p>
+          </div>
+          <div>
+            <p>Total value</p>
+            <p className="font-mono text-sm tabular-nums text-slate-200">
+              {formatCurrency(totals.marketValue)}
+            </p>
+          </div>
+          <div>
+            <p>Total P&I</p>
+            <p className="font-mono text-sm tabular-nums text-slate-200">
+              {formatCurrency(totals.monthlyPayment)}
+            </p>
+          </div>
+          <div>
+            <p>Net rent/mo</p>
+            <p className="font-mono text-sm tabular-nums text-slate-200">
+              {formatCurrency(totals.monthlyRent - totals.monthlyExpenses)}
+            </p>
+          </div>
+        </div>
+        <AddPropertyModal
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          onAdd={onAdd}
+          template={lastProperty}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="glass-card overflow-x-auto p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-200">Portfolio</h3>
-        <button
-          type="button"
-          onClick={() => setModalOpen(true)}
-          className="rounded-lg border border-cyan-500/30 bg-cyan-600/20 px-3 py-1.5 text-xs font-medium text-cyan-200 hover:bg-cyan-600/30"
-        >
-          + Add property
-        </button>
-      </div>
+      {header}
       <table className="w-full min-w-[900px] text-left text-sm">
         <thead>
           <tr className="border-b border-white/10 text-xs text-slate-400">
