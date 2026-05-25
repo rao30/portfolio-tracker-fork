@@ -9,15 +9,18 @@ npm install
 npm run dev
 npm test
 npm run build
+npm start
 ```
 
 Open the dev server URL (usually `http://localhost:5173`). The dashboard loads [`public/data/portfolio.json`](public/data/portfolio.json) on first visit.
+
+After building, `npm start` serves the production build at `http://localhost:3000` — same as Railway.
 
 ## Editing your portfolio
 
 **Option A — commit JSON**
 
-Edit [`public/data/portfolio.json`](public/data/portfolio.json) directly (snake_case fields). Commit and push; the site redeploys automatically on `main`.
+Edit [`public/data/portfolio.json`](public/data/portfolio.json) directly (snake_case fields). Commit and push; Railway redeploys on `main`.
 
 **Option B — UI + export**
 
@@ -27,13 +30,27 @@ Edit cells in the property table. Changes save to `localStorage` automatically. 
 
 > Balances and loan terms live in the repo JSON. Use a **private repository** if those numbers are sensitive.
 
-## GitHub Pages deployment
+## Railway deployment
 
-1. Push to `main`.
-2. In the repo **Settings → Pages**, set **Source** to **GitHub Actions**.
-3. The workflow in [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs tests, builds with `VITE_BASE=/<repo-name>/`, and deploys `dist`.
+Same pattern as [bake-house](https://github.com/rao30/bake-house): a small Express server serves the built Vite app from `dist/`, and Railway auto-detects the Node project.
 
-For this repo the base path is `/portfolio-tracker/`.
+### One-time setup
+
+1. In [Railway](https://railway.app/), create a **New Project → Deploy from GitHub repo**.
+2. Select `portfolio-tracker` (works with private repos).
+3. Railway runs `npm install`, `npm run build`, then `npm start` automatically.
+4. Open the service **Settings → Networking → Generate Domain** for a public URL.
+
+Every push to `main` triggers a new deploy — no GitHub Actions workflow or extra secrets required.
+
+### How it works
+
+| Phase | Command |
+|-------|---------|
+| Build | `npm run build` (TypeScript + Vite → `dist/`) |
+| Start | `node server.js` (Express static server on `$PORT`) |
+
+The app is served from `/` (no subpath), so `VITE_BASE` defaults to `/`.
 
 ## Strategies
 
@@ -98,6 +115,7 @@ Wire it into [`src/App.tsx`](src/App.tsx) with data from `SimulationResult.histo
 src/lib/          Simulation engine, formatters, portfolio hook
 src/components/   Dashboard UI and charts
 public/data/      Default portfolio JSON
+server.js         Express server for Railway (serves dist/)
 ```
 
 ## License
