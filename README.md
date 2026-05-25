@@ -18,17 +18,33 @@ After building, `npm start` serves the production build at `http://localhost:300
 
 ## Editing your portfolio
 
+**Recommended — UI + cloud (Supabase)**
+
+1. Click **+ Add property** in the portfolio table, or edit any cell inline.
+2. Changes auto-save to Supabase (debounced) when Railway has `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` set.
+3. The header shows **Synced to cloud** when persistence is active.
+
 **Option A — commit JSON**
 
-Edit [`public/data/portfolio.json`](public/data/portfolio.json) directly (snake_case fields). Commit and push; Railway redeploys on `main`.
+Edit [`public/data/portfolio.json`](public/data/portfolio.json) directly (snake_case fields). Commit and push; the next API load seeds Supabase if the row is empty, or use **Reset** to push repo defaults to the cloud.
 
-**Option B — UI + export**
+**Option B — local only (no Supabase)**
 
-Edit cells in the property table. Changes save to `localStorage` automatically. Use **Export JSON** to download the current state, then replace `public/data/portfolio.json` in the repo if you want that to become the new default.
+Without Supabase env vars, edits save to `localStorage` in the browser. Use **Export JSON** to download state and optionally update `public/data/portfolio.json`.
 
-**Reset** clears local edits and reloads from the repo file (with confirmation if local edits exist).
+**Reset** reloads repo defaults and, when cloud storage is enabled, overwrites the Supabase snapshot.
 
-> Balances and loan terms live in the repo JSON. Use a **private repository** if those numbers are sensitive.
+> Balances and loan terms are sensitive. Use a **private repository**, optional `PORTFOLIO_WRITE_KEY`, and never commit service role keys.
+
+### Current market values (defaults)
+
+| Property | Market value |
+|----------|----------------|
+| Lisa Ln (Cedar Hill) | $320,000 |
+| Brookwood (Duncanville) | $400,000 |
+| Ridge Rock (Duncanville) | $450,000 |
+| Wendy (Irving) | $460,000 |
+| Park Blvd (Plano) | $500,000 |
 
 ## Railway deployment
 
@@ -43,7 +59,26 @@ Same pattern as [bake-house](https://github.com/rao30/bake-house): a small Expre
 
 Every push to `main` triggers a new deploy — no GitHub Actions workflow or extra secrets required.
 
+### Railway environment variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `SUPABASE_URL` | Yes (for cloud save) | Project URL, e.g. `https://xxxx.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes (for cloud save) | Service role key (server only — **Settings → API** in Supabase) |
+| `PORTFOLIO_WRITE_KEY` | No | If set, PUT `/api/portfolio` requires `Authorization: Bearer <key>` |
+| `VITE_PORTFOLIO_WRITE_KEY` | No | Build-time copy of write key (only if using write protection) |
+
+Copy from [`.env.example`](.env.example). Without Supabase vars, the app still runs using `public/data/portfolio.json` and browser `localStorage`.
+
 **Important:** Do not set a manual `PORT` variable in Railway unless you change the app to match. The server listens on Railway's injected `$PORT` at `0.0.0.0`, which lets Railway auto-detect the target port for your domain.
+
+### Local dev with cloud sync
+
+```bash
+cp .env.example .env   # fill in Supabase keys
+export $(grep -v '^#' .env | xargs)
+npm run dev:all        # Vite + API on :3000, proxied /api
+```
 
 ### How it works
 
@@ -117,8 +152,10 @@ Wire it into [`src/App.tsx`](src/App.tsx) with data from `SimulationResult.histo
 ```
 src/lib/          Simulation engine, formatters, portfolio hook
 src/components/   Dashboard UI and charts
-public/data/      Default portfolio JSON
-server.js         Express server for Railway (serves dist/)
+public/data/      Default portfolio JSON (seed + fallback)
+server.js         Express server for Railway (API + static dist/)
+server/           Supabase portfolio persistence
+supabase/         SQL migrations (reference)
 ```
 
 ## License

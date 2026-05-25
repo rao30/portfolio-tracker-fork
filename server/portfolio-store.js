@@ -1,0 +1,92 @@
+import { createClient } from '@supabase/supabase-js';
+import { readFile } from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PORTFOLIO_ROW_ID = 'default';
+
+let supabase = null;
+
+function getSupabase() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  if (!supabase) {
+    supabase = createClient(url, key, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+  }
+  return supabase;
+}
+
+export function isCloudStorageEnabled() {
+  return Boolean(getSupabase());
+}
+
+async function readSeedFile() {
+  const seedPath = path.join(__dirname, '..', 'public', 'data', 'portfolio.json');
+  const raw = await readFile(seedPath, 'utf8');
+  return JSON.parse(raw);
+}
+
+export async function loadPortfolio() {
+  const client = getSupabase();
+  if (!client) {
+    return { data: await readSeedFile(), source: 'file', updatedAt: null };
+  }
+
+  const { data: row, error } = await client
+    .from('portfolio_snapshots')
+    .select('data, updated_at')
+    .eq('id', PORTFOLIO_ROW_ID)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Supabase read failed: ${error.message}`);
+  }
+
+  if (row?.data) {
+    return {
+      data: row.data,
+      source: 'cloud',
+      updatedAt: row.updated_at ?? null,
+    };
+  }
+
+  const seed = await readSeedFile();
+  const { error: insertError } = await client.from('portfolio_snapshots').upsert({
+    id: PORTFOLIO_ROW_ID,
+    data: seed,
+    updated_at: new Date().toISOString(),
+  });
+
+  if (insertError) {
+    throw new Error(`Supabase seed failed: ${insertError.message}`);
+  }
+
+  return { data: seed, source: 'cloud', updatedAt: new Date().toISOString() };
+}
+
+export async function savePortfolio(portfolioData) {
+  const client = getSupabase();
+  if (!client) {
+    throw new Error('Cloud storage is not configured');
+  }
+
+  const { data: row, error } = await client
+    .from('portfolio_snapshots')
+    .upsert({
+      id: PORTFOLIO_ROW_ID,
+      data: portfolioData,
+      updated_at: new Date().toISOString(),
+    })
+    .select('updated_at')
+    .single();
+
+  if (error) {
+    throw new Error(`Supabase save failed: ${error.message}`);
+  }
+
+  return { updatedAt: row?.updated_at ?? new Date().toISOString() };
+}

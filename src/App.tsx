@@ -31,6 +31,8 @@ function App() {
     loading,
     error,
     source,
+    syncStatus,
+    cloudEnabled,
     setBudget,
     updatePortfolioSetting,
     updateProperty,
@@ -126,6 +128,8 @@ function App() {
     <div className="mx-auto min-h-screen max-w-7xl space-y-4 p-3 sm:p-6">
       <Header
         source={source}
+        syncStatus={syncStatus}
+        cloudEnabled={cloudEnabled}
         onReset={() => void resetFromFile()}
         onExport={exportJson}
       />
