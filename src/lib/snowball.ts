@@ -12,6 +12,21 @@ const BALANCE_EPSILON = 0.01;
 const DEFAULT_APPRECIATION = 0.03;
 const DEFAULT_RENT_GROWTH = 0.025;
 const DEFAULT_EXPENSE_INFLATION = 0.02;
+const DEFAULT_BALLOON_REFI_RATE = 0.0675;
+const DEFAULT_BALLOON_REFI_TERM_MONTHS = 360;
+
+/** Fixed-rate monthly P&I from principal, annual rate, and term. */
+export function paymentFromPrincipal(
+  principal: number,
+  annualInterestRate: number,
+  termMonths: number,
+): number {
+  if (principal <= 0 || termMonths <= 0) return 0;
+  if (annualInterestRate <= 0) return principal / termMonths;
+  const r = annualInterestRate / 12;
+  const factor = Math.pow(1 + r, termMonths);
+  return (principal * r * factor) / (factor - 1);
+}
 
 export interface AmortizeResult {
   balance: number;
@@ -63,6 +78,8 @@ interface SimState {
   appreciation: number;
   closeMonth: number;
   balloonMonths?: number;
+  balloonRefiAnnualRate: number;
+  balloonRefiTermMonths: number;
   originalBalance: number;
   originalMarketValue: number;
   originalRent: number;
@@ -81,22 +98,29 @@ function scheduledPaymentForMonth(state: SimState, month: number): number {
   if (!isPropertyOwned(state, month) || state.balance <= BALANCE_EPSILON) {
     return 0;
   }
-  if (
-    state.balloonMonths != null &&
-    monthsOnLoan(state, month) > state.balloonMonths
-  ) {
-    return 0;
-  }
   return state.monthlyPayment;
 }
 
-function isBalloonDue(state: SimState, month: number): boolean {
+function isBalloonRefiMonth(state: SimState, month: number): boolean {
   return (
     state.balloonMonths != null &&
     isPropertyOwned(state, month) &&
     monthsOnLoan(state, month) === state.balloonMonths &&
     state.balance > BALANCE_EPSILON
   );
+}
+
+/** Convert remaining seller-financed balance into a conventional amortizing loan. */
+function refinanceAfterBalloon(state: SimState): void {
+  if (state.balance <= BALANCE_EPSILON) {
+    state.balloonMonths = undefined;
+    return;
+  }
+  const rate = state.balloonRefiAnnualRate;
+  const term = state.balloonRefiTermMonths;
+  state.annualInterestRate = rate;
+  state.monthlyPayment = paymentFromPrincipal(state.balance, rate, term);
+  state.balloonMonths = undefined;
 }
 
 function allLoansResolved(states: SimState[], month: number): boolean {
@@ -222,6 +246,8 @@ function initSimStates(
       appreciation: p.annualAppreciationRate,
       closeMonth,
       balloonMonths: p.balloonMonths,
+      balloonRefiAnnualRate: p.balloonRefiAnnualRate ?? DEFAULT_BALLOON_REFI_RATE,
+      balloonRefiTermMonths: p.balloonRefiTermMonths ?? DEFAULT_BALLOON_REFI_TERM_MONTHS,
       originalBalance: p.balance,
       originalMarketValue: p.marketValue,
       originalRent,
@@ -266,7 +292,7 @@ function buildEquitySnapshot(
   monthlyCashflow: number,
   target: string | null,
   paidOffThisMonth: string[],
-  balloonDueThisMonth: string[],
+  refinancedThisMonth: string[],
   cumulativeRent: number,
   cumulativeExpenses: number,
   cumulativeCashflow: number,
@@ -296,7 +322,7 @@ function buildEquitySnapshot(
     monthlyCashflow,
     targetProperty: target,
     paidOffThisMonth,
-    balloonDueThisMonth,
+    refinancedThisMonth,
     balancesByName,
     valuesByName,
     equityByName,
@@ -425,7 +451,7 @@ export function simulateSnowball(
 
   const history: MonthSnapshot[] = [];
   const payoffSchedule: Record<string, number> = {};
-  const balloonPayoffSchedule: Record<string, number> = {};
+  const refinanceSchedule: Record<string, number> = {};
   let totalInterestPaid = 0;
   let totalExtraPaid = 0;
   let cashReserve = 0;
@@ -464,12 +490,7 @@ export function simulateSnowball(
     }
 
     const target = findTarget(options.payoffOrder, states, month);
-    const balloonDueNames = states
-      .filter((s) => isBalloonDue(s, month))
-      .map((s) => s.name);
-    const balloonPriority = options.payoffOrder.filter((n) =>
-      balloonDueNames.includes(n),
-    );
+    const refinancedThisMonth: string[] = [];
 
     let monthInterest = 0;
     let monthPrincipal = 0;
@@ -499,18 +520,12 @@ export function simulateSnowball(
           payoffSchedule[s.name] = month;
         }
       }
-    }
 
-    if (balloonPriority.length > 0 && extraPool > 0) {
-      const applied = applyExtraToNames(states, balloonPriority, extraPool);
-      monthExtra += applied;
-      monthPrincipal += applied;
-      extraPool -= applied;
-
-      for (const name of balloonPriority) {
-        const s = states.find((p) => p.name === name);
-        if (s && s.balance <= BALANCE_EPSILON && !(name in balloonPayoffSchedule)) {
-          balloonPayoffSchedule[name] = month;
+      if (isBalloonRefiMonth(s, month)) {
+        refinanceAfterBalloon(s);
+        refinancedThisMonth.push(s.name);
+        if (!(s.name in refinanceSchedule)) {
+          refinanceSchedule[s.name] = month;
         }
       }
     }
@@ -592,7 +607,7 @@ export function simulateSnowball(
         monthlyCashflow,
         target,
         paidOffThisMonth,
-        balloonDueNames,
+        refinancedThisMonth,
         cumulativeRent,
         cumulativeExpenses,
         cumulativeCashflow,
@@ -631,7 +646,7 @@ export function simulateSnowball(
     totalExtraPaid,
     finalMonthlyCashflow,
     payoffSchedule,
-    balloonPayoffSchedule,
+    refinanceSchedule,
     history,
     finalEquity,
     finalNetWorth: lastSnapshot?.netWorth ?? finalEquity,
@@ -1015,6 +1030,14 @@ export function normalizePortfolio(raw: unknown): Portfolio {
     typeof obj.simulation_anchor_year === 'number'
       ? obj.simulation_anchor_year
       : 2026;
+  const portfolioBalloonRefiRate =
+    typeof obj.balloon_refi_annual_rate === 'number'
+      ? obj.balloon_refi_annual_rate
+      : DEFAULT_BALLOON_REFI_RATE;
+  const portfolioBalloonRefiTerm =
+    typeof obj.balloon_refi_term_months === 'number'
+      ? obj.balloon_refi_term_months
+      : DEFAULT_BALLOON_REFI_TERM_MONTHS;
 
   const properties: Property[] = obj.properties.map((item, i) => {
     if (!item || typeof item !== 'object') {
@@ -1081,6 +1104,14 @@ export function normalizePortfolio(raw: unknown): Portfolio {
 
     if (typeof p.balloon_months === 'number') {
       prop.balloonMonths = p.balloon_months;
+      prop.balloonRefiAnnualRate =
+        typeof p.balloon_refi_annual_rate === 'number'
+          ? p.balloon_refi_annual_rate
+          : portfolioBalloonRefiRate;
+      prop.balloonRefiTermMonths =
+        typeof p.balloon_refi_term_months === 'number'
+          ? p.balloon_refi_term_months
+          : portfolioBalloonRefiTerm;
     }
 
     return prop;
@@ -1093,6 +1124,8 @@ export function normalizePortfolio(raw: unknown): Portfolio {
     reinvestSurplus,
     monthlyReserveTarget,
     simulationAnchorYear,
+    balloonRefiAnnualRate: portfolioBalloonRefiRate,
+    balloonRefiTermMonths: portfolioBalloonRefiTerm,
     properties,
   };
 }
@@ -1104,6 +1137,8 @@ export function denormalizePortfolio(
   return {
     extra_monthly_budget: portfolio.extraMonthlyBudget,
     simulation_anchor_year: portfolio.simulationAnchorYear,
+    balloon_refi_annual_rate: portfolio.balloonRefiAnnualRate,
+    balloon_refi_term_months: portfolio.balloonRefiTermMonths,
     annual_rent_growth_rate: portfolio.annualRentGrowthRate,
     annual_expense_inflation_rate: portfolio.annualExpenseInflationRate,
     reinvest_surplus: portfolio.reinvestSurplus,
@@ -1132,6 +1167,12 @@ export function denormalizePortfolio(
       }
       if (p.balloonMonths !== undefined) {
         file.balloon_months = p.balloonMonths;
+        if (p.balloonRefiAnnualRate !== undefined) {
+          file.balloon_refi_annual_rate = p.balloonRefiAnnualRate;
+        }
+        if (p.balloonRefiTermMonths !== undefined) {
+          file.balloon_refi_term_months = p.balloonRefiTermMonths;
+        }
       }
       return file;
     }),

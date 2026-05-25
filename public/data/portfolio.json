@@ -1,5 +1,7 @@
 {
   "simulation_anchor_year": 2026,
+  "balloon_refi_annual_rate": 0.0675,
+  "balloon_refi_term_months": 360,
   "extra_monthly_budget": 5000,
   "annual_rent_growth_rate": 0.025,
   "annual_expense_inflation_rate": 0.02,

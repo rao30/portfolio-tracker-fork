@@ -17,6 +17,10 @@ export interface Property {
   closeYear?: number;
   /** Months after close when remaining balance is due in full (seller balloon). */
   balloonMonths?: number;
+  /** Post-balloon refi rate (default 6.75%). */
+  balloonRefiAnnualRate?: number;
+  /** Post-balloon refi term in months (default 360). */
+  balloonRefiTermMonths?: number;
 }
 
 /** Fields required when adding a new property via the UI. */
@@ -31,8 +35,8 @@ export interface MonthSnapshot {
   monthlyCashflow: number;
   targetProperty: string | null;
   paidOffThisMonth: string[];
-  /** Properties with a balloon payment due this month (after scheduled P&I). */
-  balloonDueThisMonth: string[];
+  /** Properties refinanced into a conventional loan after seller balloon (month 60). */
+  refinancedThisMonth: string[];
   balancesByName: Record<string, number>;
   valuesByName: Record<string, number>;
   equityByName: Record<string, number>;
@@ -57,8 +61,8 @@ export interface SimulationResult {
   totalExtraPaid: number;
   finalMonthlyCashflow: number;
   payoffSchedule: Record<string, number>;
-  /** Month when each balloon was fully satisfied (if applicable). */
-  balloonPayoffSchedule: Record<string, number>;
+  /** Month when each seller loan was refinanced after balloon (if applicable). */
+  refinanceSchedule: Record<string, number>;
   history: MonthSnapshot[];
   /** Equity at debt-free month. */
   finalEquity: number;
@@ -80,12 +84,18 @@ export interface PropertyFile {
   close_month?: number;
   close_year?: number;
   balloon_months?: number;
+  balloon_refi_annual_rate?: number;
+  balloon_refi_term_months?: number;
 }
 
 export interface PortfolioFile {
   extra_monthly_budget: number;
   /** Calendar year for simulation month 1 (default 2026). */
   simulation_anchor_year?: number;
+  /** Default post-balloon refi rate for seller-financed loans (e.g. 0.0675). */
+  balloon_refi_annual_rate?: number;
+  /** Default post-balloon refi term in months (e.g. 360). */
+  balloon_refi_term_months?: number;
   annual_rent_growth_rate?: number;
   annual_expense_inflation_rate?: number;
   reinvest_surplus?: boolean;
@@ -101,6 +111,8 @@ export interface Portfolio {
   monthlyReserveTarget: number;
   /** Calendar year represented by simulation month 1. */
   simulationAnchorYear: number;
+  balloonRefiAnnualRate: number;
+  balloonRefiTermMonths: number;
   properties: Property[];
 }
 
