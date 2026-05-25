@@ -39,16 +39,19 @@ Same pattern as [bake-house](https://github.com/rao30/bake-house): a small Expre
 1. In [Railway](https://railway.app/), create a **New Project → Deploy from GitHub repo**.
 2. Select `portfolio-tracker` (works with private repos).
 3. Railway runs `npm install`, `npm run build`, then `npm start` automatically.
-4. Open the service **Settings → Networking → Generate Domain** for a public URL.
+4. After a successful deploy, Railway should detect the app listening on `$PORT` and show a **Generate Domain** prompt on the service tile. If not, go to **Settings → Networking → Generate Domain**.
 
 Every push to `main` triggers a new deploy — no GitHub Actions workflow or extra secrets required.
+
+**Important:** Do not set a manual `PORT` variable in Railway unless you change the app to match. The server listens on Railway's injected `$PORT` at `0.0.0.0`, which lets Railway auto-detect the target port for your domain.
 
 ### How it works
 
 | Phase | Command |
 |-------|---------|
 | Build | `npm run build` (TypeScript + Vite → `dist/`) |
-| Start | `node server.js` (Express static server on `$PORT`) |
+| Start | `node server.js` (Express on `0.0.0.0:$PORT`) |
+| Config | [`railway.json`](railway.json) sets build/start commands and a `/` healthcheck |
 
 The app is served from `/` (no subpath), so `VITE_BASE` defaults to `/`.
 
