@@ -1,23 +1,37 @@
 import { STRATEGIES, STRATEGY_LABELS, type StrategyId } from '../lib/snowball';
-import { formatCurrency } from '../lib/format';
+import type { PortfolioSettingKey } from '../lib/usePortfolio';
+import { formatCurrency, formatPercent } from '../lib/format';
 
 interface ControlsProps {
   budget: number;
   budgetMax: number;
   strategy: StrategyId;
+  annualRentGrowthRate: number;
+  annualExpenseInflationRate: number;
+  reinvestSurplus: boolean;
+  monthlyReserveTarget: number;
   onBudgetChange: (value: number) => void;
   onStrategyChange: (value: StrategyId) => void;
+  onPortfolioSettingChange: (
+    field: PortfolioSettingKey,
+    value: number | boolean,
+  ) => void;
 }
 
 export function Controls({
   budget,
   budgetMax,
   strategy,
+  annualRentGrowthRate,
+  annualExpenseInflationRate,
+  reinvestSurplus,
+  monthlyReserveTarget,
   onBudgetChange,
   onStrategyChange,
+  onPortfolioSettingChange,
 }: ControlsProps) {
   return (
-    <div className="glass-card grid gap-4 p-4 sm:grid-cols-2">
+    <div className="glass-card grid gap-4 p-4 lg:grid-cols-2">
       <div>
         <label
           htmlFor="budget-slider"
@@ -72,6 +86,92 @@ export function Controls({
             </option>
           ))}
         </select>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:col-span-2">
+        <div>
+          <label
+            htmlFor="rent-growth"
+            className="mb-1 block text-xs font-medium text-slate-400"
+          >
+            Rent growth (annual): {formatPercent(annualRentGrowthRate)}
+          </label>
+          <input
+            id="rent-growth"
+            type="range"
+            min={0}
+            max={0.08}
+            step={0.005}
+            value={annualRentGrowthRate}
+            onChange={(e) =>
+              onPortfolioSettingChange(
+                'annualRentGrowthRate',
+                Number(e.target.value),
+              )
+            }
+            className="h-2 w-full cursor-pointer accent-cyan-500"
+          />
+        </div>
+        <div>
+          <label
+            htmlFor="expense-inflation"
+            className="mb-1 block text-xs font-medium text-slate-400"
+          >
+            Expense inflation (annual):{' '}
+            {formatPercent(annualExpenseInflationRate)}
+          </label>
+          <input
+            id="expense-inflation"
+            type="range"
+            min={0}
+            max={0.08}
+            step={0.005}
+            value={annualExpenseInflationRate}
+            onChange={(e) =>
+              onPortfolioSettingChange(
+                'annualExpenseInflationRate',
+                Number(e.target.value),
+              )
+            }
+            className="h-2 w-full cursor-pointer accent-cyan-500"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            id="reinvest-surplus"
+            type="checkbox"
+            checked={reinvestSurplus}
+            onChange={(e) =>
+              onPortfolioSettingChange('reinvestSurplus', e.target.checked)
+            }
+            className="accent-cyan-500"
+          />
+          <label htmlFor="reinvest-surplus" className="text-xs text-slate-300">
+            Reinvest surplus cashflow as extra principal
+          </label>
+        </div>
+        <div>
+          <label
+            htmlFor="reserve-target"
+            className="mb-1 block text-xs font-medium text-slate-400"
+          >
+            Monthly reserve target (kept in cash)
+          </label>
+          <input
+            id="reserve-target"
+            type="number"
+            min={0}
+            step={100}
+            value={monthlyReserveTarget}
+            onChange={(e) =>
+              onPortfolioSettingChange(
+                'monthlyReserveTarget',
+                Math.max(0, Number(e.target.value) || 0),
+              )
+            }
+            className="w-full rounded-lg border border-white/10 bg-slate-900/80 px-2 py-1 font-mono text-sm text-slate-100"
+          />
+        </div>
       </div>
     </div>
   );
