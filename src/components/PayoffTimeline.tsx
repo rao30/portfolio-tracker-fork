@@ -1,6 +1,7 @@
 import {
   Bar,
   BarChart,
+  CartesianGrid,
   Cell,
   ResponsiveContainer,
   Tooltip,
@@ -9,7 +10,13 @@ import {
 } from 'recharts';
 import type { SimulationResult } from '../lib/types';
 import { formatMonths, propertyColor } from '../lib/format';
-import { ChartCard, chartColors, chartMargin } from './chart-theme';
+import {
+  ChartCard,
+  chartColors,
+  chartMargin,
+  monthScaleXAxisProps,
+  yAxisLabel,
+} from './chart-theme';
 
 interface PayoffTimelineProps {
   result: SimulationResult;
@@ -19,12 +26,14 @@ export function PayoffTimeline({ result }: PayoffTimelineProps) {
   const data = Object.entries(result.payoffSchedule)
     .map(([name, month]) => ({ name, month }))
     .sort((a, b) => a.month - b.month);
+  const maxMonth = Math.max(...data.map((d) => d.month), result.monthsToPayoff, 12);
 
   return (
     <ChartCard title="Payoff timeline">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} layout="vertical" margin={chartMargin}>
-          <XAxis type="number" stroke={chartColors.axis} fontSize={11} />
+          <CartesianGrid stroke={chartColors.grid} strokeDasharray="3 3" />
+          <XAxis {...monthScaleXAxisProps(maxMonth, 'Payoff month')} />
           <YAxis
             type="category"
             dataKey="name"
@@ -32,6 +41,7 @@ export function PayoffTimeline({ result }: PayoffTimelineProps) {
             stroke={chartColors.axis}
             fontSize={9}
             tick={{ fill: chartColors.axis }}
+            label={yAxisLabel('Property')}
           />
           <Tooltip
             contentStyle={{

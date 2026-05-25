@@ -1,6 +1,7 @@
 import {
   Area,
   AreaChart,
+  CartesianGrid,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -8,7 +9,13 @@ import {
 } from 'recharts';
 import type { Property, SimulationResult } from '../lib/types';
 import { formatCurrency, propertyColor } from '../lib/format';
-import { ChartCard, chartColors, chartMargin } from './chart-theme';
+import {
+  ChartCard,
+  chartColors,
+  chartMargin,
+  timelineXAxisProps,
+  yAxisLabel,
+} from './chart-theme';
 
 interface BalanceChartProps {
   result: SimulationResult;
@@ -20,16 +27,20 @@ export function BalanceChart({ result, properties }: BalanceChartProps) {
     month: h.month,
     ...h.balancesByName,
   }));
+  const maxMonth = result.history[result.history.length - 1]?.month ?? 1;
 
   return (
     <ChartCard title="Loan balances over time">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={chartMargin}>
-          <XAxis dataKey="month" stroke={chartColors.axis} fontSize={11} />
+          <CartesianGrid stroke={chartColors.grid} strokeDasharray="3 3" />
+          <XAxis {...timelineXAxisProps(maxMonth)} />
           <YAxis
             stroke={chartColors.axis}
             fontSize={11}
+            tick={{ fill: chartColors.axis }}
             tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+            label={yAxisLabel('Loan balance')}
           />
           <Tooltip
             contentStyle={{

@@ -1,15 +1,22 @@
 import {
+  CartesianGrid,
   Line,
   LineChart,
+  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
-  Legend,
 } from 'recharts';
 import type { SimulationResult } from '../lib/types';
 import { formatCurrency } from '../lib/format';
-import { ChartCard, chartColors, chartMargin } from './chart-theme';
+import {
+  ChartCard,
+  chartColors,
+  chartMargin,
+  timelineXAxisProps,
+  yAxisLabel,
+} from './chart-theme';
 
 interface InterestChartProps {
   active: SimulationResult;
@@ -38,11 +45,14 @@ export function InterestChart({ active, baseline }: InterestChartProps) {
     <ChartCard title="Cumulative interest — active vs baseline">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={chartMargin}>
-          <XAxis dataKey="month" stroke={chartColors.axis} fontSize={11} />
+          <CartesianGrid stroke={chartColors.grid} strokeDasharray="3 3" />
+          <XAxis {...timelineXAxisProps(maxLen)} />
           <YAxis
             stroke={chartColors.axis}
             fontSize={11}
+            tick={{ fill: chartColors.axis }}
             tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+            label={yAxisLabel('Cumulative interest')}
           />
           <Tooltip
             contentStyle={{

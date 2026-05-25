@@ -115,14 +115,19 @@ function validatePayoffOrder(payoffOrder: string[], propertyNames: Set<string>):
   }
 }
 
+/**
+ * Net monthly cashflow: (rent − expenses − P&I) on financed properties,
+ * (rent − expenses) on paid-off properties.
+ */
 function computeMonthlyCashflow(
   properties: Property[],
   balances: Map<string, number>,
 ): number {
   return properties.reduce((sum, p) => {
     const bal = balances.get(p.name) ?? 0;
-    if (bal <= BALANCE_EPSILON) return sum;
-    return sum + (p.monthlyRent - p.monthlyExpenses - p.monthlyPayment);
+    const netRent = p.monthlyRent - p.monthlyExpenses;
+    if (bal <= BALANCE_EPSILON) return sum + netRent;
+    return sum + (netRent - p.monthlyPayment);
   }, 0);
 }
 
@@ -182,8 +187,6 @@ export function simulateSnowball(
         return bal > BALANCE_EPSILON;
       }) ?? null;
 
-    const monthlyCashflow = computeMonthlyCashflow(properties, balances);
-
     let monthInterest = 0;
     let monthPrincipal = 0;
     let monthExtra = 0;
@@ -223,6 +226,8 @@ export function simulateSnowball(
         }
       }
     }
+
+    const monthlyCashflow = computeMonthlyCashflow(properties, balances);
 
     totalInterestPaid += monthInterest;
     totalExtraPaid += monthExtra;

@@ -1,6 +1,7 @@
 import {
   Bar,
   BarChart,
+  CartesianGrid,
   Cell,
   ResponsiveContainer,
   Tooltip,
@@ -10,7 +11,13 @@ import {
 import type { SimulationResult } from '../lib/types';
 import { STRATEGY_LABELS, type StrategyId } from '../lib/snowball';
 import { formatMonths } from '../lib/format';
-import { ChartCard, chartColors, chartMargin } from './chart-theme';
+import {
+  ChartCard,
+  chartColors,
+  chartMargin,
+  monthScaleXAxisProps,
+  yAxisLabel,
+} from './chart-theme';
 
 interface StrategyComparisonProps {
   results: SimulationResult[];
@@ -32,12 +39,14 @@ export function StrategyComparison({
         : r.strategy,
     months: r.monthsToPayoff,
   }));
+  const maxMonth = Math.max(...data.map((d) => d.months), 12);
 
   return (
     <ChartCard title="Strategy comparison — months to payoff">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} layout="vertical" margin={chartMargin}>
-          <XAxis type="number" stroke={chartColors.axis} fontSize={11} />
+          <CartesianGrid stroke={chartColors.grid} strokeDasharray="3 3" />
+          <XAxis {...monthScaleXAxisProps(maxMonth, 'Months to payoff')} />
           <YAxis
             type="category"
             dataKey="label"
@@ -45,6 +54,7 @@ export function StrategyComparison({
             stroke={chartColors.axis}
             fontSize={10}
             tick={{ fill: chartColors.axis }}
+            label={yAxisLabel('Strategy')}
           />
           <Tooltip
             contentStyle={{

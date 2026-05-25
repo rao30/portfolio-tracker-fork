@@ -49,3 +49,33 @@ export function formatMonths(months: number): string {
   if (rem === 0) return `${years} yr`;
   return `${years} yr ${rem} mo`;
 }
+
+/** Calendar year index (1-based) for a simulation month. */
+export function yearFromMonth(month: number): number {
+  return Math.floor((month - 1) / 12) + 1;
+}
+
+/** Month within the calendar year (1–12). */
+export function monthInYear(month: number): number {
+  return ((month - 1) % 12) + 1;
+}
+
+/** Tick positions for month axes with year markers. */
+export function buildTimelineTicks(maxMonth: number): number[] {
+  if (maxMonth <= 0) return [0];
+
+  const ticks = new Set<number>([1, maxMonth]);
+  const yearStep = maxMonth > 180 ? 24 : 12;
+
+  for (let m = yearStep; m < maxMonth; m += yearStep) {
+    ticks.add(m);
+  }
+
+  if (maxMonth <= 96) {
+    for (let m = 6; m < maxMonth; m += 6) {
+      ticks.add(m);
+    }
+  }
+
+  return [...ticks].sort((a, b) => a - b);
+}

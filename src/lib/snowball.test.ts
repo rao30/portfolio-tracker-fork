@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { buildTimelineTicks, formatMonths, yearFromMonth } from './format';
 import type { Property } from './types';
 import {
   amortizeOneMonth,
@@ -35,6 +36,28 @@ const fixture: Property[] = [
     monthlyExpenses: 180,
   },
 ];
+
+describe('timeline axis helpers', () => {
+  it('maps month to calendar year', () => {
+    expect(yearFromMonth(1)).toBe(1);
+    expect(yearFromMonth(12)).toBe(1);
+    expect(yearFromMonth(13)).toBe(2);
+    expect(yearFromMonth(24)).toBe(2);
+  });
+
+  it('builds year-boundary ticks for long simulations', () => {
+    const ticks = buildTimelineTicks(180);
+    expect(ticks).toContain(1);
+    expect(ticks).toContain(12);
+    expect(ticks).toContain(24);
+    expect(ticks).toContain(180);
+  });
+
+  it('formats duration with years', () => {
+    expect(formatMonths(24)).toBe('2 yr');
+    expect(formatMonths(30)).toBe('2 yr 6 mo');
+  });
+});
 
 describe('amortizeOneMonth', () => {
   it('amortizes a normal month', () => {
@@ -277,6 +300,15 @@ describe('simulateSnowball', () => {
         payoffOrder: ['HighRate', 'HighRate', 'LowRate'],
       }),
     ).toThrow(/Duplicate property/);
+  });
+
+  it('final month cashflow equals rent minus expenses on all properties', () => {
+    const r = simulateSnowball(fixture, {
+      payoffOrder: STRATEGIES.highestRate(fixture),
+      extraMonthlyBudget: 1000,
+    });
+    const last = r.history[r.history.length - 1];
+    expect(last.monthlyCashflow).toBeCloseTo(r.finalMonthlyCashflow, 2);
   });
 
   it('baseline applies no extra principal', () => {
