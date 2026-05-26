@@ -243,7 +243,9 @@ export function usePortfolio(): UsePortfolioResult {
   const resetFromFile = useCallback(async () => {
     if (
       source !== 'file' &&
-      !window.confirm('Discard all edits and reload the default portfolio from the repo?')
+      !window.confirm(
+        'Discard all edits and reload the default portfolio from the repo? This overwrites cloud storage.',
+      )
     ) {
       return;
     }
@@ -252,16 +254,29 @@ export function usePortfolio(): UsePortfolioResult {
     setError(null);
     setSyncStatus('saving');
     try {
-      const file = await loadFromFile();
-      setPortfolio(file);
-      setSource('file');
+      let normalized: Portfolio;
+      let nextSource: DataSource = 'file';
+
       if (cloudEnabled) {
-        const ok = await saveToApi(denormalizePortfolio(file));
-        setSyncStatus(ok ? 'saved' : 'error');
-        setSource(ok ? 'cloud' : 'file');
+        const res = await fetch('/api/portfolio/reset', {
+          method: 'POST',
+          headers: writeHeaders(),
+        });
+        if (!res.ok) {
+          throw new Error(`Reset failed (${res.status})`);
+        }
+        const body = (await res.json()) as ApiPortfolioResponse;
+        normalized = normalizePortfolio(body.portfolio);
+        nextSource = body.source === 'cloud' ? 'cloud' : 'file';
+        setSyncStatus('saved');
       } else {
+        normalized = await loadFromFile();
         setSyncStatus('offline');
       }
+
+      setPortfolio(normalized);
+      setSource(nextSource);
+      saveLocal(normalized);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to reset');
       setSyncStatus('error');

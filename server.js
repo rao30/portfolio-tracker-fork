@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import {
   isCloudStorageEnabled,
   loadPortfolio,
+  resetPortfolioToSeed,
   savePortfolio,
 } from './server/portfolio-store.js';
 
@@ -37,6 +38,33 @@ app.get('/api/portfolio', async (_req, res) => {
     console.error('GET /api/portfolio', err);
     res.status(500).json({
       error: err instanceof Error ? err.message : 'Failed to load portfolio',
+    });
+  }
+});
+
+app.post('/api/portfolio/reset', async (req, res) => {
+  const writeKey = process.env.PORTFOLIO_WRITE_KEY;
+  if (writeKey) {
+    const auth = req.headers.authorization;
+    const token = auth?.startsWith('Bearer ') ? auth.slice(7) : req.headers['x-portfolio-key'];
+    if (token !== writeKey) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+  }
+
+  try {
+    const result = await resetPortfolioToSeed();
+    res.json({
+      portfolio: result.data,
+      source: result.source,
+      updatedAt: result.updatedAt,
+      cloudStorage: isCloudStorageEnabled(),
+    });
+  } catch (err) {
+    console.error('POST /api/portfolio/reset', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to reset portfolio',
     });
   }
 });

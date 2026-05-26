@@ -32,7 +32,9 @@ Edit [`public/data/portfolio.json`](public/data/portfolio.json) directly (snake_
 
 Without Supabase env vars, edits save to `localStorage` in the browser. Use **Export JSON** to download state and optionally update `public/data/portfolio.json`.
 
-**Reset** reloads repo defaults and, when cloud storage is enabled, overwrites the Supabase snapshot.
+**Reset to defaults** reloads [`public/data/portfolio.json`](public/data/portfolio.json) from the server and overwrites Supabase when cloud storage is on.
+
+If the header shows **Synced to cloud** but properties are missing, an older cloud snapshot was loaded. Click **Reset to defaults**, or bump `seed_version` in the repo (deployed builds auto-upgrade cloud when behind).
 
 ### Portfolio JSON schedule fields
 

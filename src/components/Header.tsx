@@ -126,9 +126,14 @@ export function Header({
         <button
           type="button"
           onClick={onReset}
+          title={
+            source === 'cloud' || source === 'local'
+              ? 'Reload portfolio.json from the server (fixes missing properties)'
+              : undefined
+          }
           className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-slate-200 transition hover:bg-white/10"
         >
-          Reset
+          Reset to defaults
         </button>
         <button
           type="button"

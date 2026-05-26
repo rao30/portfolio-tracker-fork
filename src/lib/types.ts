@@ -108,6 +108,8 @@ export interface PropertyFile {
 }
 
 export interface PortfolioFile {
+  /** Bump when repo seed changes; cloud auto-upgrades when behind. */
+  seed_version?: number;
   extra_monthly_budget: number;
   /** Calendar year for simulation month 1 (default 2026). */
   simulation_anchor_year?: number;
@@ -125,6 +127,7 @@ export interface PortfolioFile {
 }
 
 export interface Portfolio {
+  seedVersion?: number;
   extraMonthlyBudget: number;
   annualRentGrowthRate: number;
   annualExpenseInflationRate: number;

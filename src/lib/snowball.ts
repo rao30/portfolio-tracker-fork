@@ -1109,6 +1109,8 @@ export function normalizePortfolio(raw: unknown): Portfolio {
     throw new Error('Invalid portfolio: expected an object');
   }
   const obj = raw as Record<string, unknown>;
+  const seedVersion =
+    typeof obj.seed_version === 'number' ? obj.seed_version : undefined;
   const extraMonthlyBudget = obj.extra_monthly_budget;
   if (typeof extraMonthlyBudget !== 'number' || extraMonthlyBudget < 0) {
     throw new Error('Invalid extra_monthly_budget');
@@ -1243,6 +1245,7 @@ export function normalizePortfolio(raw: unknown): Portfolio {
   });
 
   return {
+    seedVersion,
     extraMonthlyBudget,
     annualRentGrowthRate,
     annualExpenseInflationRate,
@@ -1261,6 +1264,7 @@ export function denormalizePortfolio(
   portfolio: Portfolio,
 ): import('./types').PortfolioFile {
   return {
+    seed_version: portfolio.seedVersion,
     extra_monthly_budget: portfolio.extraMonthlyBudget,
     simulation_anchor_year: portfolio.simulationAnchorYear,
     simulation_anchor_month: portfolio.simulationAnchorMonth,

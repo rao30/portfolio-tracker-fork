@@ -54,15 +54,42 @@ export async function loadPortfolio() {
     throw new Error(`Supabase read failed: ${error.message}`);
   }
 
+  const seed = await readSeedFile();
+  const seedVersion = typeof seed.seed_version === 'number' ? seed.seed_version : 0;
+
   if (row?.data) {
+    const cloudVersion =
+      typeof row.data.seed_version === 'number' ? row.data.seed_version : 0;
+    if (cloudVersion >= seedVersion) {
+      return {
+        data: row.data,
+        source: 'cloud',
+        updatedAt: row.updated_at ?? null,
+      };
+    }
+
+    const { error: upgradeError } = await client.from('portfolio_snapshots').upsert({
+      id: PORTFOLIO_ROW_ID,
+      data: seed,
+      updated_at: new Date().toISOString(),
+    });
+
+    if (upgradeError) {
+      throw new Error(`Supabase seed upgrade failed: ${upgradeError.message}`);
+    }
+
+    console.info(
+      `Portfolio seed upgraded: cloud v${cloudVersion} → repo v${seedVersion}`,
+    );
+
     return {
-      data: row.data,
+      data: seed,
       source: 'cloud',
-      updatedAt: row.updated_at ?? null,
+      updatedAt: new Date().toISOString(),
+      upgradedFromVersion: cloudVersion,
     };
   }
 
-  const seed = await readSeedFile();
   const { error: insertError } = await client.from('portfolio_snapshots').upsert({
     id: PORTFOLIO_ROW_ID,
     data: seed,
@@ -97,4 +124,25 @@ export async function savePortfolio(portfolioData) {
   }
 
   return { updatedAt: row?.updated_at ?? new Date().toISOString() };
+}
+
+/** Overwrite cloud snapshot with the repo seed file (same as deploy defaults). */
+export async function resetPortfolioToSeed() {
+  const seed = await readSeedFile();
+  const client = getSupabase();
+  if (!client) {
+    return { data: seed, source: 'file', updatedAt: null };
+  }
+
+  const { error } = await client.from('portfolio_snapshots').upsert({
+    id: PORTFOLIO_ROW_ID,
+    data: seed,
+    updated_at: new Date().toISOString(),
+  });
+
+  if (error) {
+    throw new Error(`Supabase reset failed: ${error.message}`);
+  }
+
+  return { data: seed, source: 'cloud', updatedAt: new Date().toISOString() };
 }
