@@ -330,6 +330,10 @@ export interface PropertyInsight {
   capRate: number;
   payoffRank: number | null;
   monthlyNetRent: number;
+  /** Annual cashflow after debt service and capex reserve. */
+  cashflowAnnual: number;
+  /** Monthly cashflow after debt service and capex reserve. */
+  cashflowMonthly: number;
   dscr: number;
   cashOnCash: number;
   breakEvenOccupancy: number;

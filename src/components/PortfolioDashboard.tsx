@@ -4,7 +4,12 @@ import {
   computePortfolioYearMetrics,
   maxPortfolioDashboardYear,
 } from '../lib/snowball';
-import { formatCurrency, formatLtv, formatPercent } from '../lib/format';
+import {
+  cashflowToneClass,
+  formatCurrency,
+  formatLtv,
+  formatPercent,
+} from '../lib/format';
 
 interface PortfolioDashboardProps {
   portfolio: Portfolio;
@@ -152,11 +157,13 @@ export function PortfolioDashboard({
             </p>
             <p
               className={`mt-0.5 font-mono text-lg font-semibold tabular-nums ${
-                item.warn
-                  ? 'text-amber-400'
-                  : item.highlight
-                    ? 'text-emerald-400'
-                    : 'text-white'
+                item.label === 'Annual cashflow'
+                  ? cashflowToneClass(metrics.cashflowAnnual)
+                  : item.warn
+                    ? 'text-amber-400'
+                    : item.highlight
+                      ? 'text-emerald-400'
+                      : 'text-white'
               }`}
             >
               {item.value}

@@ -1,6 +1,13 @@
+import { useMemo } from 'react';
 import type { PropertyInsight, SimulationResult } from '../lib/types';
 import { comparisonAtHorizons } from '../lib/snowball';
-import { formatCurrency, formatLtv, formatMonths, formatPercent } from '../lib/format';
+import {
+  cashflowToneClass,
+  formatCurrency,
+  formatLtv,
+  formatMonths,
+  formatPercent,
+} from '../lib/format';
 
 interface PropertyInsightsProps {
   insights: PropertyInsight[];
@@ -9,6 +16,85 @@ interface PropertyInsightsProps {
   /** Calendar label for the selected portfolio year (e.g. "2026 (now)"). */
   yearLabel?: string;
   ownedCount?: number;
+}
+
+function dscrToneClass(dscr: number): string {
+  if (!Number.isFinite(dscr)) return 'text-slate-400';
+  if (dscr < 1) return 'text-red-400';
+  if (dscr < 1.25) return 'text-amber-400';
+  return 'text-emerald-400';
+}
+
+function cocToneClass(rate: number): string {
+  if (rate > 0) return 'text-emerald-400';
+  if (rate < 0) return 'text-red-400';
+  return 'text-slate-400';
+}
+
+function CashflowValue({
+  annual,
+  monthly,
+  size = 'md',
+}: {
+  annual: number;
+  monthly: number;
+  size?: 'sm' | 'md' | 'lg';
+}) {
+  const tone = cashflowToneClass(annual);
+  const annualSize =
+    size === 'lg'
+      ? 'text-lg font-semibold'
+      : size === 'sm'
+        ? 'text-sm font-medium'
+        : 'text-base font-semibold';
+  return (
+    <div>
+      <p className={`font-mono tabular-nums ${annualSize} ${tone}`}>
+        {formatCurrency(annual)}
+        <span className="ml-1 text-[10px] font-normal text-slate-500">/yr</span>
+      </p>
+      <p className={`font-mono text-[10px] tabular-nums ${tone} opacity-80`}>
+        {formatCurrency(monthly)}/mo
+      </p>
+    </div>
+  );
+}
+
+function InsightsSummary({ insights }: { insights: PropertyInsight[] }) {
+  const totalAnnual = insights.reduce((s, p) => s + p.cashflowAnnual, 0);
+  const positive = insights.filter((p) => p.cashflowAnnual > 0).length;
+  const negative = insights.filter((p) => p.cashflowAnnual < 0).length;
+  const neutral = insights.length - positive - negative;
+
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-white/10 bg-slate-900/50 px-3 py-2.5">
+      <div>
+        <p className="text-[10px] uppercase tracking-wide text-slate-500">
+          Portfolio cashflow (sum)
+        </p>
+        <CashflowValue
+          annual={totalAnnual}
+          monthly={totalAnnual / 12}
+          size="lg"
+        />
+      </div>
+      <div className="flex flex-wrap gap-3 text-xs">
+        <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-emerald-400">
+          {positive} positive
+        </span>
+        {negative > 0 && (
+          <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-red-400">
+            {negative} negative
+          </span>
+        )}
+        {neutral > 0 && (
+          <span className="rounded-full bg-slate-500/15 px-2 py-0.5 text-slate-400">
+            {neutral} break-even
+          </span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function PropertyInsights({
@@ -24,6 +110,11 @@ export function PropertyInsights({
       : null;
   const horizons = comparisonAtHorizons(result, [60, 120, 180]);
 
+  const sorted = useMemo(
+    () => [...insights].sort((a, b) => b.cashflowAnnual - a.cashflowAnnual),
+    [insights],
+  );
+
   if (stacked) {
     return (
       <div className="app-surface divide-y divide-white/10">
@@ -33,13 +124,32 @@ export function PropertyInsights({
             <p className="mb-3 text-xs text-slate-500">{subtitle}</p>
           )}
           {!subtitle && <div className="mb-3" />}
+          <InsightsSummary insights={insights} />
           <ul className="space-y-3">
-            {insights.map((p) => (
+            {sorted.map((p) => (
               <li
                 key={p.name}
-                className="border-b border-white/5 pb-3 last:border-0 last:pb-0"
+                className={`rounded-lg border px-3 py-2.5 ${
+                  p.cashflowAnnual < 0
+                    ? 'border-red-500/20 bg-red-500/5'
+                    : p.cashflowAnnual > 0
+                      ? 'border-emerald-500/15 bg-emerald-500/5'
+                      : 'border-white/10 bg-slate-900/30'
+                }`}
               >
-                <p className="font-medium text-slate-100">{p.name}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-medium text-slate-100">{p.name}</p>
+                  <CashflowValue
+                    annual={p.cashflowAnnual}
+                    monthly={p.cashflowMonthly}
+                    size="sm"
+                  />
+                </div>
+                {p.warnings.length > 0 && (
+                  <p className="mt-1 text-[10px] text-amber-400">
+                    {p.warnings.join('; ')}
+                  </p>
+                )}
                 <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
                   <div>
                     <dt className="text-slate-500">Equity</dt>
@@ -52,15 +162,19 @@ export function PropertyInsights({
                     <dd className="font-mono tabular-nums">{formatLtv(p.ltv)}</dd>
                   </div>
                   <div>
-                    <dt className="text-slate-500">Cap rate</dt>
-                    <dd className="font-mono tabular-nums">
-                      {formatPercent(p.capRate)}
+                    <dt className="text-slate-500">DSCR</dt>
+                    <dd
+                      className={`font-mono tabular-nums ${dscrToneClass(p.dscr)}`}
+                    >
+                      {Number.isFinite(p.dscr) ? p.dscr.toFixed(2) : '—'}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-slate-500">Payoff rank</dt>
-                    <dd className="font-mono tabular-nums">
-                      {p.payoffRank ?? '—'}
+                    <dt className="text-slate-500">CoC</dt>
+                    <dd
+                      className={`font-mono tabular-nums ${cocToneClass(p.cashOnCash)}`}
+                    >
+                      {formatPercent(p.cashOnCash)}
                     </dd>
                   </div>
                 </dl>
@@ -69,9 +183,7 @@ export function PropertyInsights({
           </ul>
         </section>
         <section className="p-3">
-          <h3 className="mb-3 text-sm font-semibold text-slate-200">
-            Horizons
-          </h3>
+          <h3 className="mb-3 text-sm font-semibold text-slate-200">Horizons</h3>
           <ul className="space-y-2 text-xs">
             {horizons.map((h) => (
               <li
@@ -109,63 +221,94 @@ export function PropertyInsights({
           <p className="mb-3 text-xs text-slate-500">{subtitle}</p>
         )}
         {!subtitle && <div className="mb-3" />}
-        <table className="w-full min-w-[960px] text-left text-xs">
+        <InsightsSummary insights={insights} />
+        <table className="w-full min-w-[880px] text-left text-xs">
           <thead>
             <tr className="border-b border-white/10 text-slate-400">
-              <th className="pb-2 pr-2 font-medium">Property</th>
-              <th className="pb-2 pr-2 font-medium">Value</th>
-              <th className="pb-2 pr-2 font-medium">Equity</th>
-              <th className="pb-2 pr-2 font-medium">LTV</th>
-              <th className="pb-2 pr-2 font-medium">Cap rate</th>
-              <th className="pb-2 pr-2 font-medium">DSCR</th>
-              <th className="pb-2 pr-2 font-medium">CoC</th>
-              <th className="pb-2 pr-2 font-medium">Break-even occ.</th>
-              <th className="pb-2 pr-2 font-medium">Capex/mo</th>
-              <th className="pb-2 font-medium">Payoff rank</th>
+              <th className="pb-2 pr-3 font-medium">Property</th>
+              <th className="pb-2 pr-3 font-medium">Cashflow</th>
+              <th className="pb-2 pr-3 font-medium">Equity</th>
+              <th className="pb-2 pr-3 font-medium">LTV</th>
+              <th className="pb-2 pr-3 font-medium">DSCR</th>
+              <th className="pb-2 pr-3 font-medium">CoC</th>
+              <th className="pb-2 pr-3 font-medium">Cap rate</th>
+              <th className="pb-2 pr-3 font-medium">Value</th>
+              <th className="pb-2 font-medium">Payoff</th>
             </tr>
           </thead>
           <tbody>
-            {insights.map((p) => (
+            {sorted.map((p) => (
               <tr
                 key={p.name}
-                className={`border-b border-white/5 text-slate-200 ${p.warnings.length ? 'bg-amber-500/5' : ''}`}
+                className={`border-b border-white/5 text-slate-200 ${
+                  p.cashflowAnnual < 0
+                    ? 'bg-red-500/[0.04]'
+                    : p.warnings.length
+                      ? 'bg-amber-500/5'
+                      : ''
+                }`}
               >
-                <td className="py-2 pr-2">
-                  <div>{p.name}</div>
+                <td className="py-2.5 pr-3">
+                  <div className="font-medium text-slate-100">{p.name}</div>
                   {p.warnings.length > 0 && (
-                    <div className="text-[10px] text-amber-400">{p.warnings.join('; ')}</div>
+                    <div className="mt-0.5 text-[10px] text-amber-400">
+                      {p.warnings.join('; ')}
+                    </div>
                   )}
                 </td>
-                <td className="py-2 pr-2 font-mono tabular-nums">
-                  {formatCurrency(p.marketValue)}
+                <td className="py-2.5 pr-3">
+                  <CashflowValue
+                    annual={p.cashflowAnnual}
+                    monthly={p.cashflowMonthly}
+                  />
                 </td>
-                <td className="py-2 pr-2 font-mono tabular-nums text-cyan-300">
+                <td className="py-2.5 pr-3 font-mono tabular-nums text-cyan-300">
                   {formatCurrency(p.equity)}
                 </td>
-                <td className="py-2 pr-2 font-mono tabular-nums">
+                <td className="py-2.5 pr-3 font-mono tabular-nums">
                   {formatLtv(p.ltv)}
                 </td>
-                <td className="py-2 pr-2 font-mono tabular-nums">
-                  {formatPercent(p.capRate)}
-                </td>
-                <td className="py-2 pr-2 font-mono tabular-nums">
+                <td
+                  className={`py-2.5 pr-3 font-mono tabular-nums ${dscrToneClass(p.dscr)}`}
+                >
                   {Number.isFinite(p.dscr) ? p.dscr.toFixed(2) : '—'}
                 </td>
-                <td className="py-2 pr-2 font-mono tabular-nums">
+                <td
+                  className={`py-2.5 pr-3 font-mono tabular-nums ${cocToneClass(p.cashOnCash)}`}
+                >
                   {formatPercent(p.cashOnCash)}
                 </td>
-                <td className="py-2 pr-2 font-mono tabular-nums">
-                  {formatPercent(p.breakEvenOccupancy)}
+                <td className="py-2.5 pr-3 font-mono tabular-nums text-slate-300">
+                  {formatPercent(p.capRate)}
                 </td>
-                <td className="py-2 pr-2 font-mono tabular-nums">
-                  {formatCurrency(p.monthlyCapexReserve)}
+                <td className="py-2.5 pr-3 font-mono tabular-nums text-slate-300">
+                  {formatCurrency(p.marketValue)}
                 </td>
-                <td className="py-2 font-mono tabular-nums">
+                <td className="py-2.5 font-mono tabular-nums text-slate-400">
                   {p.payoffRank ?? '—'}
                 </td>
               </tr>
             ))}
           </tbody>
+          <tfoot>
+            <tr className="border-t border-white/10 text-slate-300">
+              <td className="py-2.5 pr-3 font-medium">Total</td>
+              <td className="py-2.5 pr-3">
+                <CashflowValue
+                  annual={insights.reduce((s, p) => s + p.cashflowAnnual, 0)}
+                  monthly={
+                    insights.reduce((s, p) => s + p.cashflowAnnual, 0) / 12
+                  }
+                />
+              </td>
+              <td className="py-2.5 pr-3 font-mono tabular-nums text-cyan-300">
+                {formatCurrency(insights.reduce((s, p) => s + p.equity, 0))}
+              </td>
+              <td colSpan={6} className="py-2.5 text-[10px] text-slate-500">
+                Sorted by cashflow · after debt &amp; capex
+              </td>
+            </tr>
+          </tfoot>
         </table>
       </div>
 

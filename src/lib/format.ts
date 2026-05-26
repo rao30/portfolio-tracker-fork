@@ -32,6 +32,13 @@ export function formatCurrency(value: number): string {
   }).format(value);
 }
 
+/** Tailwind text color for signed cashflow values. */
+export function cashflowToneClass(value: number): string {
+  if (value > 0) return 'text-emerald-400';
+  if (value < 0) return 'text-red-400';
+  return 'text-slate-400';
+}
+
 /** Format a decimal rate as a percentage string. */
 export function formatPercent(rate: number): string {
   return new Intl.NumberFormat('en-US', {

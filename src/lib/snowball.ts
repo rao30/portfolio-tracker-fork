@@ -1320,8 +1320,9 @@ export function computePropertyInsightsAtMonth(
       const debtService = monthlyPayment * 12;
       const dscr = debtService > 0 && balance > 0 ? noi / debtService : Infinity;
       const cashInvested = resolveCashInvested(p);
-      const annualCf =
-        (netRent - (balance > 0 ? monthlyPayment : 0) - monthlyCapexReserve) * 12;
+      const monthlyCf =
+        netRent - (balance > 0 ? monthlyPayment : 0) - monthlyCapexReserve;
+      const annualCf = monthlyCf * 12;
       const cashOnCash = cashInvested > 0 ? annualCf / cashInvested : 0;
       const breakEvenOccupancy =
         grossRent > 0
@@ -1354,6 +1355,8 @@ export function computePropertyInsightsAtMonth(
         capRate,
         payoffRank: rankIdx >= 0 ? rankIdx + 1 : null,
         monthlyNetRent: netRent,
+        cashflowAnnual: annualCf,
+        cashflowMonthly: monthlyCf,
         dscr,
         cashOnCash,
         breakEvenOccupancy,
@@ -1386,8 +1389,9 @@ export function computePropertyInsights(
     const debtService = p.monthlyPayment * 12;
     const dscr = debtService > 0 && p.balance > 0 ? noi / debtService : Infinity;
     const cashInvested = resolveCashInvested(p);
-    const annualCf =
-      (netRent - (p.balance > 0 ? p.monthlyPayment : 0) - monthlyCapexReserve) * 12;
+    const monthlyCf =
+      netRent - (p.balance > 0 ? p.monthlyPayment : 0) - monthlyCapexReserve;
+    const annualCf = monthlyCf * 12;
     const cashOnCash = cashInvested > 0 ? annualCf / cashInvested : 0;
     const grossRent = p.monthlyRent;
     const breakEvenOccupancy =
@@ -1410,6 +1414,8 @@ export function computePropertyInsights(
       capRate,
       payoffRank: rankIdx >= 0 ? rankIdx + 1 : null,
       monthlyNetRent: netRent,
+      cashflowAnnual: annualCf,
+      cashflowMonthly: monthlyCf,
       dscr,
       cashOnCash,
       breakEvenOccupancy,
