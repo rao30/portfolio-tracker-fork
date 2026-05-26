@@ -5,10 +5,88 @@ import { formatCurrency, formatLtv, formatMonths, formatPercent } from '../lib/f
 interface PropertyInsightsProps {
   insights: PropertyInsight[];
   result: SimulationResult;
+  stacked?: boolean;
 }
 
-export function PropertyInsights({ insights, result }: PropertyInsightsProps) {
+export function PropertyInsights({
+  insights,
+  result,
+  stacked = false,
+}: PropertyInsightsProps) {
   const horizons = comparisonAtHorizons(result, [60, 120, 180]);
+
+  if (stacked) {
+    return (
+      <div className="app-surface divide-y divide-white/10">
+        <section className="p-3">
+          <h3 className="mb-3 text-sm font-semibold text-slate-200">
+            Per-property
+          </h3>
+          <ul className="space-y-3">
+            {insights.map((p) => (
+              <li
+                key={p.name}
+                className="border-b border-white/5 pb-3 last:border-0 last:pb-0"
+              >
+                <p className="font-medium text-slate-100">{p.name}</p>
+                <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                  <div>
+                    <dt className="text-slate-500">Equity</dt>
+                    <dd className="font-mono tabular-nums text-cyan-300">
+                      {formatCurrency(p.equity)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">LTV</dt>
+                    <dd className="font-mono tabular-nums">{formatLtv(p.ltv)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">Cap rate</dt>
+                    <dd className="font-mono tabular-nums">
+                      {formatPercent(p.capRate)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">Payoff rank</dt>
+                    <dd className="font-mono tabular-nums">
+                      {p.payoffRank ?? '—'}
+                    </dd>
+                  </div>
+                </dl>
+              </li>
+            ))}
+          </ul>
+        </section>
+        <section className="p-3">
+          <h3 className="mb-3 text-sm font-semibold text-slate-200">
+            Horizons
+          </h3>
+          <ul className="space-y-2 text-xs">
+            {horizons.map((h) => (
+              <li
+                key={h.month}
+                className="flex items-center justify-between gap-2 border-b border-white/5 py-2 last:border-0"
+              >
+                <span className="text-slate-400">{formatMonths(h.month)}</span>
+                <span className="font-mono tabular-nums text-cyan-300">
+                  {formatCurrency(h.equity)}
+                </span>
+                <span className="font-mono tabular-nums text-slate-300">
+                  NW {formatCurrency(h.netWorth)}
+                </span>
+              </li>
+            ))}
+            <li className="flex items-center justify-between gap-2 pt-1 font-medium text-emerald-400">
+              <span>Debt-free</span>
+              <span className="font-mono tabular-nums">
+                {formatCurrency(result.finalEquity)}
+              </span>
+            </li>
+          </ul>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -103,7 +181,9 @@ export function PropertyInsights({ insights, result }: PropertyInsightsProps) {
               </tr>
             ))}
             <tr className="font-medium text-emerald-400">
-              <td className="py-2 pr-2">Debt-free ({formatMonths(result.monthsToPayoff)})</td>
+              <td className="py-2 pr-2">
+                Debt-free ({formatMonths(result.monthsToPayoff)})
+              </td>
               <td className="py-2 pr-2 font-mono tabular-nums">
                 {formatCurrency(result.finalEquity)}
               </td>

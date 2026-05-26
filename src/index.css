@@ -13,6 +13,15 @@
     @apply rounded-xl border border-white/10 bg-white/5 shadow-lg backdrop-blur-md;
   }
 
+  /** Single control surface — avoids stacking many cards on small screens. */
+  .app-surface {
+    @apply rounded-xl border border-white/10 bg-white/[0.03];
+  }
+
+  .section-divider {
+    @apply border-b border-white/10 last:border-b-0;
+  }
+
   .tabular-nums {
     font-variant-numeric: tabular-nums;
   }

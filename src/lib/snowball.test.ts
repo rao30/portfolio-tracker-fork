@@ -1,11 +1,23 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { describe, expect, it } from 'vitest';
-import { buildTimelineTicks, formatMonths, yearFromMonth } from './format';
+import {
+  buildTimelineTicks,
+  calendarYearFromMonth,
+  closeMonthFromYear,
+  formatMonths,
+  yearFromMonth,
+} from './format';
 import type { Property } from './types';
 import {
   amortizeOneMonth,
   compareStrategies,
   computeMonthlyPayment,
   normalizePortfolio,
+  paymentFromPrincipal,
+  resolvePropertySchedule,
+  totalMonthlyExpenses,
+  utilitiesFromRent,
   SEED_PROPERTY_NAMES,
   simulateSnowball,
   STRATEGIES,
@@ -497,7 +509,255 @@ describe('normalizePortfolio', () => {
       ],
     });
     expect(p.extraMonthlyBudget).toBe(5000);
+    expect(p.simulationAnchorYear).toBe(2026);
     expect(p.properties[0].annualInterestRate).toBe(0.05);
+  });
+
+  it('maps close_year to closeMonth from anchor', () => {
+    const p = normalizePortfolio({
+      extra_monthly_budget: 0,
+      simulation_anchor_year: 2026,
+      properties: [
+        {
+          name: 'Future',
+          close_year: 2028,
+          balance: 100,
+          market_value: 100,
+          annual_interest_rate: 0,
+          monthly_payment: 1,
+          monthly_rent: 1,
+          monthly_expenses: 0,
+        },
+      ],
+    });
+    expect(p.properties[0].closeMonth).toBe(25);
+    expect(p.properties[0].closeYear).toBe(2028);
+  });
+});
+
+describe('utilities expense', () => {
+  it('charges 15% of rent as utilities for configured properties', () => {
+    expect(utilitiesFromRent(6200, 0.15)).toBe(930);
+    expect(totalMonthlyExpenses(6200, 1860, 0.15)).toBe(2790);
+  });
+
+  it('reduces cashflow when utilities are enabled', () => {
+    const base: Property = {
+      name: 'Test',
+      balance: 100000,
+      marketValue: 150000,
+      annualInterestRate: 0.05,
+      annualAppreciationRate: 0.03,
+      monthlyPayment: 600,
+      monthlyRent: 4000,
+      monthlyExpenses: 1200,
+    };
+    const withUtilities: Property = { ...base, utilitiesRentRate: 0.15 };
+    const rBase = simulateSnowball([base], {
+      payoffOrder: ['Test'],
+      extraMonthlyBudget: 0,
+      snowballCashflow: false,
+      strategyName: 'test',
+      maxMonths: 1,
+      allowUnresolved: true,
+    });
+    const rUtil = simulateSnowball([withUtilities], {
+      payoffOrder: ['Test'],
+      extraMonthlyBudget: 0,
+      snowballCashflow: false,
+      strategyName: 'test',
+      maxMonths: 1,
+      allowUnresolved: true,
+    });
+    expect(rUtil.history[0].monthlyUtilities).toBeCloseTo(600, 0);
+    expect(rUtil.history[0].monthlyCashflow).toBeLessThan(rBase.history[0].monthlyCashflow);
+  });
+});
+
+describe('close schedule and balloon', () => {
+  it('closeMonthFromYear aligns with calendarYearFromMonth', () => {
+    expect(closeMonthFromYear(2028, 2026)).toBe(25);
+    expect(calendarYearFromMonth(25, 2026)).toBe(2028);
+  });
+
+  it('activates a property on its close month', () => {
+    const props: Property[] = [
+      {
+        name: 'Future Duplex',
+        balance: 100000,
+        marketValue: 100000,
+        annualInterestRate: 0,
+        annualAppreciationRate: 0,
+        monthlyPayment: 500,
+        monthlyRent: 1200,
+        monthlyExpenses: 360,
+        closeMonth: 13,
+      },
+    ];
+    const r = simulateSnowball(props, {
+      payoffOrder: ['Future Duplex'],
+      extraMonthlyBudget: 0,
+      snowballCashflow: false,
+      strategyName: 'test',
+    });
+    expect(r.history[11].balancesByName['Future Duplex']).toBe(0);
+    expect(r.history[11].monthlyRent).toBe(0);
+    expect(r.history[12].balancesByName['Future Duplex']).toBeCloseTo(99500, 0);
+    expect(r.history[12].monthlyRent).toBeCloseTo(1200, 0);
+  });
+
+  it('leaves 75% balance after balloon month with minimum payments only', () => {
+    const props: Property[] = [
+      {
+        name: 'Balloon Loan',
+        balance: 240000,
+        marketValue: 240000,
+        annualInterestRate: 0,
+        annualAppreciationRate: 0,
+        monthlyPayment: 1000,
+        monthlyRent: 0,
+        monthlyExpenses: 0,
+        balloonMonths: 60,
+        closeMonth: 1,
+      },
+    ];
+    const r = simulateSnowball(props, {
+      payoffOrder: ['Balloon Loan'],
+      extraMonthlyBudget: 0,
+      snowballCashflow: false,
+      strategyName: 'test',
+      maxMonths: 60,
+      allowUnresolved: true,
+    });
+    const snap = r.history[59];
+    expect(snap.balancesByName['Balloon Loan']).toBeCloseTo(180000, 0);
+    expect(snap.refinancedThisMonth).toEqual([]);
+  });
+
+  it('refis balloon balance into 6.75% 30-year loan for month 61+', () => {
+    const balance = 240000;
+    const sellerPayment = balance / 240;
+    const props: Property[] = [
+      {
+        name: 'Balloon Loan',
+        balance,
+        marketValue: balance,
+        annualInterestRate: 0,
+        annualAppreciationRate: 0,
+        monthlyPayment: sellerPayment,
+        monthlyRent: 0,
+        monthlyExpenses: 0,
+        balloonMonths: 60,
+        refiYear: 2031,
+        refiMonthCalendar: 1,
+        refiSimMonth: 61,
+        balloonRefiAnnualRate: 0.0675,
+        balloonRefiTermMonths: 360,
+        closeMonth: 1,
+      },
+    ];
+    const r = simulateSnowball(props, {
+      payoffOrder: ['Balloon Loan'],
+      extraMonthlyBudget: 0,
+      snowballCashflow: false,
+      strategyName: 'test',
+      maxMonths: 62,
+      allowUnresolved: true,
+    });
+    expect(r.history[59].balancesByName['Balloon Loan']).toBeCloseTo(180000, 0);
+    expect(r.history[60].refinancedThisMonth).toContain('Balloon Loan');
+    expect(r.refinanceSchedule['Balloon Loan']).toBe(61);
+    const expectedPi = paymentFromPrincipal(180000, 0.0675, 360);
+    expect(expectedPi).toBeCloseTo(1167.85, 0);
+    expect(r.history[61].balancesByName['Balloon Loan']).toBeLessThan(180000);
+  });
+
+  it('simulates full portfolio.json with staggered closes and balloons', () => {
+    const raw = JSON.parse(
+      readFileSync(join(process.cwd(), 'public/data/portfolio.json'), 'utf8'),
+    );
+    const portfolio = normalizePortfolio(raw);
+    const r = simulateSnowball(portfolio.properties, {
+      payoffOrder: STRATEGIES.highestRate(portfolio.properties),
+      extraMonthlyBudget: portfolio.extraMonthlyBudget,
+      strategyName: 'highestRate',
+    });
+    expect(r.monthsToPayoff).toBeGreaterThan(200);
+    const refiMonths = r.history.filter((h) => h.refinancedThisMonth.length > 0);
+    expect(refiMonths.length).toBeGreaterThanOrEqual(4);
+    const shady116 = portfolio.properties.find((p) =>
+      p.name.startsWith('116/118'),
+    );
+    expect(shady116?.closeMonth).toBe(1);
+    expect(shady116?.closeYear).toBe(2026);
+    const seller = portfolio.properties.find((p) =>
+      p.name.startsWith('144/146'),
+    );
+    expect(seller?.refiYear).toBe(2031);
+    expect(seller?.refiSimMonth).toBe(61);
+    expect(seller?.balloonRefiAnnualRate).toBe(0.0675);
+    const deborah = portfolio.properties.find((p) => p.name.startsWith('1419'));
+    expect(deborah?.closeMonth).toBe(37);
+    expect(deborah?.refiYear).toBe(2034);
+    expect(deborah?.refiSimMonth).toBe(97);
+  });
+
+  it('reads close and refi dates from JSON via resolvePropertySchedule', () => {
+    const schedule = resolvePropertySchedule(
+      {
+        financing_type: 'seller',
+        close_year: 2027,
+        close_month_calendar: 1,
+        balloon_months: 60,
+        seller_amortization_months: 240,
+        refi_year: 2032,
+        refi_month: 1,
+        refi_annual_rate: 0.0675,
+        refi_term_months: 360,
+        annual_interest_rate: 0,
+      },
+      2026,
+      1,
+      { refiRate: 0.06, refiTermMonths: 360 },
+    );
+    expect(schedule.closeMonth).toBe(13);
+    expect(schedule.refiSimMonth).toBe(73);
+    expect(schedule.refiYear).toBe(2032);
+    expect(schedule.balloonRefiAnnualRate).toBe(0.0675);
+  });
+
+  it('refis on refi_sim month even when extra budget is available', () => {
+    const props: Property[] = [
+      {
+        name: 'Balloon Loan',
+        balance: 100000,
+        marketValue: 100000,
+        annualInterestRate: 0,
+        annualAppreciationRate: 0,
+        monthlyPayment: 100000 / 240,
+        monthlyRent: 0,
+        monthlyExpenses: 0,
+        balloonMonths: 60,
+        refiSimMonth: 61,
+        balloonRefiAnnualRate: 0.0675,
+        balloonRefiTermMonths: 360,
+        closeMonth: 1,
+      },
+    ];
+    const r = simulateSnowball(props, {
+      payoffOrder: ['Balloon Loan'],
+      extraMonthlyBudget: 500,
+      pauseExtraMonths: 60,
+      snowballCashflow: false,
+      strategyName: 'test',
+      maxMonths: 62,
+      allowUnresolved: true,
+    });
+    expect(r.refinanceSchedule['Balloon Loan']).toBe(61);
+    expect(r.payoffSchedule['Balloon Loan']).toBeUndefined();
+    const refiBalance = r.history[60].balancesByName['Balloon Loan'];
+    expect(refiBalance).toBeGreaterThan(70000);
+    expect(refiBalance).toBeLessThan(76000);
   });
 });
 

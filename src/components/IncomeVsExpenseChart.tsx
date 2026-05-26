@@ -25,6 +25,8 @@ export function IncomeVsExpenseChart({ result }: IncomeVsExpenseChartProps) {
   const data = result.history.map((h) => ({
     month: h.month,
     rent: h.monthlyRent,
+    operating: h.monthlyOperatingExpenses,
+    utilities: h.monthlyUtilities,
     expenses: h.monthlyExpenses,
     pi: h.monthlyPi,
     capex: h.monthlyCapex,
@@ -56,7 +58,9 @@ export function IncomeVsExpenseChart({ result }: IncomeVsExpenseChartProps) {
             formatter={(value: number, name: string) => {
               const labels: Record<string, string> = {
                 rent: 'Gross rent',
-                expenses: 'Expenses',
+                operating: 'Operating expenses',
+                utilities: 'Utilities',
+                expenses: 'Total expenses',
                 pi: 'P&I',
                 capex: 'Capex reserve',
                 cashflow: 'Net cashflow',
@@ -74,9 +78,24 @@ export function IncomeVsExpenseChart({ result }: IncomeVsExpenseChartProps) {
           />
           <Line
             type="monotone"
+            dataKey="operating"
+            stroke="#fb923c"
+            strokeWidth={2}
+            dot={false}
+          />
+          <Line
+            type="monotone"
+            dataKey="utilities"
+            stroke="#a78bfa"
+            strokeWidth={2}
+            dot={false}
+          />
+          <Line
+            type="monotone"
             dataKey="expenses"
             stroke="#f87171"
             strokeWidth={2}
+            strokeDasharray="4 4"
             dot={false}
           />
           <Line

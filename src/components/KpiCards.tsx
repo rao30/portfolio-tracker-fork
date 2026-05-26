@@ -12,6 +12,7 @@ interface KpiCardsProps {
   baseline: SimulationResult;
   portfolio: Portfolio;
   equityHorizon?: number;
+  compact?: boolean;
 }
 
 export function KpiCards({
@@ -19,6 +20,7 @@ export function KpiCards({
   baseline,
   portfolio,
   equityHorizon = 120,
+  compact = false,
 }: KpiCardsProps) {
   const interestSaved = baseline.totalInterestPaid - active.totalInterestPaid;
   const current = currentPortfolioMetrics(portfolio.properties);
@@ -66,16 +68,47 @@ export function KpiCards({
       sub: 'At debt-free vs today',
     },
     {
-      label: 'Interest saved vs baseline',
+      label: 'Interest saved',
       value: formatCurrency(interestSaved),
       highlight: interestSaved > 0,
     },
     {
-      label: 'Final monthly cashflow',
+      label: 'Final cashflow',
       value: formatCurrency(active.finalMonthlyCashflow),
       sub: formatCurrency(debtFreeSnap?.netWorth ?? active.finalNetWorth) + ' net worth',
     },
   ];
+
+  if (compact) {
+    return (
+      <div className="app-surface overflow-hidden">
+        <div className="flex gap-0 overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
+          {items.map((item, i) => (
+            <div
+              key={item.label}
+              className={`min-w-[9.5rem] shrink-0 px-3 py-3 ${
+                i > 0 ? 'border-l border-white/10' : ''
+              }`}
+            >
+              <p className="text-[10px] uppercase tracking-wide text-slate-500">
+                {item.label}
+              </p>
+              <p
+                className={`mt-0.5 font-mono text-base font-semibold tabular-nums ${
+                  item.highlight ? 'text-emerald-400' : 'text-white'
+                }`}
+              >
+                {item.value}
+              </p>
+              {item.sub && (
+                <p className="mt-0.5 text-[10px] text-slate-500">{item.sub}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-8">

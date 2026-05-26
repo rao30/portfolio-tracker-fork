@@ -7,6 +7,7 @@ interface ScenarioControlsProps {
   portfolio: Portfolio;
   scenarioId: string;
   onScenarioChange: (scenario: ScenarioConfig) => void;
+  embedded?: boolean;
 }
 
 const CUSTOM_ID = 'custom';
@@ -15,6 +16,7 @@ export function ScenarioControls({
   portfolio,
   scenarioId,
   onScenarioChange,
+  embedded = false,
 }: ScenarioControlsProps) {
   const sellScenarios = portfolio.properties.map((p) => buildSellScenario(p.name));
   const allPresets = [...SCENARIO_PRESETS, ...sellScenarios];
@@ -37,7 +39,7 @@ export function ScenarioControls({
   );
 
   return (
-    <div className="glass-card space-y-3 p-4">
+    <div className={embedded ? 'space-y-3' : 'glass-card space-y-3 p-4'}>
       <label
         htmlFor="scenario-select"
         className="block text-sm font-medium text-slate-300"

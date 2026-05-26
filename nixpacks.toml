@@ -1,0 +1,11 @@
+# Fallback when Dockerfile is not used. Prune devDeps after build for faster deploys.
+# Node >= 20 required by @supabase/supabase-js.
+
+[phases.install]
+cmds = ["npm ci --include=dev --ignore-scripts"]
+
+[phases.build]
+cmds = ["npm run build", "npm prune --omit=dev"]
+
+[start]
+cmd = "npm start"

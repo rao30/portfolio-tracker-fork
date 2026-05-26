@@ -1,3 +1,4 @@
+import { calendarToSimMonth } from './format';
 import { computeMonthlyPayment } from './tax';
 import type {
   ExpenseBreakdown,
@@ -23,6 +24,21 @@ const DEFAULT_RENT_GROWTH = 0.025;
 const DEFAULT_EXPENSE_INFLATION = 0.02;
 export const DEFAULT_CAPEX_RESERVE_RATE = 0.1;
 export const DEFAULT_VACANCY_RATE = 0;
+const DEFAULT_BALLOON_REFI_RATE = 0.0675;
+const DEFAULT_BALLOON_REFI_TERM_MONTHS = 360;
+
+/** Fixed-rate monthly P&I from principal, annual rate, and term. */
+export function paymentFromPrincipal(
+  principal: number,
+  annualInterestRate: number,
+  termMonths: number,
+): number {
+  if (principal <= 0 || termMonths <= 0) return 0;
+  if (annualInterestRate <= 0) return principal / termMonths;
+  const r = annualInterestRate / 12;
+  const factor = Math.pow(1 + r, termMonths);
+  return (principal * r * factor) / (factor - 1);
+}
 
 export interface AmortizeResult {
   balance: number;
@@ -58,10 +74,27 @@ export interface SimulationOptions {
   capexReserveFlat?: number;
   rateShock?: number;
   pauseExtraMonths?: number;
+  /** Lump-sum extra principal applied in month 1 to the first active target. */
   initialLumpSum?: number;
   timedSellScenario?: ScenarioConfig | null;
-  /** When true, return partial history instead of throwing if maxMonths hit. */
+  /** If true, return history even when balances remain after maxMonths. */
   allowIncomplete?: boolean;
+  allowUnresolved?: boolean;
+}
+
+/** Monthly utilities from gross rent when a rate is configured. */
+export function utilitiesFromRent(monthlyRent: number, utilitiesRentRate?: number): number {
+  if (!utilitiesRentRate || utilitiesRentRate <= 0) return 0;
+  return monthlyRent * utilitiesRentRate;
+}
+
+/** Total monthly expenses (operating + utilities). */
+export function totalMonthlyExpenses(
+  monthlyRent: number,
+  monthlyOperatingExpenses: number,
+  utilitiesRentRate?: number,
+): number {
+  return monthlyOperatingExpenses + utilitiesFromRent(monthlyRent, utilitiesRentRate);
 }
 
 interface SimState {
@@ -71,14 +104,25 @@ interface SimState {
   grossMonthlyRent: number;
   monthlyRent: number;
   monthlyExpenses: number;
+  utilitiesRentRate?: number;
   monthlyPayment: number;
   annualInterestRate: number;
   rentGrowth: number;
   expenseInflation: number;
   appreciation: number;
+  vacancyRate: number;
   capexReserveRate: number;
   capexReserveFlat: number;
   events: PropertyEvent[];
+  closeMonth: number;
+  refiSimMonth?: number;
+  balloonRefiAnnualRate: number;
+  balloonRefiTermMonths: number;
+  originalBalance: number;
+  originalMarketValue: number;
+  originalGrossRent: number;
+  originalRent: number;
+  originalExpenses: number;
 }
 
 export { computeMonthlyPayment };
@@ -152,12 +196,14 @@ export function validateProperty(
   const capexFlat = p.capexReserveFlat ?? portfolio.defaultCapexReserveFlat;
   const vacancy = resolveVacancyRate(p, portfolio, scenario);
   const effectiveRent = p.monthlyRent * (1 - vacancy);
+  const operating = resolveMonthlyExpenses(p);
+  const totalExpenses = totalMonthlyExpenses(p.monthlyRent, operating, p.utilitiesRentRate);
   const capex = propertyMonthlyCapex(p.monthlyRent, capexRate, capexFlat);
   const netCf =
-    effectiveRent - p.monthlyExpenses - (p.balance > 0 ? p.monthlyPayment : 0) - capex;
+    effectiveRent - totalExpenses - (p.balance > 0 ? p.monthlyPayment : 0) - capex;
   if (netCf < 0) warnings.push('Negative cashflow after capex');
 
-  const noi = (effectiveRent - p.monthlyExpenses) * 12;
+  const noi = (effectiveRent - totalExpenses) * 12;
   const debtService = p.monthlyPayment * 12;
   const dscr = debtService > 0 ? noi / debtService : Infinity;
   if (dscr < 1 && p.balance > 0) warnings.push('DSCR below 1.0');
@@ -166,6 +212,78 @@ export function validateProperty(
   if (ltv > 0.8) warnings.push('LTV above 80%');
 
   return { warnings };
+}
+
+function isPropertyOwned(state: SimState, month: number): boolean {
+  return month >= state.closeMonth;
+}
+
+function scheduledPaymentForMonth(state: SimState, month: number): number {
+  if (!isPropertyOwned(state, month) || state.balance <= BALANCE_EPSILON) {
+    return 0;
+  }
+  return state.monthlyPayment;
+}
+
+function isBalloonRefiMonth(state: SimState, month: number): boolean {
+  return (
+    state.refiSimMonth != null &&
+    isPropertyOwned(state, month) &&
+    month === state.refiSimMonth &&
+    state.balance > BALANCE_EPSILON
+  );
+}
+
+/** Convert remaining seller-financed balance into a conventional amortizing loan. */
+function refinanceAfterBalloon(state: SimState): void {
+  if (state.balance <= BALANCE_EPSILON) {
+    state.refiSimMonth = undefined;
+    return;
+  }
+  const rate = state.balloonRefiAnnualRate;
+  const term = state.balloonRefiTermMonths;
+  state.annualInterestRate = rate;
+  state.monthlyPayment = paymentFromPrincipal(state.balance, rate, term);
+  state.refiSimMonth = undefined;
+}
+
+function allLoansResolved(states: SimState[], month: number): boolean {
+  return states.every(
+    (s) => isPropertyOwned(s, month) && s.balance <= BALANCE_EPSILON,
+  );
+}
+
+function stateUtilities(state: SimState): number {
+  return utilitiesFromRent(state.monthlyRent, state.utilitiesRentRate);
+}
+
+function stateTotalExpenses(state: SimState): number {
+  return state.monthlyExpenses + stateUtilities(state);
+}
+
+function activateProperty(state: SimState): void {
+  state.balance = state.originalBalance;
+  state.marketValue = state.originalMarketValue;
+  state.grossMonthlyRent = state.originalGrossRent;
+  state.monthlyRent = state.originalRent;
+  state.monthlyExpenses = state.originalExpenses;
+}
+
+function applyExtraToNames(
+  states: SimState[],
+  names: string[],
+  amount: number,
+): number {
+  let remaining = amount;
+  for (const name of names) {
+    if (remaining <= 0) break;
+    const target = states.find((s) => s.name === name);
+    if (!target || target.balance <= BALANCE_EPSILON) continue;
+    const before = target.balance;
+    target.balance = applyExtraPrincipal(target.balance, remaining);
+    remaining -= before - target.balance;
+  }
+  return amount - remaining;
 }
 
 /** Apply one month of scheduled P&I plus optional extra principal. */
@@ -222,19 +340,17 @@ function monthlyGrowthFactor(annualRate: number): number {
   return Math.pow(1 + annualRate, 1 / 12);
 }
 
-function compoundGrowth(states: SimState[]): void {
+function compoundGrowth(states: SimState[], month: number): void {
   for (const s of states) {
+    if (!isPropertyOwned(s, month)) continue;
     s.marketValue *= monthlyGrowthFactor(s.appreciation);
     s.grossMonthlyRent *= monthlyGrowthFactor(s.rentGrowth);
-    s.monthlyRent = s.grossMonthlyRent;
+    s.monthlyRent = s.grossMonthlyRent * (1 - s.vacancyRate);
     s.monthlyExpenses *= monthlyGrowthFactor(s.expenseInflation);
   }
 }
 
-function propertyToSimState(
-  p: Property,
-  options: SimulationOptions,
-): SimState {
+function propertyToSimState(p: Property, options: SimulationOptions): SimState {
   const portfolioRentGrowth = options.annualRentGrowthRate ?? DEFAULT_RENT_GROWTH;
   const portfolioExpenseInflation =
     options.annualExpenseInflationRate ?? DEFAULT_EXPENSE_INFLATION;
@@ -247,22 +363,38 @@ function propertyToSimState(
     options.defaultCapexReserveRate ??
     0;
   const capexFlat = p.capexReserveFlat ?? options.defaultCapexReserveFlat ?? 0;
+  const closeMonth = p.closeMonth ?? 1;
+  const activeAtStart = closeMonth <= 1;
+  const grossRent = p.monthlyRent;
+  const effectiveRent = grossRent * (1 - vacancy);
+  const operating = resolveMonthlyExpenses(p);
 
   return {
     name: p.name,
-    balance: p.balance,
-    marketValue: p.marketValue,
-    grossMonthlyRent: p.monthlyRent,
-    monthlyRent: p.monthlyRent * (1 - vacancy),
-    monthlyExpenses: resolveMonthlyExpenses(p),
+    balance: activeAtStart ? p.balance : 0,
+    marketValue: activeAtStart ? p.marketValue : 0,
+    grossMonthlyRent: activeAtStart ? grossRent : 0,
+    monthlyRent: activeAtStart ? effectiveRent : 0,
+    monthlyExpenses: activeAtStart ? operating : 0,
+    utilitiesRentRate: p.utilitiesRentRate,
     monthlyPayment: p.monthlyPayment,
     annualInterestRate: p.annualInterestRate + rateShock,
     rentGrowth: p.annualRentGrowthRate ?? portfolioRentGrowth,
     expenseInflation: p.annualExpenseInflationRate ?? portfolioExpenseInflation,
     appreciation: p.annualAppreciationRate,
+    vacancyRate: vacancy,
     capexReserveRate: capexRate,
     capexReserveFlat: capexFlat,
     events: p.events ?? [],
+    closeMonth,
+    refiSimMonth: p.refiSimMonth,
+    balloonRefiAnnualRate: p.balloonRefiAnnualRate ?? DEFAULT_BALLOON_REFI_RATE,
+    balloonRefiTermMonths: p.balloonRefiTermMonths ?? DEFAULT_BALLOON_REFI_TERM_MONTHS,
+    originalBalance: p.balance,
+    originalMarketValue: p.marketValue,
+    originalGrossRent: grossRent,
+    originalRent: effectiveRent,
+    originalExpenses: operating,
   };
 }
 
@@ -286,9 +418,7 @@ function applyPropertyEvents(
         case 'rentChange':
           if (ev.rent != null) {
             s.grossMonthlyRent = ev.rent;
-            const vacancy =
-              options.vacancyRate ?? options.defaultVacancyRate ?? 0;
-            s.monthlyRent = ev.rent * (1 - vacancy);
+            s.monthlyRent = ev.rent * (1 - s.vacancyRate);
           }
           break;
         case 'rateReset':
@@ -326,27 +456,30 @@ function applyPropertyEvents(
   return capexSpikeTotal;
 }
 
-function computeMonthlyCashflow(states: SimState[]): number {
+function computeMonthlyCashflow(states: SimState[], month: number): number {
   return states.reduce((sum, s) => {
-    const netRent = s.monthlyRent - s.monthlyExpenses;
+    if (!isPropertyOwned(s, month)) return sum;
+    const netRent = s.monthlyRent - stateTotalExpenses(s);
     if (s.balance <= BALANCE_EPSILON) return sum + netRent;
-    return sum + (netRent - s.monthlyPayment);
+    const pi = scheduledPaymentForMonth(s, month);
+    return sum + (netRent - pi);
   }, 0);
 }
 
-function computeMonthlyPi(states: SimState[]): number {
+function computeMonthlyPi(states: SimState[], month: number): number {
   return states.reduce((sum, s) => {
-    if (s.balance <= BALANCE_EPSILON) return sum;
-    return sum + s.monthlyPayment;
+    if (!isPropertyOwned(s, month) || s.balance <= BALANCE_EPSILON) return sum;
+    return sum + scheduledPaymentForMonth(s, month);
   }, 0);
 }
 
-function computeCapexDeduction(states: SimState[]): number {
-  return states.reduce(
-    (sum, s) =>
-      sum + propertyMonthlyCapex(s.grossMonthlyRent, s.capexReserveRate, s.capexReserveFlat),
-    0,
-  );
+function computeCapexDeduction(states: SimState[], month: number): number {
+  return states.reduce((sum, s) => {
+    if (!isPropertyOwned(s, month)) return sum;
+    return (
+      sum + propertyMonthlyCapex(s.grossMonthlyRent, s.capexReserveRate, s.capexReserveFlat)
+    );
+  }, 0);
 }
 
 function buildEquitySnapshot(
@@ -360,6 +493,7 @@ function buildEquitySnapshot(
   monthlyCapex: number,
   target: string | null,
   paidOffThisMonth: string[],
+  refinancedThisMonth: string[],
   cumulativeRent: number,
   cumulativeExpenses: number,
   cumulativeCashflow: number,
@@ -389,6 +523,7 @@ function buildEquitySnapshot(
     monthlyCashflow,
     targetProperty: target,
     paidOffThisMonth,
+    refinancedThisMonth,
     balancesByName,
     valuesByName,
     equityByName,
@@ -396,9 +531,23 @@ function buildEquitySnapshot(
     totalPropertyValue,
     totalLiabilities: totalBalance,
     netWorth: totalEquity + cashReserve,
-    monthlyRent: states.reduce((s, p) => s + p.monthlyRent, 0),
-    monthlyExpenses: states.reduce((s, p) => s + p.monthlyExpenses, 0),
-    monthlyPi: computeMonthlyPi(states),
+    monthlyRent: states.reduce(
+      (sum, p) => sum + (isPropertyOwned(p, month) ? p.monthlyRent : 0),
+      0,
+    ),
+    monthlyOperatingExpenses: states.reduce(
+      (sum, p) => sum + (isPropertyOwned(p, month) ? p.monthlyExpenses : 0),
+      0,
+    ),
+    monthlyUtilities: states.reduce(
+      (sum, p) => sum + (isPropertyOwned(p, month) ? stateUtilities(p) : 0),
+      0,
+    ),
+    monthlyExpenses: states.reduce(
+      (sum, p) => sum + (isPropertyOwned(p, month) ? stateTotalExpenses(p) : 0),
+      0,
+    ),
+    monthlyPi: computeMonthlyPi(states, month),
     monthlyCapex,
     cumulativeRentCollected: cumulativeRent,
     cumulativeExpenses: cumulativeExpenses,
@@ -479,11 +628,16 @@ function validatePayoffOrder(payoffOrder: string[], propertyNames: Set<string>):
 function findTarget(
   payoffOrder: string[],
   states: SimState[],
+  month: number,
 ): string | null {
   return (
     payoffOrder.find((name) => {
       const s = states.find((p) => p.name === name);
-      return s && s.balance > BALANCE_EPSILON;
+      return (
+        s &&
+        isPropertyOwned(s, month) &&
+        s.balance > BALANCE_EPSILON
+      );
     }) ?? null
   );
 }
@@ -550,6 +704,7 @@ export function simulateSnowball(
 
   const history: MonthSnapshot[] = [];
   const payoffSchedule: Record<string, number> = {};
+  const refinanceSchedule: Record<string, number> = {};
   let totalInterestPaid = 0;
   let totalExtraPaid = 0;
   let cashReserve = 0;
@@ -569,17 +724,23 @@ export function simulateSnowball(
     }
 
     if (month > 1) {
-      compoundGrowth(states);
+      compoundGrowth(states, month);
     }
 
-    const activeCount = states.filter((s) => s.balance > BALANCE_EPSILON).length;
-    if (activeCount === 0) break;
+    for (const s of states) {
+      if (month === s.closeMonth && s.closeMonth > 1) {
+        activateProperty(s);
+      }
+    }
+
+    if (allLoansResolved(states, month)) break;
 
     const effectiveBudget = month <= pauseExtraMonths ? 0 : extraMonthlyBudget;
     let extraPool = effectiveBudget;
 
     if (snowballCashflow) {
       for (const s of states) {
+        if (!isPropertyOwned(s, month)) continue;
         if (s.balance <= BALANCE_EPSILON) {
           extraPool += s.monthlyPayment;
         }
@@ -591,7 +752,8 @@ export function simulateSnowball(
       initialLumpSum = 0;
     }
 
-    const target = findTarget(payoffOrder, states);
+    const target = findTarget(payoffOrder, states, month);
+    const refinancedThisMonth: string[] = [];
 
     let monthInterest = 0;
     let monthPrincipal = 0;
@@ -600,32 +762,51 @@ export function simulateSnowball(
 
     for (const s of states) {
       const startBal = s.balance;
-      if (startBal <= BALANCE_EPSILON) continue;
+      if (!isPropertyOwned(s, month) || startBal <= BALANCE_EPSILON) continue;
 
+      if (isBalloonRefiMonth(s, month)) {
+        refinanceAfterBalloon(s);
+        refinancedThisMonth.push(s.name);
+        if (!(s.name in refinanceSchedule)) {
+          refinanceSchedule[s.name] = month;
+        }
+      }
+
+      const payment = scheduledPaymentForMonth(s, month);
       const result = amortizeOneMonth({
         balance: startBal,
         annualInterestRate: s.annualInterestRate,
-        scheduledPayment: s.monthlyPayment,
+        scheduledPayment: payment,
         extraPayment: 0,
         propertyName: s.name,
       });
 
-      let newBal = result.balance;
+      s.balance = result.balance;
       monthInterest += result.interestPaid;
       monthPrincipal += result.principalPaid;
 
-      if (s.name === target && extraPool > 0) {
-        const beforeExtra = newBal;
-        newBal = applyExtraPrincipal(newBal, extraPool);
-        const applied = beforeExtra - newBal;
-        monthExtra += applied;
-        monthPrincipal += applied;
-        extraPool = 0;
+      if (result.paidOff && startBal > BALANCE_EPSILON) {
+        paidOffThisMonth.push(s.name);
+        if (!(s.name in payoffSchedule)) {
+          payoffSchedule[s.name] = month;
+        }
       }
 
-      s.balance = newBal;
+    }
 
-      if (newBal <= BALANCE_EPSILON && startBal > BALANCE_EPSILON) {
+    if (target && extraPool > 0) {
+      const applied = applyExtraToNames(states, [target], extraPool);
+      monthExtra += applied;
+      monthPrincipal += applied;
+      extraPool = 0;
+    }
+
+    for (const s of states) {
+      if (
+        s.balance <= BALANCE_EPSILON &&
+        isPropertyOwned(s, month) &&
+        !paidOffThisMonth.includes(s.name)
+      ) {
         paidOffThisMonth.push(s.name);
         if (!(s.name in payoffSchedule)) {
           payoffSchedule[s.name] = month;
@@ -633,11 +814,17 @@ export function simulateSnowball(
       }
     }
 
-    cumulativeRent += states.reduce((sum, s) => sum + s.monthlyRent, 0);
-    cumulativeExpenses += states.reduce((sum, s) => sum + s.monthlyExpenses, 0);
+    cumulativeRent += states.reduce(
+      (sum, st) => sum + (isPropertyOwned(st, month) ? st.monthlyRent : 0),
+      0,
+    );
+    cumulativeExpenses += states.reduce(
+      (sum, st) => sum + (isPropertyOwned(st, month) ? stateTotalExpenses(st) : 0),
+      0,
+    );
 
-    let monthlyCashflow = computeMonthlyCashflow(states);
-    const capexDeduction = computeCapexDeduction(states) + eventCapexSpike;
+    let monthlyCashflow = computeMonthlyCashflow(states, month);
+    const capexDeduction = computeCapexDeduction(states, month) + eventCapexSpike;
     monthlyCashflow -= capexDeduction;
 
     if (monthlyCashflow > 0) {
@@ -648,7 +835,7 @@ export function simulateSnowball(
     if (surplus > 0) {
       if (reinvestSurplus) {
         const balancesBeforeReinvest = new Map(states.map((s) => [s.name, s.balance]));
-        const currentTarget = findTarget(payoffOrder, states);
+        const currentTarget = findTarget(payoffOrder, states, month);
         const surplusReinvested = applyExtraToTarget(states, currentTarget, surplus);
         monthExtra += surplusReinvested;
         monthPrincipal += surplusReinvested;
@@ -685,30 +872,34 @@ export function simulateSnowball(
         capexDeduction,
         target,
         paidOffThisMonth,
+        refinancedThisMonth,
         cumulativeRent,
         cumulativeExpenses,
         cumulativeCashflow,
       ),
     );
 
-    const totalBalance = states.reduce((s, p) => s + p.balance, 0);
-    if (totalBalance <= BALANCE_EPSILON) break;
+    if (allLoansResolved(states, month)) break;
   }
 
-  const remaining = states.some((s) => s.balance > BALANCE_EPSILON);
-  if (remaining && !options.allowIncomplete) {
+  const lastSimMonth = history[history.length - 1]?.month ?? 0;
+  const remaining = states.some(
+    (s) => s.closeMonth <= lastSimMonth && s.balance > BALANCE_EPSILON,
+  );
+  if (remaining && !options.allowIncomplete && !options.allowUnresolved) {
     throw new Error(
       `Simulation did not converge within ${maxMonths} months`,
     );
   }
 
   const finalMonthlyCashflow = states.reduce((sum, s) => {
+    if (!isPropertyOwned(s, lastSimMonth)) return sum;
     const capex = propertyMonthlyCapex(
       s.grossMonthlyRent,
       s.capexReserveRate,
       s.capexReserveFlat,
     );
-    return sum + (s.monthlyRent - s.monthlyExpenses - capex);
+    return sum + (s.monthlyRent - stateTotalExpenses(s) - capex);
   }, 0);
   const finalEquity = states.reduce(
     (sum, s) => sum + (s.marketValue - s.balance),
@@ -724,6 +915,7 @@ export function simulateSnowball(
     totalExtraPaid,
     finalMonthlyCashflow,
     payoffSchedule,
+    refinanceSchedule,
     history,
     finalEquity,
     finalNetWorth: lastSnapshot?.netWorth ?? finalEquity,
@@ -759,6 +951,7 @@ function portfolioSimOptions(
   };
 }
 
+/** Apply a scenario: returns properties to simulate and optional lump-sum from sale. */
 export function applyScenario(
   portfolio: Portfolio,
   scenario: ScenarioConfig | null,
@@ -807,15 +1000,13 @@ export function buildSellScenario(propertyName: string): ScenarioConfig {
   };
 }
 
+/** Run all registered strategies (and optional baseline) and sort by speed. */
 export function compareStrategies(
   properties: Property[],
   options?: {
     extraMonthlyBudget?: number;
     includeBaseline?: boolean;
-    simulationOptions?: Omit<
-      SimulationOptions,
-      'payoffOrder' | 'strategyName' | 'extraMonthlyBudget'
-    >;
+    simulationOptions?: Omit<SimulationOptions, 'payoffOrder' | 'strategyName' | 'extraMonthlyBudget'>;
   },
 ): SimulationResult[] {
   const extraMonthlyBudget = options?.extraMonthlyBudget ?? 0;
@@ -888,6 +1079,7 @@ export function runSimulation(
   });
 }
 
+/** Snapshot at a given month (clamped to history). */
 export function snapshotAtMonth(
   result: SimulationResult,
   month: number,
@@ -897,6 +1089,7 @@ export function snapshotAtMonth(
   return result.history[idx] ?? null;
 }
 
+/** Current portfolio equity from property inputs (month 0). */
 export function currentPortfolioMetrics(properties: Property[]): {
   totalEquity: number;
   totalValue: number;
@@ -920,22 +1113,27 @@ export function computePropertyInsights(
     const ltv = p.marketValue > 0 ? p.balance / p.marketValue : 0;
     const vacancy = resolveVacancyRate(p, portfolio, scenario);
     const effectiveRent = p.monthlyRent * (1 - vacancy);
-    const netRent = effectiveRent - p.monthlyExpenses;
+    const operating = resolveMonthlyExpenses(p);
+    const netRent =
+      effectiveRent - totalMonthlyExpenses(p.monthlyRent, operating, p.utilitiesRentRate);
     const capexRate = resolveCapexRate(p, portfolio, scenario);
     const capexFlat = p.capexReserveFlat ?? portfolio.defaultCapexReserveFlat;
     const monthlyCapexReserve = propertyMonthlyCapex(p.monthlyRent, capexRate, capexFlat);
     const capRate = p.marketValue > 0 ? (netRent * 12) / p.marketValue : 0;
     const rankIdx = payoffOrder.indexOf(p.name);
-    const noi = (effectiveRent - p.monthlyExpenses) * 12;
+    const noi = (effectiveRent - totalMonthlyExpenses(p.monthlyRent, operating, p.utilitiesRentRate)) * 12;
     const debtService = p.monthlyPayment * 12;
     const dscr = debtService > 0 && p.balance > 0 ? noi / debtService : Infinity;
     const cashInvested = resolveCashInvested(p);
-    const annualCf = (netRent - (p.balance > 0 ? p.monthlyPayment : 0) - monthlyCapexReserve) * 12;
+    const annualCf =
+      (netRent - (p.balance > 0 ? p.monthlyPayment : 0) - monthlyCapexReserve) * 12;
     const cashOnCash = cashInvested > 0 ? annualCf / cashInvested : 0;
     const grossRent = p.monthlyRent;
     const breakEvenOccupancy =
       grossRent > 0
-        ? (p.monthlyExpenses + (p.balance > 0 ? p.monthlyPayment : 0) + monthlyCapexReserve) /
+        ? (totalMonthlyExpenses(p.monthlyRent, operating, p.utilitiesRentRate) +
+            (p.balance > 0 ? p.monthlyPayment : 0) +
+            monthlyCapexReserve) /
           grossRent
         : 0;
     const monthlyInterest = p.balance * (p.annualInterestRate / 12);
@@ -980,6 +1178,7 @@ export function comparisonAtHorizons(
   });
 }
 
+/** Binary search for minimum extra budget to reach debt-free by target month. */
 export function findBudgetForDebtFreeByMonth(
   portfolio: Portfolio,
   strategyId: StrategyId,
@@ -1014,6 +1213,7 @@ export function findBudgetForDebtFreeByMonth(
   return canHit(lo + 1) ? lo + 1 : null;
 }
 
+/** Binary search for minimum extra budget to reach equity target at a month. */
 export function findBudgetForEquityAtMonth(
   portfolio: Portfolio,
   strategyId: StrategyId,
@@ -1072,7 +1272,7 @@ export function generateInsights(
   const year10 = snapshotAtMonth(active, 120);
   if (year10) {
     insights.push(
-      `Projected equity at year 10: ${formatCurrencyShort(year10.totalEquity)} (LTV ${((year10.totalLiabilities / year10.totalPropertyValue) * 100).toFixed(0)}%).`,
+      `Projected equity at year 10: ${formatCurrencyShort(year10.totalEquity)} (LTV ${(year10.totalLiabilities / year10.totalPropertyValue * 100).toFixed(0)}%).`,
     );
   }
 
@@ -1091,7 +1291,7 @@ export function generateInsights(
 
   if (metrics.ltv > 0.7) {
     insights.push(
-      `Portfolio LTV is ${(metrics.ltv * 100).toFixed(0)}% — equity builds as balances pay down and values appreciate.`,
+      `Portfolio LTV is ${(metrics.ltv * 100).toFixed(0)}% ????? equity builds as balances pay down and values appreciate.`,
     );
   }
 
@@ -1114,6 +1314,112 @@ function formatMonthsShort(months: number): string {
   return `${years} yr ${rem} mo`;
 }
 
+/** Resolve close/refi calendar fields from portfolio JSON into simulation months. */
+export function resolvePropertySchedule(
+  raw: Record<string, unknown>,
+  anchorYear: number,
+  anchorMonth: number,
+  defaults: { refiRate: number; refiTermMonths: number },
+): {
+  financingType?: 'conventional' | 'seller';
+  closeMonth: number;
+  closeYear?: number;
+  closeMonthCalendar?: number;
+  balloonMonths?: number;
+  sellerAmortizationMonths?: number;
+  refiYear?: number;
+  refiMonthCalendar?: number;
+  refiSimMonth?: number;
+  balloonRefiAnnualRate?: number;
+  balloonRefiTermMonths?: number;
+} {
+  const financingType =
+    raw.financing_type === 'seller'
+      ? 'seller'
+      : raw.financing_type === 'conventional'
+        ? 'conventional'
+        : undefined;
+
+  let closeMonth = 1;
+  let closeYear: number | undefined;
+  let closeMonthCalendar: number | undefined;
+
+  if (typeof raw.close_month === 'number') {
+    closeMonth = raw.close_month;
+  } else if (typeof raw.close_year === 'number') {
+    closeYear = raw.close_year;
+    closeMonthCalendar =
+      typeof raw.close_month_calendar === 'number' ? raw.close_month_calendar : 1;
+    closeMonth = calendarToSimMonth(
+      closeYear,
+      closeMonthCalendar,
+      anchorYear,
+      anchorMonth,
+    );
+  }
+
+  const balloonMonths =
+    typeof raw.balloon_months === 'number' ? raw.balloon_months : undefined;
+  const sellerAmortizationMonths =
+    typeof raw.seller_amortization_months === 'number'
+      ? raw.seller_amortization_months
+      : undefined;
+
+  let refiYear: number | undefined;
+  let refiMonthCalendar: number | undefined;
+  let refiSimMonth: number | undefined;
+
+  if (typeof raw.refi_year === 'number') {
+    refiYear = raw.refi_year;
+    refiMonthCalendar = typeof raw.refi_month === 'number' ? raw.refi_month : 1;
+    refiSimMonth = calendarToSimMonth(
+      refiYear,
+      refiMonthCalendar,
+      anchorYear,
+      anchorMonth,
+    );
+  } else if (balloonMonths != null) {
+    refiSimMonth = closeMonth + balloonMonths;
+  }
+
+  const isSeller =
+    financingType === 'seller' || (balloonMonths != null && raw.annual_interest_rate === 0);
+
+  const refiRate =
+    typeof raw.refi_annual_rate === 'number'
+      ? raw.refi_annual_rate
+      : typeof raw.balloon_refi_annual_rate === 'number'
+        ? raw.balloon_refi_annual_rate
+        : isSeller
+          ? defaults.refiRate
+          : undefined;
+
+  const refiTermMonths =
+    typeof raw.refi_term_months === 'number'
+      ? raw.refi_term_months
+      : typeof raw.balloon_refi_term_months === 'number'
+        ? raw.balloon_refi_term_months
+        : isSeller
+          ? defaults.refiTermMonths
+          : undefined;
+
+  return {
+    financingType:
+      financingType ?? (balloonMonths != null ? 'seller' : undefined),
+    closeMonth,
+    closeYear,
+    closeMonthCalendar,
+    balloonMonths,
+    sellerAmortizationMonths,
+    refiYear,
+    refiMonthCalendar,
+    refiSimMonth: isSeller || balloonMonths != null ? refiSimMonth : undefined,
+    balloonRefiAnnualRate: refiRate,
+    balloonRefiTermMonths: refiTermMonths,
+  };
+}
+
+/** Normalize raw JSON into a Portfolio (exported for tests and hook). */
 function normalizeExpenseBreakdown(raw: Record<string, unknown> | undefined) {
   if (!raw) return undefined;
   const b: ExpenseBreakdown = {};
@@ -1128,58 +1434,8 @@ function normalizeExpenseBreakdown(raw: Record<string, unknown> | undefined) {
   return Object.keys(b).length > 0 ? b : undefined;
 }
 
-function normalizeProperty(item: unknown, i: number): Property {
-  if (!item || typeof item !== 'object') {
-    throw new Error(`Invalid property at index ${i}`);
-  }
-  const p = item as Record<string, unknown>;
-  const name = p.name;
-  const balance = p.balance;
-  const marketValue =
-    typeof p.market_value === 'number'
-      ? p.market_value
-      : typeof p.marketValue === 'number'
-        ? p.marketValue
-        : (balance as number) * 1.5;
-  const annualInterestRate = p.annual_interest_rate;
-  const monthlyPayment = p.monthly_payment;
-  const monthlyRent = p.monthly_rent;
-  const monthlyExpenses = p.monthly_expenses;
-  const annualAppreciationRate =
-    typeof p.annual_appreciation_rate === 'number'
-      ? p.annual_appreciation_rate
-      : DEFAULT_APPRECIATION;
-
-  if (typeof name !== 'string' || !name.trim()) {
-    throw new Error(`Property ${i}: invalid name`);
-  }
-  for (const [key, val] of [
-    ['balance', balance],
-    ['market_value', marketValue],
-    ['annual_interest_rate', annualInterestRate],
-    ['monthly_payment', monthlyPayment],
-    ['monthly_rent', monthlyRent],
-    ['monthly_expenses', monthlyExpenses],
-  ] as const) {
-    if (typeof val !== 'number' || Number.isNaN(val)) {
-      throw new Error(`Property "${name}": invalid ${key}`);
-    }
-  }
-
-  const prop: Property = {
-    name,
-    balance: balance as number,
-    marketValue: marketValue as number,
-    annualInterestRate: annualInterestRate as number,
-    annualAppreciationRate,
-    monthlyPayment: monthlyPayment as number,
-    monthlyRent: monthlyRent as number,
-    monthlyExpenses: monthlyExpenses as number,
-  };
-
+function applyOptionalPropertyFields(prop: Property, p: Record<string, unknown>): void {
   const optionalNums: [keyof Property, string][] = [
-    ['annualRentGrowthRate', 'annual_rent_growth_rate'],
-    ['annualExpenseInflationRate', 'annual_expense_inflation_rate'],
     ['vacancyRate', 'vacancy_rate'],
     ['capexReserveRate', 'capex_reserve_rate'],
     ['capexReserveFlat', 'capex_reserve_flat'],
@@ -1210,8 +1466,6 @@ function normalizeProperty(item: unknown, i: number): Property {
   if (Array.isArray(p.events)) {
     prop.events = p.events as PropertyEvent[];
   }
-
-  return prop;
 }
 
 export function normalizePortfolio(raw: unknown): Portfolio {
@@ -1219,6 +1473,8 @@ export function normalizePortfolio(raw: unknown): Portfolio {
     throw new Error('Invalid portfolio: expected an object');
   }
   const obj = raw as Record<string, unknown>;
+  const seedVersion =
+    typeof obj.seed_version === 'number' ? obj.seed_version : undefined;
   const extraMonthlyBudget = obj.extra_monthly_budget;
   if (typeof extraMonthlyBudget !== 'number' || extraMonthlyBudget < 0) {
     throw new Error('Invalid extra_monthly_budget');
@@ -1226,8 +1482,6 @@ export function normalizePortfolio(raw: unknown): Portfolio {
   if (!Array.isArray(obj.properties)) {
     throw new Error('Invalid properties array');
   }
-
-  const properties = obj.properties.map(normalizeProperty);
 
   const annualRentGrowthRate =
     typeof obj.annual_rent_growth_rate === 'number'
@@ -1252,8 +1506,128 @@ export function normalizePortfolio(raw: unknown): Portfolio {
     typeof obj.default_capex_reserve_flat === 'number'
       ? obj.default_capex_reserve_flat
       : 0;
+  const simulationAnchorYear =
+    typeof obj.simulation_anchor_year === 'number'
+      ? obj.simulation_anchor_year
+      : 2026;
+  const simulationAnchorMonth =
+    typeof obj.simulation_anchor_month === 'number'
+      ? obj.simulation_anchor_month
+      : 1;
+  const portfolioDefaults = {
+    refiRate:
+      typeof obj.default_refi_annual_rate === 'number'
+        ? obj.default_refi_annual_rate
+        : typeof obj.balloon_refi_annual_rate === 'number'
+          ? obj.balloon_refi_annual_rate
+          : DEFAULT_BALLOON_REFI_RATE,
+    refiTermMonths:
+      typeof obj.default_refi_term_months === 'number'
+        ? obj.default_refi_term_months
+        : typeof obj.balloon_refi_term_months === 'number'
+          ? obj.balloon_refi_term_months
+          : DEFAULT_BALLOON_REFI_TERM_MONTHS,
+  };
 
-  const partialPortfolio = {
+  const properties: Property[] = obj.properties.map((item, i) => {
+    if (!item || typeof item !== 'object') {
+      throw new Error(`Invalid property at index ${i}`);
+    }
+    const p = item as Record<string, unknown>;
+    const name = p.name;
+    const balance = p.balance;
+    const marketValue =
+      typeof p.market_value === 'number'
+        ? p.market_value
+        : typeof p.marketValue === 'number'
+          ? p.marketValue
+          : (balance as number) * 1.5;
+    const annualInterestRate = p.annual_interest_rate;
+    const monthlyPayment = p.monthly_payment;
+    const monthlyRent = p.monthly_rent;
+    const monthlyExpenses = p.monthly_expenses;
+    const annualAppreciationRate =
+      typeof p.annual_appreciation_rate === 'number'
+        ? p.annual_appreciation_rate
+        : DEFAULT_APPRECIATION;
+
+    if (typeof name !== 'string' || !name.trim()) {
+      throw new Error(`Property ${i}: invalid name`);
+    }
+    for (const [key, val] of [
+      ['balance', balance],
+      ['market_value', marketValue],
+      ['annual_interest_rate', annualInterestRate],
+      ['monthly_payment', monthlyPayment],
+      ['monthly_rent', monthlyRent],
+      ['monthly_expenses', monthlyExpenses],
+    ] as const) {
+      if (typeof val !== 'number' || Number.isNaN(val)) {
+        throw new Error(`Property "${name}": invalid ${key}`);
+      }
+    }
+
+    const prop: Property = {
+      name,
+      balance: balance as number,
+      marketValue: marketValue as number,
+      annualInterestRate: annualInterestRate as number,
+      annualAppreciationRate,
+      monthlyPayment: monthlyPayment as number,
+      monthlyRent: monthlyRent as number,
+      monthlyExpenses: monthlyExpenses as number,
+    };
+
+    if (typeof p.annual_rent_growth_rate === 'number') {
+      prop.annualRentGrowthRate = p.annual_rent_growth_rate;
+    }
+    if (typeof p.annual_expense_inflation_rate === 'number') {
+      prop.annualExpenseInflationRate = p.annual_expense_inflation_rate;
+    }
+
+    const schedule = resolvePropertySchedule(
+      p,
+      simulationAnchorYear,
+      simulationAnchorMonth,
+      portfolioDefaults,
+    );
+    prop.closeMonth = schedule.closeMonth;
+    if (schedule.closeYear !== undefined) prop.closeYear = schedule.closeYear;
+    if (schedule.closeMonthCalendar !== undefined) {
+      prop.closeMonthCalendar = schedule.closeMonthCalendar;
+    }
+    if (schedule.financingType !== undefined) {
+      prop.financingType = schedule.financingType;
+    }
+    if (schedule.balloonMonths !== undefined) {
+      prop.balloonMonths = schedule.balloonMonths;
+    }
+    if (schedule.sellerAmortizationMonths !== undefined) {
+      prop.sellerAmortizationMonths = schedule.sellerAmortizationMonths;
+    }
+    if (schedule.refiYear !== undefined) prop.refiYear = schedule.refiYear;
+    if (schedule.refiMonthCalendar !== undefined) {
+      prop.refiMonthCalendar = schedule.refiMonthCalendar;
+    }
+    if (schedule.refiSimMonth !== undefined) prop.refiSimMonth = schedule.refiSimMonth;
+    if (schedule.balloonRefiAnnualRate !== undefined) {
+      prop.balloonRefiAnnualRate = schedule.balloonRefiAnnualRate;
+    }
+    if (schedule.balloonRefiTermMonths !== undefined) {
+      prop.balloonRefiTermMonths = schedule.balloonRefiTermMonths;
+    }
+
+    if (typeof p.utilities_rent_rate === 'number') {
+      prop.utilitiesRentRate = p.utilities_rent_rate;
+    }
+
+    applyOptionalPropertyFields(prop, p);
+
+    return prop;
+  });
+
+  const partialPortfolio: Portfolio = {
+    seedVersion,
     extraMonthlyBudget,
     annualRentGrowthRate,
     annualExpenseInflationRate,
@@ -1269,20 +1643,32 @@ export function normalizePortfolio(raw: unknown): Portfolio {
       obj.acquisition_template as Parameters<typeof normalizeAcquisitionTemplate>[0],
     ),
     goals: Array.isArray(obj.goals) ? (obj.goals as GoalConfig[]) : [],
+    simulationAnchorYear,
+    simulationAnchorMonth,
+    defaultRefiAnnualRate: portfolioDefaults.refiRate,
+    defaultRefiTermMonths: portfolioDefaults.refiTermMonths,
     properties,
   };
 
   partialPortfolio.acquisitionTemplate = normalizeAcquisitionTemplate(
     obj.acquisition_template as Parameters<typeof normalizeAcquisitionTemplate>[0],
-    partialPortfolio as Portfolio,
+    partialPortfolio,
   );
 
   return partialPortfolio;
 }
 
-export function denormalizePortfolio(portfolio: Portfolio): import('./types').PortfolioFile {
+/** Convert Portfolio back to snake_case JSON shape. */
+export function denormalizePortfolio(
+  portfolio: Portfolio,
+): import('./types').PortfolioFile {
   return {
+    seed_version: portfolio.seedVersion,
     extra_monthly_budget: portfolio.extraMonthlyBudget,
+    simulation_anchor_year: portfolio.simulationAnchorYear,
+    simulation_anchor_month: portfolio.simulationAnchorMonth,
+    default_refi_annual_rate: portfolio.defaultRefiAnnualRate,
+    default_refi_term_months: portfolio.defaultRefiTermMonths,
     annual_rent_growth_rate: portfolio.annualRentGrowthRate,
     annual_expense_inflation_rate: portfolio.annualExpenseInflationRate,
     reinvest_surplus: portfolio.reinvestSurplus,
@@ -1309,6 +1695,38 @@ export function denormalizePortfolio(portfolio: Portfolio): import('./types').Po
       }
       if (p.annualExpenseInflationRate !== undefined) {
         file.annual_expense_inflation_rate = p.annualExpenseInflationRate;
+      }
+      if (p.financingType !== undefined) {
+        file.financing_type = p.financingType;
+      }
+      if (p.closeYear !== undefined) {
+        file.close_year = p.closeYear;
+        if (p.closeMonthCalendar !== undefined && p.closeMonthCalendar !== 1) {
+          file.close_month_calendar = p.closeMonthCalendar;
+        }
+      } else if (p.closeMonth !== undefined && p.closeMonth > 1) {
+        file.close_month = p.closeMonth;
+      }
+      if (p.balloonMonths !== undefined) {
+        file.balloon_months = p.balloonMonths;
+      }
+      if (p.sellerAmortizationMonths !== undefined) {
+        file.seller_amortization_months = p.sellerAmortizationMonths;
+      }
+      if (p.refiYear !== undefined) {
+        file.refi_year = p.refiYear;
+        if (p.refiMonthCalendar !== undefined && p.refiMonthCalendar !== 1) {
+          file.refi_month = p.refiMonthCalendar;
+        }
+      }
+      if (p.balloonRefiAnnualRate !== undefined) {
+        file.refi_annual_rate = p.balloonRefiAnnualRate;
+      }
+      if (p.balloonRefiTermMonths !== undefined) {
+        file.refi_term_months = p.balloonRefiTermMonths;
+      }
+      if (p.utilitiesRentRate !== undefined) {
+        file.utilities_rent_rate = p.utilitiesRentRate;
       }
       if (p.vacancyRate !== undefined) file.vacancy_rate = p.vacancyRate;
       if (p.capexReserveRate !== undefined) file.capex_reserve_rate = p.capexReserveRate;

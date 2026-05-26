@@ -72,6 +72,30 @@ export function yearFromMonth(month: number): number {
   return Math.floor((month - 1) / 12) + 1;
 }
 
+/** Calendar year for a simulation month given the anchor year for month 1. */
+export function calendarYearFromMonth(month: number, anchorYear: number): number {
+  return anchorYear + yearFromMonth(month) - 1;
+}
+
+/** Simulation month (1-based) for a calendar year/month vs portfolio anchor. */
+export function calendarToSimMonth(
+  year: number,
+  month: number,
+  anchorYear: number,
+  anchorMonth = 1,
+): number {
+  return (year - anchorYear) * 12 + (month - anchorMonth) + 1;
+}
+
+/** Simulation month when a property closes in January of closeYear. */
+export function closeMonthFromYear(
+  closeYear: number,
+  anchorYear: number,
+  anchorMonth = 1,
+): number {
+  return calendarToSimMonth(closeYear, 1, anchorYear, anchorMonth);
+}
+
 /** Month within the calendar year (1–12). */
 export function monthInYear(month: number): number {
   return ((month - 1) % 12) + 1;

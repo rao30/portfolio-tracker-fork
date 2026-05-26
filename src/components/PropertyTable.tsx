@@ -1,14 +1,17 @@
 import { Fragment, useState } from 'react';
-import type { ExpenseBreakdown, Portfolio, Property } from '../lib/types';
+import type { ExpenseBreakdown, Portfolio, Property, PropertyDraft } from '../lib/types';
 import { formatCurrency, formatPercent, propertyColor } from '../lib/format';
+import { totalMonthlyExpenses, utilitiesFromRent } from '../lib/snowball';
+import { AddPropertyModal } from './AddPropertyModal';
 import { ExpenseBreakdownEditor } from './ExpenseBreakdownEditor';
 
 interface PropertyTableProps {
   portfolio: Portfolio;
   onUpdate: (index: number, field: keyof Property, value: string) => void;
-  onExpenseBreakdownChange: (index: number, breakdown: ExpenseBreakdown) => void;
-  onAdd: () => void;
+  onExpenseBreakdownChange?: (index: number, breakdown: ExpenseBreakdown) => void;
+  onAdd: (property: PropertyDraft) => void;
   onRemove: (index: number) => void;
+  mobileCards?: boolean;
 }
 
 type EditableField = keyof Property;
@@ -21,7 +24,8 @@ const BASIC_COLUMNS: { key: EditableField; label: string; mono?: boolean }[] = [
   { key: 'annualAppreciationRate', label: 'Appr.', mono: true },
   { key: 'monthlyPayment', label: 'P&I', mono: true },
   { key: 'monthlyRent', label: 'Rent', mono: true },
-  { key: 'monthlyExpenses', label: 'Expenses', mono: true },
+  { key: 'monthlyExpenses', label: 'Operating', mono: true },
+  { key: 'utilitiesRentRate', label: 'Utilities', mono: true },
 ];
 
 const ADVANCED_COLUMNS: { key: EditableField; label: string; mono?: boolean }[] = [
@@ -34,6 +38,16 @@ const ADVANCED_COLUMNS: { key: EditableField; label: string; mono?: boolean }[] 
   { key: 'costSegPercent', label: 'Cost seg', mono: true },
 ];
 
+const MOBILE_FIELDS: { key: EditableField; label: string }[] = [
+  { key: 'balance', label: 'Balance' },
+  { key: 'marketValue', label: 'Value' },
+  { key: 'annualInterestRate', label: 'Rate' },
+  { key: 'monthlyPayment', label: 'P&I' },
+  { key: 'monthlyRent', label: 'Rent' },
+  { key: 'monthlyExpenses', label: 'Operating' },
+  { key: 'utilitiesRentRate', label: 'Utilities' },
+];
+
 const PERCENT_FIELDS = new Set<EditableField>([
   'annualInterestRate',
   'annualAppreciationRate',
@@ -43,6 +57,7 @@ const PERCENT_FIELDS = new Set<EditableField>([
   'capexReserveRate',
   'landPercent',
   'costSegPercent',
+  'utilitiesRentRate',
 ]);
 
 const CURRENCY_FIELDS = new Set<EditableField>([
@@ -57,6 +72,11 @@ const CURRENCY_FIELDS = new Set<EditableField>([
 
 function fieldDisplay(p: Property, field: EditableField): string {
   if (field === 'name') return p.name;
+  if (field === 'utilitiesRentRate') {
+    if (p.utilitiesRentRate == null) return '—';
+    const amt = utilitiesFromRent(p.monthlyRent, p.utilitiesRentRate);
+    return `${formatPercent(p.utilitiesRentRate)} (${formatCurrency(amt)})`;
+  }
   const val = p[field];
   if (val === undefined) return '—';
   if (PERCENT_FIELDS.has(field)) return formatPercent(val as number);
@@ -123,42 +143,107 @@ function EditableCell({ value, display, onCommit, mono, warn }: EditableCellProp
   );
 }
 
+function PropertyCard({
+  property,
+  index,
+  onUpdate,
+  onRemove,
+  canRemove,
+}: {
+  property: Property;
+  index: number;
+  onUpdate: (index: number, field: keyof Property, value: string) => void;
+  onRemove: (index: number) => void;
+  canRemove: boolean;
+}) {
+  return (
+    <article className="section-divider px-3 py-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span
+            className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+            style={{ backgroundColor: propertyColor(property.name) }}
+          />
+          <EditableCell
+            value={rawValue(property, 'name')}
+            display={property.name}
+            onCommit={(v) => onUpdate(index, 'name', v)}
+          />
+        </div>
+        <button
+          type="button"
+          onClick={() => onRemove(index)}
+          disabled={!canRemove}
+          className="shrink-0 text-xs text-red-400 disabled:opacity-30"
+          aria-label="Remove property"
+        >
+          Remove
+        </button>
+      </div>
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+        {MOBILE_FIELDS.map((field) => (
+          <div key={field.key}>
+            <dt className="text-slate-500">{field.label}</dt>
+            <dd className="mt-0.5 font-mono tabular-nums text-slate-200">
+              <EditableCell
+                value={rawValue(property, field.key)}
+                display={fieldDisplay(property, field.key)}
+                onCommit={(v) => onUpdate(index, field.key, v)}
+                mono
+              />
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </article>
+  );
+}
+
 export function PropertyTable({
   portfolio,
   onUpdate,
   onExpenseBreakdownChange,
   onAdd,
   onRemove,
+  mobileCards = false,
 }: PropertyTableProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const { properties } = portfolio;
+  const lastProperty = properties[properties.length - 1];
   const columns = showAdvanced
     ? [...BASIC_COLUMNS, ...ADVANCED_COLUMNS]
     : BASIC_COLUMNS;
 
   const totals = properties.reduce(
-    (acc, p) => ({
-      balance: acc.balance + p.balance,
-      marketValue: acc.marketValue + p.marketValue,
-      monthlyPayment: acc.monthlyPayment + p.monthlyPayment,
-      monthlyRent: acc.monthlyRent + p.monthlyRent,
-      monthlyExpenses: acc.monthlyExpenses + p.monthlyExpenses,
-    }),
+    (acc, p) => {
+      const utilities = utilitiesFromRent(p.monthlyRent, p.utilitiesRentRate);
+      return {
+        balance: acc.balance + p.balance,
+        marketValue: acc.marketValue + p.marketValue,
+        monthlyPayment: acc.monthlyPayment + p.monthlyPayment,
+        monthlyRent: acc.monthlyRent + p.monthlyRent,
+        monthlyOperating: acc.monthlyOperating + p.monthlyExpenses,
+        monthlyUtilities: acc.monthlyUtilities + utilities,
+      };
+    },
     {
       balance: 0,
       marketValue: 0,
       monthlyPayment: 0,
       monthlyRent: 0,
-      monthlyExpenses: 0,
+      monthlyOperating: 0,
+      monthlyUtilities: 0,
     },
   );
+  const totalExpenses = totals.monthlyOperating + totals.monthlyUtilities;
 
-  return (
-    <div className="glass-card overflow-x-auto p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-200">Portfolio</h3>
-        <div className="flex gap-2">
+  const header = (
+    <div className="mb-3 flex items-center justify-between">
+      <h3 className="text-sm font-semibold text-slate-200">Portfolio</h3>
+      <div className="flex gap-2">
+        {!mobileCards && (
           <button
             type="button"
             onClick={() => setShowAdvanced((v) => !v)}
@@ -166,15 +251,71 @@ export function PropertyTable({
           >
             {showAdvanced ? 'Hide advanced' : 'Advanced columns'}
           </button>
-          <button
-            type="button"
-            onClick={onAdd}
-            className="rounded-lg border border-white/10 px-2 py-1 text-xs text-slate-300 hover:bg-white/5"
-          >
-            + Add property
-          </button>
-        </div>
+        )}
+        <button
+          type="button"
+          onClick={() => setModalOpen(true)}
+          className="rounded-lg border border-cyan-500/30 bg-cyan-600/20 px-3 py-1.5 text-xs font-medium text-cyan-200 hover:bg-cyan-600/30"
+        >
+          + Add property
+        </button>
       </div>
+    </div>
+  );
+
+  if (mobileCards) {
+    return (
+      <div className="app-surface overflow-hidden">
+        <div className="border-b border-white/10 px-3 pt-3">{header}</div>
+        {properties.map((p, i) => (
+          <PropertyCard
+            key={`${p.name}-${i}`}
+            property={p}
+            index={i}
+            onUpdate={onUpdate}
+            onRemove={onRemove}
+            canRemove={properties.length > 1}
+          />
+        ))}
+        <div className="grid grid-cols-2 gap-2 border-t border-white/10 bg-white/[0.02] px-3 py-3 text-xs text-slate-400">
+          <div>
+            <p>Total balance</p>
+            <p className="font-mono text-sm tabular-nums text-slate-200">
+              {formatCurrency(totals.balance)}
+            </p>
+          </div>
+          <div>
+            <p>Total value</p>
+            <p className="font-mono text-sm tabular-nums text-slate-200">
+              {formatCurrency(totals.marketValue)}
+            </p>
+          </div>
+          <div>
+            <p>Total P&I</p>
+            <p className="font-mono text-sm tabular-nums text-slate-200">
+              {formatCurrency(totals.monthlyPayment)}
+            </p>
+          </div>
+          <div>
+            <p>Net rent/mo</p>
+            <p className="font-mono text-sm tabular-nums text-slate-200">
+              {formatCurrency(totals.monthlyRent - totalExpenses)}
+            </p>
+          </div>
+        </div>
+        <AddPropertyModal
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          onAdd={onAdd}
+          template={lastProperty}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="glass-card overflow-x-auto p-4">
+      {header}
       <table className="w-full min-w-[900px] text-left text-sm">
         <thead>
           <tr className="border-b border-white/10 text-xs text-slate-400">
@@ -194,58 +335,58 @@ export function PropertyTable({
 
             return (
               <Fragment key={`${p.name}-${i}`}>
-              <tr className="border-b border-white/5">
-                <td className="py-2 pr-2">
-                  <span
-                    className="inline-block h-3 w-3 rounded-full"
-                    style={{ backgroundColor: propertyColor(p.name) }}
-                  />
-                </td>
-                {columns.map((col) => (
-                  <td key={col.key} className="py-2 pr-2">
-                    <EditableCell
-                      value={rawValue(p, col.key)}
-                      display={fieldDisplay(p, col.key)}
-                      onCommit={(v) => onUpdate(i, col.key, v)}
-                      mono={col.mono}
-                      warn={col.key === 'monthlyPayment' && piWarn}
+                <tr className="border-b border-white/5">
+                  <td className="py-2 pr-2">
+                    <span
+                      className="inline-block h-3 w-3 rounded-full"
+                      style={{ backgroundColor: propertyColor(p.name) }}
                     />
                   </td>
-                ))}
-                <td className="py-2">
-                  <div className="flex gap-1">
-                    {showAdvanced && (
+                  {columns.map((col) => (
+                    <td key={col.key} className="py-2 pr-2">
+                      <EditableCell
+                        value={rawValue(p, col.key)}
+                        display={fieldDisplay(p, col.key)}
+                        onCommit={(v) => onUpdate(i, col.key, v)}
+                        mono={col.mono}
+                        warn={col.key === 'monthlyPayment' && piWarn}
+                      />
+                    </td>
+                  ))}
+                  <td className="py-2">
+                    <div className="flex gap-1">
+                      {showAdvanced && onExpenseBreakdownChange && (
+                        <button
+                          type="button"
+                          onClick={() => setExpandedRow(expandedRow === i ? null : i)}
+                          className="text-xs text-slate-400 hover:text-cyan-300"
+                          title="Expense breakdown"
+                        >
+                          {expandedRow === i ? '▾' : '▸'}
+                        </button>
+                      )}
                       <button
                         type="button"
-                        onClick={() => setExpandedRow(expandedRow === i ? null : i)}
-                        className="text-xs text-slate-400 hover:text-cyan-300"
-                        title="Expense breakdown"
+                        onClick={() => onRemove(i)}
+                        disabled={properties.length <= 1}
+                        className="text-xs text-red-400 disabled:opacity-30 hover:text-red-300"
+                        aria-label="Remove property"
                       >
-                        {expandedRow === i ? '▾' : '▸'}
+                        ×
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => onRemove(i)}
-                      disabled={properties.length <= 1}
-                      className="text-xs text-red-400 disabled:opacity-30 hover:text-red-300"
-                      aria-label="Remove property"
-                    >
-                      ×
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              {expandedRow === i && showAdvanced && (
-                <tr key={`${p.name}-${i}-breakdown`}>
-                  <td colSpan={columns.length + 2} className="pb-3 pl-8 pr-2">
-                    <ExpenseBreakdownEditor
-                      property={p}
-                      onChange={(b) => onExpenseBreakdownChange(i, b)}
-                    />
+                    </div>
                   </td>
                 </tr>
-              )}
+                {expandedRow === i && showAdvanced && onExpenseBreakdownChange && (
+                  <tr key={`${p.name}-${i}-breakdown`}>
+                    <td colSpan={columns.length + 2} className="pb-3 pl-8 pr-2">
+                      <ExpenseBreakdownEditor
+                        property={p}
+                        onChange={(b) => onExpenseBreakdownChange(i, b)}
+                      />
+                    </td>
+                  </tr>
+                )}
               </Fragment>
             );
           })}
@@ -269,15 +410,28 @@ export function PropertyTable({
               {formatCurrency(totals.monthlyRent)}
             </td>
             <td className="pt-2 font-mono tabular-nums">
-              {formatCurrency(totals.monthlyExpenses)}
+              {formatCurrency(totals.monthlyOperating)}
             </td>
-            {showAdvanced && ADVANCED_COLUMNS.map((col) => (
-              <td key={col.key} className="pt-2">—</td>
-            ))}
+            <td className="pt-2 font-mono tabular-nums">
+              {formatCurrency(totals.monthlyUtilities)}
+            </td>
+            {showAdvanced &&
+              ADVANCED_COLUMNS.map((col) => (
+                <td key={col.key} className="pt-2">
+                  —
+                </td>
+              ))}
             <td />
           </tr>
         </tfoot>
       </table>
+
+      <AddPropertyModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onAdd={onAdd}
+        template={lastProperty}
+      />
     </div>
   );
 }
