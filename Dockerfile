@@ -13,6 +13,8 @@ COPY package.json package-lock.json ./
 COPY index.html vite.config.ts postcss.config.js tailwind.config.js tsconfig*.json ./
 COPY public ./public
 COPY src ./src
+COPY server ./server
+COPY mcp-server ./mcp-server
 RUN npm run build
 
 FROM node:20-alpine AS release
@@ -23,6 +25,7 @@ RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 COPY --from=build /app/dist ./dist
 COPY server.js ./
 COPY server ./server
+COPY --from=build /app/server/portfolio-analytics.mjs ./server/portfolio-analytics.mjs
 COPY public ./public
 EXPOSE 3000
 CMD ["node", "server.js"]
