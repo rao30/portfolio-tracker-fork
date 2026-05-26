@@ -4,6 +4,8 @@ node_modules
 # Build
 dist
 dist-ssr
+server/portfolio-analytics.mjs
+mcp-server/dist/
 *.local
 
 # Environment

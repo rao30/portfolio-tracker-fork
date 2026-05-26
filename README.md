@@ -54,7 +54,63 @@ Simulation timing and seller/refi terms live in [`public/data/portfolio.json`](p
 
 The engine converts calendar dates to simulation months from the anchor. Seller `monthly_payment` and `annual_interest_rate` in JSON are the values used until refi.
 
-> Balances and loan terms are sensitive. Use a **private repository**, optional `PORTFOLIO_WRITE_KEY`, and never commit service role keys.
+> Balances and loan terms are sensitive. Use a **private repository**, set `PORTFOLIO_API_KEY` on Railway, and never commit service role keys.
+
+## LLM / MCP access (Cursor, Claude, etc.)
+
+An MCP server lets assistants read your **live** portfolio from Railway and run the same simulation engine as the dashboard (strategy comparison, tax planner, per-property DSCR, budget solvers).
+
+### 1. Protect the Railway API
+
+On Railway, set a long random secret:
+
+```bash
+openssl rand -hex 32
+```
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `PORTFOLIO_API_KEY` | **Yes** (recommended) | Protects `GET /api/portfolio`, `POST /api/analyze`, and writes |
+| `VITE_PORTFOLIO_API_KEY` | Yes (if UI uses cloud) | Same value at **build** time so the browser can load/save |
+
+Without `PORTFOLIO_API_KEY`, portfolio endpoints stay open — fine for local dev only.
+
+### 2. Cursor MCP config
+
+Copy [`.cursor/mcp.json.example`](.cursor/mcp.json.example) to `.cursor/mcp.json` (gitignored) and fill in:
+
+```json
+{
+  "mcpServers": {
+    "rental-snowball": {
+      "command": "node",
+      "args": ["mcp-server/dist/index.js"],
+      "env": {
+        "PORTFOLIO_TRACKER_URL": "https://your-app.up.railway.app",
+        "PORTFOLIO_API_KEY": "same-secret-as-railway"
+      }
+    }
+  }
+}
+```
+
+Run `npm run build` once so `mcp-server/dist/index.js` exists.
+
+### 3. Tools exposed to the LLM
+
+| Tool | What it does |
+|------|----------------|
+| `get_portfolio` | Live portfolio JSON (properties, loans, tax profile) |
+| `list_analyzer_capabilities` | Strategy and scenario ids |
+| `portfolio_current_metrics` | Current LTV, equity, debt totals |
+| `simulate_payoff_strategy` | Full snowball run for one strategy/scenario |
+| `compare_payoff_strategies` | Rank all payoff strategies |
+| `portfolio_insights` | Narratives + year metrics + per-property breakdown |
+| `property_cashflow_breakdown` | Cap rate, DSCR, cash-on-cash by property |
+| `tax_planner_summary` | Depreciation and passive loss summary |
+| `solve_extra_budget_goal` | Min extra budget for debt-free or equity target |
+
+Direct HTTP (same auth): `POST /api/analyze` with body `{ "action": "insights", "strategy": "highestRate" }` — loads cloud portfolio when `portfolio` is omitted.
 
 ### Current market values (defaults)
 
@@ -86,8 +142,10 @@ Every push to `main` triggers a new deploy — no GitHub Actions workflow or ext
 | `SUPABASE_URL` | Yes (for cloud save) | Project URL, e.g. `https://xxxx.supabase.co` |
 | `SUPABASE_SECRET_KEY` | Yes (for cloud save) | `sb_secret_...` from Supabase **Settings → API Keys** (preferred) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Alt | Legacy service role JWT if you have not migrated to secret keys yet |
-| `PORTFOLIO_WRITE_KEY` | No | If set, PUT `/api/portfolio` requires `Authorization: Bearer <key>` |
-| `VITE_PORTFOLIO_WRITE_KEY` | No | Build-time copy of write key (only if using write protection) |
+| `PORTFOLIO_API_KEY` | **Recommended** | Protects portfolio read, analyze API, and writes (`Bearer` or `X-Portfolio-Key`) |
+| `PORTFOLIO_WRITE_KEY` | Legacy | Same as API key if `PORTFOLIO_API_KEY` unset |
+| `VITE_PORTFOLIO_API_KEY` | If UI + key | Build-time key for browser `/api/portfolio` |
+| `VITE_PORTFOLIO_WRITE_KEY` | Legacy | Alias for `VITE_PORTFOLIO_API_KEY` |
 
 Copy from [`.env.example`](.env.example). Without Supabase vars, the app still runs using `public/data/portfolio.json` and browser `localStorage`.
 
@@ -186,7 +244,8 @@ src/lib/          Simulation engine, formatters, portfolio hook
 src/components/   Dashboard UI and charts
 public/data/      Default portfolio JSON (seed + fallback)
 server.js         Express server for Railway (API + static dist/)
-server/           Supabase portfolio persistence
+server/           Supabase persistence, analytics API, auth
+mcp-server/       Stdio MCP server for LLM tools (calls Railway API)
 supabase/         SQL migrations (reference)
 ```
 

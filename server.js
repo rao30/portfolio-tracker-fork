@@ -2,6 +2,8 @@ import express from 'express';
 import { existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { analyzeFromPortfolio, listCapabilities } from './server/analytics-handlers.js';
+import { getPortfolioApiKey, requirePortfolioApiKey } from './server/auth.js';
 import {
   isCloudStorageEnabled,
   loadPortfolio,
@@ -22,10 +24,11 @@ app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
     cloudStorage: isCloudStorageEnabled(),
+    apiKeyRequired: Boolean(getPortfolioApiKey()),
   });
 });
 
-app.get('/api/portfolio', async (_req, res) => {
+app.get('/api/portfolio', requirePortfolioApiKey, async (_req, res) => {
   try {
     const result = await loadPortfolio();
     res.json({
@@ -42,17 +45,7 @@ app.get('/api/portfolio', async (_req, res) => {
   }
 });
 
-app.post('/api/portfolio/reset', async (req, res) => {
-  const writeKey = process.env.PORTFOLIO_WRITE_KEY;
-  if (writeKey) {
-    const auth = req.headers.authorization;
-    const token = auth?.startsWith('Bearer ') ? auth.slice(7) : req.headers['x-portfolio-key'];
-    if (token !== writeKey) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
-    }
-  }
-
+app.post('/api/portfolio/reset', requirePortfolioApiKey, async (_req, res) => {
   try {
     const result = await resetPortfolioToSeed();
     res.json({
@@ -69,17 +62,7 @@ app.post('/api/portfolio/reset', async (req, res) => {
   }
 });
 
-app.put('/api/portfolio', async (req, res) => {
-  const writeKey = process.env.PORTFOLIO_WRITE_KEY;
-  if (writeKey) {
-    const auth = req.headers.authorization;
-    const token = auth?.startsWith('Bearer ') ? auth.slice(7) : req.headers['x-portfolio-key'];
-    if (token !== writeKey) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
-    }
-  }
-
+app.put('/api/portfolio', requirePortfolioApiKey, async (req, res) => {
   if (!isCloudStorageEnabled()) {
     res.status(503).json({ error: 'Cloud storage is not configured' });
     return;
@@ -98,6 +81,29 @@ app.put('/api/portfolio', async (req, res) => {
     console.error('PUT /api/portfolio', err);
     res.status(500).json({
       error: err instanceof Error ? err.message : 'Failed to save portfolio',
+    });
+  }
+});
+
+app.get('/api/analyze/capabilities', requirePortfolioApiKey, (_req, res) => {
+  res.json(listCapabilities());
+});
+
+app.post('/api/analyze', requirePortfolioApiKey, async (req, res) => {
+  try {
+    const portfolio = req.body?.portfolio;
+    let data;
+    if (portfolio && typeof portfolio === 'object') {
+      data = analyzeFromPortfolio(portfolio, req.body);
+    } else {
+      const loaded = await loadPortfolio();
+      data = analyzeFromPortfolio(loaded.data, req.body);
+    }
+    res.json({ ok: true, ...data });
+  } catch (err) {
+    console.error('POST /api/analyze', err);
+    res.status(400).json({
+      error: err instanceof Error ? err.message : 'Analysis failed',
     });
   }
 });

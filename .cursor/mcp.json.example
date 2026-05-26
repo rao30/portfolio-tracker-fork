@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "rental-snowball": {
+      "command": "node",
+      "args": ["mcp-server/dist/index.js"],
+      "env": {
+        "PORTFOLIO_TRACKER_URL": "https://your-app.up.railway.app",
+        "PORTFOLIO_API_KEY": "generate-a-long-random-secret"
+      }
+    }
+  }
+}

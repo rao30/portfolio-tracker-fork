@@ -84,9 +84,23 @@ interface ApiPortfolioResponse {
   cloudStorage: boolean;
 }
 
+function portfolioApiKey(): string | undefined {
+  const apiKey = import.meta.env.VITE_PORTFOLIO_API_KEY;
+  const writeKey = import.meta.env.VITE_PORTFOLIO_WRITE_KEY;
+  return apiKey || writeKey || undefined;
+}
+
+function apiHeaders(jsonBody = false): HeadersInit {
+  const key = portfolioApiKey();
+  const headers: Record<string, string> = {};
+  if (jsonBody) headers['Content-Type'] = 'application/json';
+  if (key) headers.Authorization = `Bearer ${key}`;
+  return headers;
+}
+
 async function loadFromApi(): Promise<ApiPortfolioResponse | null> {
   try {
-    const res = await fetch('/api/portfolio');
+    const res = await fetch('/api/portfolio', { headers: apiHeaders() });
     if (!res.ok) return null;
     return (await res.json()) as ApiPortfolioResponse;
   } catch {
@@ -95,12 +109,7 @@ async function loadFromApi(): Promise<ApiPortfolioResponse | null> {
 }
 
 function writeHeaders(): HeadersInit {
-  const key = import.meta.env.VITE_PORTFOLIO_WRITE_KEY;
-  if (!key) return { 'Content-Type': 'application/json' };
-  return {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${key}`,
-  };
+  return apiHeaders(true);
 }
 
 async function saveToApi(file: PortfolioFile): Promise<boolean> {
