@@ -579,6 +579,27 @@ describe('normalizePortfolio', () => {
     expect(p.properties[0].annualInsurance).toBe(3100);
     expect(p.properties[0].monthlyExpenses).toBeCloseTo(858.33, 2);
   });
+
+  it('sets conventional DeSoto duplex market value to 450k when JSON used loan balance', () => {
+    const p = normalizePortfolio({
+      extra_monthly_budget: 0,
+      properties: [
+        {
+          name: '116/118 Shadybrook Dr (conventional)',
+          financing_type: 'conventional',
+          balance: 360000,
+          market_value: 360000,
+          annual_interest_rate: 0.06625,
+          monthly_payment: 2305,
+          monthly_rent: 3600,
+          monthly_expenses: 1080,
+        },
+      ],
+    });
+    expect(p.properties[0].marketValue).toBe(450_000);
+    expect(p.properties[0].purchasePrice).toBe(450_000);
+    expect(p.properties[0].marketValue - p.properties[0].balance).toBe(90_000);
+  });
 });
 
 describe('computePortfolioYearMetrics', () => {

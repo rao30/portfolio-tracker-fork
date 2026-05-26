@@ -1758,6 +1758,9 @@ const DESOTO_EXPENSE_DEFAULTS = {
   annualInsurance: 3100,
 };
 
+/** Appraised / ARV for DeSoto duplex acquisitions (loan balance is separate). */
+export const DESOTO_DUPLEX_MARKET_VALUE = 450_000;
+
 /** DeSoto portfolio properties share 2% tax and $3,100/yr insurance. */
 export function isDesotoProperty(name: string): boolean {
   return (
@@ -1769,9 +1772,22 @@ export function isDesotoProperty(name: string): boolean {
 function applyDesotoPortfolioDefaults(portfolio: Portfolio): Portfolio {
   const properties = portfolio.properties.map((p) => {
     if (!isDesotoProperty(p.name)) return p;
-    const purchasePrice = p.purchasePrice ?? p.marketValue;
+
+    let marketValue = p.marketValue;
+    let purchasePrice = p.purchasePrice ?? p.marketValue;
+
+    // Conventional DeSoto duplexes: value is ~$450k; balance is the loan only.
+    if (
+      p.financingType === 'conventional' &&
+      marketValue < DESOTO_DUPLEX_MARKET_VALUE
+    ) {
+      marketValue = DESOTO_DUPLEX_MARKET_VALUE;
+      purchasePrice = Math.max(purchasePrice, DESOTO_DUPLEX_MARKET_VALUE);
+    }
+
     const next: Property = {
       ...p,
+      marketValue,
       purchasePrice,
       propertyTaxRate:
         p.propertyTaxRate ?? DESOTO_EXPENSE_DEFAULTS.propertyTaxRate,

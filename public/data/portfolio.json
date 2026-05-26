@@ -1,5 +1,5 @@
 {
-  "seed_version": 8,
+  "seed_version": 9,
   "simulation_anchor_year": 2026,
   "simulation_anchor_month": 1,
   "default_refi_annual_rate": 0.0675,
@@ -97,7 +97,7 @@
       "close_year": 2026,
       "close_month_calendar": 1,
       "balance": 360000,
-      "market_value": 360000,
+      "market_value": 450000,
       "annual_interest_rate": 0.06625,
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 2305.12,
@@ -105,7 +105,8 @@
       "monthly_expenses": 858.33,
       "property_tax_rate": 0.02,
       "annual_insurance": 3100,
-      "purchase_price": 360000
+      "purchase_price": 450000,
+      "cash_invested": 90000
     },
     {
       "name": "144/146 Shadybrook Dr (seller 6%, 5yr balloon)",
@@ -138,7 +139,7 @@
       "close_year": 2027,
       "close_month_calendar": 1,
       "balance": 360000,
-      "market_value": 360000,
+      "market_value": 450000,
       "annual_interest_rate": 0.06625,
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 2305.12,
@@ -146,7 +147,8 @@
       "monthly_expenses": 858.33,
       "property_tax_rate": 0.02,
       "annual_insurance": 3100,
-      "purchase_price": 360000
+      "purchase_price": 450000,
+      "cash_invested": 90000
     },
     {
       "name": "125/127 Larchbrook Dr (seller 6%, 5yr balloon)",
@@ -179,7 +181,7 @@
       "close_year": 2028,
       "close_month_calendar": 1,
       "balance": 372000,
-      "market_value": 372000,
+      "market_value": 450000,
       "annual_interest_rate": 0.06625,
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 2381.96,
@@ -187,7 +189,8 @@
       "monthly_expenses": 878.33,
       "property_tax_rate": 0.02,
       "annual_insurance": 3100,
-      "purchase_price": 372000
+      "purchase_price": 450000,
+      "cash_invested": 78000
     },
     {
       "name": "800/802 Summit Dr (seller 6%, 5yr balloon)",
@@ -220,7 +223,7 @@
       "close_year": 2029,
       "close_month_calendar": 1,
       "balance": 372000,
-      "market_value": 372000,
+      "market_value": 450000,
       "annual_interest_rate": 0.06625,
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 2381.96,
@@ -228,7 +231,8 @@
       "monthly_expenses": 878.33,
       "property_tax_rate": 0.02,
       "annual_insurance": 3100,
-      "purchase_price": 372000
+      "purchase_price": 450000,
+      "cash_invested": 78000
     },
     {
       "name": "1419/1421 Deborah Dr (seller 6%, 5yr balloon)",
