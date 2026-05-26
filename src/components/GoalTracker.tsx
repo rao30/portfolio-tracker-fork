@@ -8,6 +8,7 @@ import {
   type StrategyId,
 } from '../lib/snowball';
 import { formatCurrency, formatMonths } from '../lib/format';
+import { NumericInput } from './NumericInput';
 
 interface GoalTrackerProps {
   portfolio: Portfolio;
@@ -111,13 +112,11 @@ export function GoalTracker({
         <h3 className="mb-2 text-sm font-semibold text-slate-200">
           Goal: debt-free by
         </h3>
-        <input
-          type="number"
+        <NumericInput
+          value={goalMonth}
+          onChange={(v) => setGoalMonth(v ?? 12)}
           min={12}
           max={600}
-          step={12}
-          value={goalMonth}
-          onChange={(e) => setGoalMonth(Number(e.target.value))}
           className="mb-2 w-full rounded-lg border border-white/10 bg-slate-900/80 px-3 py-2 font-mono text-sm text-slate-100"
         />
         <p className="text-xs text-slate-400">
@@ -146,12 +145,10 @@ export function GoalTracker({
         <h3 className="mb-2 text-sm font-semibold text-slate-200">
           Goal: equity at {formatMonths(goalMonth)}
         </h3>
-        <input
-          type="number"
-          min={100000}
-          step={50000}
+        <NumericInput
           value={goalEquity}
-          onChange={(e) => setGoalEquity(Number(e.target.value))}
+          onChange={(v) => setGoalEquity(v ?? 100_000)}
+          min={100_000}
           className="mb-2 w-full rounded-lg border border-white/10 bg-slate-900/80 px-3 py-2 font-mono text-sm text-slate-100"
         />
         <p className="text-xs text-slate-400">

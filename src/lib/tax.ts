@@ -20,17 +20,17 @@ const MACRS_15 = [
 ];
 
 export function bonusDepreciationForYear(taxYear: number): number {
-  if (taxYear <= 2022) return 1;
-  if (taxYear === 2023) return 0.8;
+  // Restored to 100% under renewed bonus depreciation (2025+).
+  if (taxYear >= 2025) return 1;
   if (taxYear === 2024) return 0.6;
-  if (taxYear === 2025) return 0.4;
-  if (taxYear === 2026) return 0.2;
-  return 0;
+  if (taxYear === 2023) return 0.8;
+  if (taxYear <= 2022) return 1;
+  return 1;
 }
 
 export function defaultTaxProfile(taxYear = new Date().getFullYear()): TaxProfile {
   return {
-    annualW2Income: 0,
+    annualW2Income: 350_000,
     spouseIsReps: true,
     marginalTaxRate: 0.32,
     taxYear,

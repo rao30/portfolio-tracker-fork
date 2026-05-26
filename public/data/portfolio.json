@@ -12,10 +12,11 @@
   "default_vacancy_rate": 0,
   "default_capex_reserve_rate": 0.1,
   "tax_profile": {
-    "annual_w2_income": 400000,
+    "annual_w2_income": 350000,
     "spouse_is_reps": true,
     "marginal_tax_rate": 0.32,
     "tax_year": 2026,
+    "bonus_depreciation_rate": 1,
     "remaining_bonus_carryover": 250000,
     "state_tax_rate": 0
   },

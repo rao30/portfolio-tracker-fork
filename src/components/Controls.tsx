@@ -1,6 +1,7 @@
 import { STRATEGIES, STRATEGY_LABELS, type StrategyId } from '../lib/snowball';
 import type { PortfolioSettingKey } from '../lib/usePortfolio';
 import { formatCurrency, formatPercent } from '../lib/format';
+import { NumericInput } from './NumericInput';
 
 interface ControlsProps {
   budget: number;
@@ -73,17 +74,14 @@ export function Controls({
                 onChange={(e) => onBudgetChange(Number(e.target.value))}
                 className="h-2 flex-1 cursor-pointer accent-cyan-500"
               />
-              <input
-                type="number"
+              <NumericInput
+                value={budget}
+                onChange={(v) => {
+                  const n = v ?? 0;
+                  onBudgetChange(Math.min(budgetMax, Math.max(0, n)));
+                }}
                 min={0}
                 max={budgetMax}
-                step={100}
-                value={budget}
-                onChange={(e) => {
-                  const v = Number(e.target.value);
-                  if (!Number.isNaN(v))
-                    onBudgetChange(Math.min(budgetMax, Math.max(0, v)));
-                }}
                 className="w-24 rounded-lg border border-white/10 bg-slate-900/80 px-2 py-1 font-mono text-sm tabular-nums text-slate-100"
               />
             </div>
@@ -192,18 +190,16 @@ export function Controls({
             >
               Monthly reserve target (kept in cash)
             </label>
-            <input
+            <NumericInput
               id="reserve-target"
-              type="number"
-              min={0}
-              step={100}
               value={monthlyReserveTarget}
-              onChange={(e) =>
+              onChange={(v) =>
                 onPortfolioSettingChange(
                   'monthlyReserveTarget',
-                  Math.max(0, Number(e.target.value) || 0),
+                  Math.max(0, v ?? 0),
                 )
               }
+              min={0}
               className="w-full rounded-lg border border-white/10 bg-slate-900/80 px-2 py-1 font-mono text-sm text-slate-100"
             />
           </div>

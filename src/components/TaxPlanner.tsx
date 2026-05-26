@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { Portfolio } from '../lib/types';
 import { computeTaxPlannerResult, type PropertyTaxLoss } from '../lib/tax';
 import { formatCurrency, formatPercent } from '../lib/format';
+import { NumericInput } from './NumericInput';
 
 interface TaxPlannerProps {
   portfolio: Portfolio;
@@ -118,15 +119,10 @@ export function TaxPlanner({ portfolio, onTaxProfileChange }: TaxPlannerProps) {
             <label htmlFor="w2-income" className="mb-1 block text-xs text-slate-400">
               Annual W2 income
             </label>
-            <input
+            <NumericInput
               id="w2-income"
-              type="number"
-              min={0}
-              step={1000}
               value={tp.annualW2Income}
-              onChange={(e) =>
-                onTaxProfileChange('annualW2Income', Number(e.target.value) || 0)
-              }
+              onChange={(v) => onTaxProfileChange('annualW2Income', v ?? 0)}
               className="w-full rounded-lg border border-white/10 bg-slate-900/80 px-3 py-2 font-mono text-sm text-slate-100"
             />
           </div>
@@ -134,18 +130,10 @@ export function TaxPlanner({ portfolio, onTaxProfileChange }: TaxPlannerProps) {
             <label htmlFor="bonus-carryover" className="mb-1 block text-xs text-slate-400">
               Remaining bonus dep. carryover
             </label>
-            <input
+            <NumericInput
               id="bonus-carryover"
-              type="number"
-              min={0}
-              step={1000}
               value={tp.remainingBonusCarryover}
-              onChange={(e) =>
-                onTaxProfileChange(
-                  'remainingBonusCarryover',
-                  Number(e.target.value) || 0,
-                )
-              }
+              onChange={(v) => onTaxProfileChange('remainingBonusCarryover', v ?? 0)}
               className="w-full rounded-lg border border-white/10 bg-slate-900/80 px-3 py-2 font-mono text-sm text-slate-100"
             />
             <p className="mt-1 text-[10px] text-slate-500">Leftover from 2025 acquisitions</p>
@@ -154,16 +142,13 @@ export function TaxPlanner({ portfolio, onTaxProfileChange }: TaxPlannerProps) {
             <label htmlFor="marginal-rate" className="mb-1 block text-xs text-slate-400">
               Marginal tax rate
             </label>
-            <input
+            <NumericInput
               id="marginal-rate"
-              type="number"
+              value={tp.marginalTaxRate}
+              onChange={(v) => onTaxProfileChange('marginalTaxRate', v ?? 0)}
               min={0}
               max={0.5}
-              step={0.01}
-              value={tp.marginalTaxRate}
-              onChange={(e) =>
-                onTaxProfileChange('marginalTaxRate', Number(e.target.value) || 0)
-              }
+              allowDecimal
               className="w-full rounded-lg border border-white/10 bg-slate-900/80 px-2 py-2 font-mono text-sm text-slate-100"
             />
           </div>

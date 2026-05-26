@@ -28,10 +28,13 @@ const sampleProperty: Property = {
 };
 
 describe('bonusDepreciationForYear', () => {
-  it('phases down through 2026', () => {
+  it('is 100% for 2025+ under renewed bonus depreciation', () => {
+    expect(bonusDepreciationForYear(2025)).toBe(1);
+    expect(bonusDepreciationForYear(2026)).toBe(1);
+  });
+
+  it('phases down before renewal', () => {
     expect(bonusDepreciationForYear(2024)).toBe(0.6);
-    expect(bonusDepreciationForYear(2026)).toBe(0.2);
-    expect(bonusDepreciationForYear(2028)).toBe(0);
   });
 });
 

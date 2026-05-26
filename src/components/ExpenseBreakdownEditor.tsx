@@ -1,6 +1,7 @@
 import type { ExpenseBreakdown, Property } from '../lib/types';
 import { resolveMonthlyExpenses } from '../lib/snowball';
 import { formatCurrency } from '../lib/format';
+import { NumericInput } from './NumericInput';
 
 interface ExpenseBreakdownEditorProps {
   property: Property;
@@ -11,20 +12,22 @@ function BreakdownInput({
   label,
   value,
   onChange,
+  allowDecimal = false,
 }: {
   label: string;
   value?: number;
-  onChange: (v: string) => void;
+  onChange: (v: number | undefined) => void;
+  allowDecimal?: boolean;
 }) {
   return (
     <div>
       <label className="text-[10px] text-slate-500">{label}</label>
-      <input
-        type="number"
+      <NumericInput
+        value={value}
+        onChange={onChange}
+        optional
+        allowDecimal={allowDecimal}
         min={0}
-        step={10}
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value)}
         className="w-full rounded border border-white/10 bg-slate-900/80 px-1 py-0.5 font-mono text-xs text-slate-100"
       />
     </div>
@@ -37,9 +40,8 @@ export function ExpenseBreakdownEditor({
 }: ExpenseBreakdownEditorProps) {
   const b: ExpenseBreakdown = property.expenseBreakdown ?? {};
 
-  const setField = (key: keyof ExpenseBreakdown, val: string) => {
-    const num = val === '' ? undefined : Number(val);
-    onChange({ ...b, [key]: num });
+  const setField = (key: keyof ExpenseBreakdown, val: number | undefined) => {
+    onChange({ ...b, [key]: val });
   };
 
   return (
@@ -73,6 +75,7 @@ export function ExpenseBreakdownEditor({
           label="Mgmt % of rent"
           value={b.managementPercent}
           onChange={(v) => setField('managementPercent', v)}
+          allowDecimal
         />
         <BreakdownInput
           label="Maintenance"

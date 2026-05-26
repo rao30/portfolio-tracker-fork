@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Property, PropertyDraft } from '../lib/types';
+import { NumericInput } from './NumericInput';
 
 const EMPTY_DRAFT: PropertyDraft = {
   name: '',
@@ -23,16 +24,15 @@ function numField(
   label: string,
   value: number,
   onChange: (n: number) => void,
-  opts?: { step?: string; hint?: string },
+  opts?: { decimal?: boolean; hint?: string },
 ) {
   return (
     <label className="block text-xs text-slate-400">
       <span className="mb-1 block">{label}</span>
-      <input
-        type="number"
-        step={opts?.step ?? 'any'}
-        value={Number.isFinite(value) ? value : ''}
-        onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+      <NumericInput
+        value={Number.isFinite(value) ? value : 0}
+        onChange={(n) => onChange(n ?? 0)}
+        allowDecimal={opts?.decimal}
         className="w-full rounded-lg border border-white/10 bg-slate-900 px-2 py-1.5 text-sm text-white"
       />
       {opts?.hint ? <span className="mt-0.5 block text-[10px] text-slate-500">{opts.hint}</span> : null}
@@ -106,10 +106,10 @@ export function AddPropertyModal({ open, onClose, onAdd, template }: AddProperty
           )}
           {numField('Annual interest rate', draft.annualInterestRate, (n) =>
             setDraft((d) => ({ ...d, annualInterestRate: n })),
-          { step: '0.0001', hint: 'Decimal, e.g. 0.065 for 6.5%' })}
+          { decimal: true, hint: 'Decimal, e.g. 0.065 for 6.5%' })}
           {numField('Annual appreciation', draft.annualAppreciationRate, (n) =>
             setDraft((d) => ({ ...d, annualAppreciationRate: n })),
-          { step: '0.01', hint: 'Default 0.03 = 3%' })}
+          { decimal: true, hint: 'Default 0.03 = 3%' })}
           {numField('Monthly P&I ($)', draft.monthlyPayment, (n) =>
             setDraft((d) => ({ ...d, monthlyPayment: n })),
           )}

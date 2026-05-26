@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { Portfolio, ScenarioConfig } from '../lib/types';
 import { SCENARIO_PRESETS, buildSellScenario } from '../lib/snowball';
 import { formatPercent } from '../lib/format';
+import { NumericInput } from './NumericInput';
 
 interface ScenarioControlsProps {
   portfolio: Portfolio;
@@ -135,18 +136,18 @@ export function ScenarioControls({
             <label className="mb-1 block text-xs text-slate-400">
               Pause extra payments (months)
             </label>
-            <input
-              type="number"
-              min={0}
-              max={60}
+            <NumericInput
               value={customPause}
-              onChange={(e) => {
-                setCustomPause(Number(e.target.value) || 0);
+              onChange={(v) => {
+                const pause = v ?? 0;
+                setCustomPause(pause);
                 onScenarioChange({
                   ...customScenario,
-                  pauseExtraMonths: Number(e.target.value) || 0,
+                  pauseExtraMonths: pause,
                 });
               }}
+              min={0}
+              max={60}
               className="w-full rounded border border-white/10 bg-slate-900/80 px-2 py-1 text-sm text-slate-100"
             />
           </div>
