@@ -85,6 +85,27 @@ export function Controls({
                 className="w-24 rounded-lg border border-white/10 bg-slate-900/80 px-2 py-1 font-mono text-sm tabular-nums text-slate-100"
               />
             </div>
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-white/10 bg-slate-900/40 px-3 py-2">
+              <input
+                id="snowball-surplus"
+                type="checkbox"
+                checked={reinvestSurplus}
+                onChange={(e) =>
+                  onPortfolioSettingChange('reinvestSurplus', e.target.checked)
+                }
+                className="mt-0.5 accent-cyan-500"
+              />
+              <label htmlFor="snowball-surplus" className="text-xs text-slate-300">
+                <span className="font-medium text-slate-200">
+                  Snowball leftover cashflow
+                </span>
+                <span className="mt-0.5 block text-slate-500">
+                  Each month, apply positive cashflow (after debt, capex, and reserve)
+                  to the target loan—on top of the extra budget above. Paid-off
+                  properties still roll their P&I into the snowball automatically.
+                </span>
+              </label>
+            </div>
           </div>
           <div>
             <label
@@ -168,20 +189,6 @@ export function Controls({
               }
               className="h-2 w-full cursor-pointer accent-cyan-500"
             />
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              id="reinvest-surplus"
-              type="checkbox"
-              checked={reinvestSurplus}
-              onChange={(e) =>
-                onPortfolioSettingChange('reinvestSurplus', e.target.checked)
-              }
-              className="accent-cyan-500"
-            />
-            <label htmlFor="reinvest-surplus" className="text-xs text-slate-300">
-              Reinvest surplus cashflow as extra principal
-            </label>
           </div>
           <div>
             <label

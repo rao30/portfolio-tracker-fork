@@ -384,6 +384,20 @@ describe('simulateSnowball', () => {
     expect(last.netWorth).toBeGreaterThan(last.totalEquity);
   });
 
+  it('snowballs leftover cashflow when reinvestSurplus is enabled', () => {
+    const baseOpts = {
+      payoffOrder: ['Only'],
+      extraMonthlyBudget: 0,
+      snowballCashflow: false,
+      monthlyReserveTarget: 0,
+      defaultCapexReserveRate: 0,
+    };
+    const without = simulateSnowball(single, { ...baseOpts, reinvestSurplus: false });
+    const withSurplus = simulateSnowball(single, { ...baseOpts, reinvestSurplus: true });
+    expect(withSurplus.monthsToPayoff).toBeLessThan(without.monthsToPayoff);
+    expect(withSurplus.totalExtraPaid).toBeGreaterThan(without.totalExtraPaid);
+  });
+
   it('deducts per-property capex reserve from cashflow', () => {
     const withCapex = simulateSnowball(fixture, {
       payoffOrder: STRATEGIES.highestRate(fixture),
