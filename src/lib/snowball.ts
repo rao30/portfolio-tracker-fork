@@ -129,19 +129,30 @@ export { computeMonthlyPayment };
 
 export function resolveMonthlyExpenses(p: Property): number {
   const b = p.expenseBreakdown;
-  if (!b) return p.monthlyExpenses;
+  const basis = p.purchasePrice ?? p.marketValue;
+  const propertyTax =
+    b?.propertyTax ??
+    (p.propertyTaxRate != null && basis > 0
+      ? (basis * p.propertyTaxRate) / 12
+      : undefined);
+  const insurance =
+    b?.insurance ??
+    (p.annualInsurance != null ? p.annualInsurance / 12 : undefined);
+
+  if (propertyTax == null && insurance == null && !b) return p.monthlyExpenses;
+
   const mgmt =
-    b.managementPercent != null
+    b?.managementPercent != null
       ? p.monthlyRent * b.managementPercent
-      : (b.management ?? 0);
+      : (b?.management ?? 0);
   const sum =
-    (b.propertyTax ?? 0) +
-    (b.insurance ?? 0) +
-    (b.hoa ?? 0) +
+    (propertyTax ?? 0) +
+    (insurance ?? 0) +
+    (b?.hoa ?? 0) +
     mgmt +
-    (b.maintenance ?? 0) +
-    (b.utilities ?? 0) +
-    (b.other ?? 0);
+    (b?.maintenance ?? 0) +
+    (b?.utilities ?? 0) +
+    (b?.other ?? 0);
   return sum > 0 ? sum : p.monthlyExpenses;
 }
 
@@ -207,9 +218,6 @@ export function validateProperty(
   const debtService = p.monthlyPayment * 12;
   const dscr = debtService > 0 ? noi / debtService : Infinity;
   if (dscr < 1 && p.balance > 0) warnings.push('DSCR below 1.0');
-
-  const ltv = p.marketValue > 0 ? p.balance / p.marketValue : 0;
-  if (ltv > 0.8) warnings.push('LTV above 80%');
 
   return { warnings };
 }
@@ -1443,6 +1451,8 @@ function applyOptionalPropertyFields(prop: Property, p: Record<string, unknown>)
     ['originalLoanAmount', 'original_loan_amount'],
     ['remainingTermMonths', 'remaining_term_months'],
     ['purchasePrice', 'purchase_price'],
+    ['propertyTaxRate', 'property_tax_rate'],
+    ['annualInsurance', 'annual_insurance'],
     ['landPercent', 'land_percent'],
     ['placedInServiceYear', 'placed_in_service_year'],
     ['costSegPercent', 'cost_seg_percent'],
@@ -1735,6 +1745,8 @@ export function denormalizePortfolio(
       if (p.originalLoanAmount !== undefined) file.original_loan_amount = p.originalLoanAmount;
       if (p.remainingTermMonths !== undefined) file.remaining_term_months = p.remainingTermMonths;
       if (p.purchasePrice !== undefined) file.purchase_price = p.purchasePrice;
+      if (p.propertyTaxRate !== undefined) file.property_tax_rate = p.propertyTaxRate;
+      if (p.annualInsurance !== undefined) file.annual_insurance = p.annualInsurance;
       if (p.landPercent !== undefined) file.land_percent = p.landPercent;
       if (p.placedInServiceYear !== undefined) {
         file.placed_in_service_year = p.placedInServiceYear;

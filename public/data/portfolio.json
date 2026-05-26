@@ -100,7 +100,9 @@
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 1728.84,
       "monthly_rent": 3600,
-      "monthly_expenses": 1080,
+      "monthly_expenses": 958.33,
+      "property_tax_rate": 0.02,
+      "annual_insurance": 3100,
       "purchase_price": 420000,
       "use_cost_seg": true
     },
@@ -121,7 +123,9 @@
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 1833.33,
       "monthly_rent": 3600,
-      "monthly_expenses": 1080,
+      "monthly_expenses": 1191.67,
+      "property_tax_rate": 0.02,
+      "annual_insurance": 3100,
       "purchase_price": 560000,
       "remaining_term_months": 240,
       "use_cost_seg": true

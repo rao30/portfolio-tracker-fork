@@ -62,6 +62,10 @@ export interface Property {
   remainingTermMonths?: number;
   /** Tax / depreciation inputs. */
   purchasePrice?: number;
+  /** Annual property tax rate applied to purchase price (or market value). */
+  propertyTaxRate?: number;
+  /** Annual property insurance premium. */
+  annualInsurance?: number;
   landPercent?: number;
   placedInServiceYear?: number;
   useCostSeg?: boolean;
@@ -162,6 +166,8 @@ export interface PropertyFile {
   original_loan_amount?: number;
   remaining_term_months?: number;
   purchase_price?: number;
+  property_tax_rate?: number;
+  annual_insurance?: number;
   land_percent?: number;
   placed_in_service_year?: number;
   use_cost_seg?: boolean;
