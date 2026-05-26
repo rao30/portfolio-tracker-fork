@@ -13,8 +13,11 @@ import {
   amortizeOneMonth,
   compareStrategies,
   computeMonthlyPayment,
+  computePortfolioYearMetrics,
   isDesotoProperty,
+  monthForPortfolioYear,
   normalizePortfolio,
+  runSimulation,
   paymentFromPrincipal,
   resolveMonthlyExpenses,
   resolvePropertySchedule,
@@ -559,6 +562,32 @@ describe('normalizePortfolio', () => {
   });
 });
 
+describe('computePortfolioYearMetrics', () => {
+  it('returns annual cashflow and CoC at year 1', () => {
+    const portfolio = normalizePortfolio(
+      JSON.parse(
+        readFileSync(join(process.cwd(), 'public/data/portfolio.json'), 'utf-8'),
+      ),
+    );
+    const result = runSimulation(portfolio, 'highestRate');
+    const m = computePortfolioYearMetrics(portfolio, result, 1);
+    expect(m).not.toBeNull();
+    expect(m!.year).toBe(1);
+    expect(m!.calendarYear).toBe(2026);
+    expect(m!.month).toBe(1);
+    expect(m!.ownedCount).toBeGreaterThan(0);
+    expect(m!.cashflowAnnual).toBe(result.history[0]!.monthlyCashflow * 12);
+    expect(m!.noiAnnual).toBe(
+      (result.history[0]!.monthlyRent - result.history[0]!.monthlyExpenses) * 12,
+    );
+  });
+
+  it('advances snapshot month with year slider', () => {
+    expect(monthForPortfolioYear(1)).toBe(1);
+    expect(monthForPortfolioYear(3)).toBe(25);
+  });
+});
+
 describe('validateProperty', () => {
   it('does not warn on high LTV', () => {
     const property: Property = {
@@ -891,31 +920,21 @@ describe('seed portfolio integration', () => {
       monthlyExpenses: 1740,
     },
     {
-      name: 'DeSoto Duplex A (financed)',
-      balance: 270000,
-      marketValue: 420000,
-      annualInterestRate: 0.06625,
-      annualAppreciationRate: 0.03,
-      monthlyPayment: 1728.84,
-      monthlyRent: 3600,
-      monthlyExpenses: 1080,
-    },
-    {
-      name: SEED_PROPERTY_NAMES.desotoB,
-      balance: 440000,
-      marketValue: 560000,
+      name: SEED_PROPERTY_NAMES.shadybrookSeller,
+      balance: 460000,
+      marketValue: 460000,
       annualInterestRate: 0,
       annualAppreciationRate: 0.03,
-      monthlyPayment: 1833.33,
+      monthlyPayment: 1916.67,
       monthlyRent: 3600,
-      monthlyExpenses: 1080,
+      monthlyExpenses: 1025,
     },
   ];
 
-  it('highest rate starts with Park Blvd and ends with DeSoto B', () => {
+  it('highest rate starts with Park Blvd and ends with Shadybrook seller', () => {
     const order = STRATEGIES.highestRate(seed);
     expect(order[0]).toBe(SEED_PROPERTY_NAMES.parkBlvd);
-    expect(order[order.length - 1]).toBe(SEED_PROPERTY_NAMES.desotoB);
+    expect(order[order.length - 1]).toBe(SEED_PROPERTY_NAMES.shadybrookSeller);
   });
 
   it('pays off portfolio in roughly 14-16 years at $5k extra', () => {
@@ -929,7 +948,7 @@ describe('seed portfolio integration', () => {
     expect(r.monthsToPayoff).toBeLessThanOrEqual(200);
   });
 
-  it('Lisa Ln and DeSoto B are last two paid off under highest rate', () => {
+  it('Lisa Ln and Shadybrook seller are last two paid off under highest rate', () => {
     const r = simulateSnowball(seed, {
       payoffOrder: STRATEGIES.highestRate(seed),
       extraMonthlyBudget: 5000,
@@ -941,7 +960,7 @@ describe('seed portfolio integration', () => {
     );
     const lastTwo = months.slice(0, 2).map(([name]) => name);
     expect(lastTwo).toContain(SEED_PROPERTY_NAMES.lisaLn);
-    expect(lastTwo).toContain(SEED_PROPERTY_NAMES.desotoB);
+    expect(lastTwo).toContain(SEED_PROPERTY_NAMES.shadybrookSeller);
   });
 
 });

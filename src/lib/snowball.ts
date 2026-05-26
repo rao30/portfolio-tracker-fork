@@ -7,6 +7,7 @@ import type {
   Portfolio,
   Property,
   PropertyEvent,
+  PortfolioYearMetrics,
   PropertyInsight,
   ScenarioConfig,
   SimulationResult,
@@ -1097,6 +1098,65 @@ export function snapshotAtMonth(
   return result.history[idx] ?? null;
 }
 
+/** Simulation month at the start of a 1-based portfolio year. */
+export function monthForPortfolioYear(year: number): number {
+  return Math.max(1, (year - 1) * 12 + 1);
+}
+
+export function maxPortfolioDashboardYear(result: SimulationResult): number {
+  return Math.max(1, Math.min(20, Math.ceil(result.monthsToPayoff / 12)));
+}
+
+/** Portfolio KPIs at the start of a given year (year 1 = current / anchor year). */
+export function computePortfolioYearMetrics(
+  portfolio: Portfolio,
+  result: SimulationResult,
+  year: number,
+): PortfolioYearMetrics | null {
+  const month = monthForPortfolioYear(year);
+  const snap = snapshotAtMonth(result, month);
+  if (!snap) return null;
+
+  const anchorYear = portfolio.simulationAnchorYear ?? 2026;
+  const owned = portfolio.properties.filter((p) => (p.closeMonth ?? 1) <= month);
+  const cashInvested = owned.reduce((s, p) => s + resolveCashInvested(p), 0);
+
+  const rentMonthly = snap.monthlyRent;
+  const opexMonthly = snap.monthlyExpenses;
+  const noiAnnual = (rentMonthly - opexMonthly) * 12;
+  const debtServiceAnnual = snap.monthlyPi * 12;
+  const capexAnnual = snap.monthlyCapex * 12;
+  const cashflowAnnual = snap.monthlyCashflow * 12;
+  const propertyValue = snap.totalPropertyValue;
+  const debt = snap.totalLiabilities;
+  const equity = snap.totalEquity;
+  const ltv = propertyValue > 0 ? debt / propertyValue : 0;
+  const capRate = propertyValue > 0 ? noiAnnual / propertyValue : 0;
+  const portfolioDscr =
+    debtServiceAnnual > 0 ? noiAnnual / debtServiceAnnual : null;
+  const cashOnCash = cashInvested > 0 ? cashflowAnnual / cashInvested : null;
+
+  return {
+    year,
+    calendarYear: anchorYear + year - 1,
+    month,
+    ownedCount: owned.length,
+    rentMonthly,
+    noiAnnual,
+    debtServiceAnnual,
+    capexAnnual,
+    cashflowAnnual,
+    cashInvested,
+    cashOnCash,
+    capRate,
+    portfolioDscr,
+    equity,
+    propertyValue,
+    debt,
+    ltv,
+  };
+}
+
 /** Current portfolio equity from property inputs (month 0). */
 export function currentPortfolioMetrics(properties: Property[]): {
   totalEquity: number;
@@ -1809,6 +1869,7 @@ export function denormalizePortfolio(
 
 export const SEED_PROPERTY_NAMES = {
   parkBlvd: 'Park Blvd (Plano, projected post-move-out)',
-  desotoB: 'DeSoto Duplex B (0% seller-financed)',
+  shadybrookSeller:
+    '144/146 Shadybrook Dr (0% seller-financed, 5yr balloon)',
   lisaLn: 'Lisa Ln (Cedar Hill)',
 } as const;

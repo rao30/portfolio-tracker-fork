@@ -6,11 +6,11 @@ import { GoalTracker } from './components/GoalTracker';
 import { Header } from './components/Header';
 import { IncomeVsExpenseChart } from './components/IncomeVsExpenseChart';
 import { InterestChart } from './components/InterestChart';
-import { KpiCards } from './components/KpiCards';
 import { MonteCarloChart } from './components/MonteCarloChart';
 import { MobileNav, type MobileTab } from './components/MobileNav';
 import { NetWorthChart } from './components/NetWorthChart';
 import { PayoffTimeline } from './components/PayoffTimeline';
+import { PortfolioDashboard } from './components/PortfolioDashboard';
 import { PropertyInsights } from './components/PropertyInsights';
 import { PropertyTable } from './components/PropertyTable';
 import { ScenarioControls } from './components/ScenarioControls';
@@ -55,7 +55,7 @@ function App() {
   const [mobileTab, setMobileTab] = useState<MobileTab>('overview');
   const [activeStrategy, setActiveStrategy] = useState<StrategyId>('highestRate');
   const [scenario, setScenario] = useState<ScenarioConfig>(SCENARIO_PRESETS[0]);
-  const [equityHorizon, setEquityHorizon] = useState(120);
+  const [portfolioYear, setPortfolioYear] = useState(1);
 
   const budgetMax = useMemo(() => {
     if (!portfolio) return 20000;
@@ -185,11 +185,11 @@ function App() {
                 />
               </div>
             </div>
-            <KpiCards
-              active={activeResult}
-              baseline={baselineResult}
+            <PortfolioDashboard
               portfolio={portfolio}
-              equityHorizon={equityHorizon}
+              result={activeResult}
+              year={portfolioYear}
+              onYearChange={setPortfolioYear}
               compact
             />
             <div className="app-surface overflow-hidden">
@@ -266,21 +266,6 @@ function App() {
               </button>
             </div>
             <Controls {...controlProps} mode="advanced" />
-            <div className="app-surface flex items-center gap-3 p-4">
-              <label htmlFor="equity-horizon-mobile" className="text-sm text-slate-300">
-                Equity KPI horizon
-              </label>
-              <select
-                id="equity-horizon-mobile"
-                value={equityHorizon}
-                onChange={(e) => setEquityHorizon(Number(e.target.value))}
-                className="flex-1 rounded-lg border border-white/10 bg-slate-900/80 px-2 py-2 text-sm text-slate-100"
-              >
-                <option value={60}>5 years</option>
-                <option value={120}>10 years</option>
-                <option value={180}>15 years</option>
-              </select>
-            </div>
             <GoalTracker {...goalProps} section="goals" />
             <GoalTracker {...goalProps} section="milestones" />
           </div>
@@ -303,36 +288,17 @@ function App() {
 
       <Controls {...controlProps} />
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <ScenarioControls
-            portfolio={portfolio}
-            scenarioId={scenario.id}
-            onScenarioChange={setScenario}
-          />
-        </div>
-        <div className="glass-card flex items-center gap-3 p-4">
-          <label htmlFor="equity-horizon" className="text-sm text-slate-300">
-            Equity KPI horizon
-          </label>
-          <select
-            id="equity-horizon"
-            value={equityHorizon}
-            onChange={(e) => setEquityHorizon(Number(e.target.value))}
-            className="flex-1 rounded-lg border border-white/10 bg-slate-900/80 px-2 py-1 text-sm text-slate-100"
-          >
-            <option value={60}>5 years</option>
-            <option value={120}>10 years</option>
-            <option value={180}>15 years</option>
-          </select>
-        </div>
-      </div>
-
-      <KpiCards
-        active={activeResult}
-        baseline={baselineResult}
+      <PortfolioDashboard
         portfolio={portfolio}
-        equityHorizon={equityHorizon}
+        result={activeResult}
+        year={portfolioYear}
+        onYearChange={setPortfolioYear}
+      />
+
+      <ScenarioControls
+        portfolio={portfolio}
+        scenarioId={scenario.id}
+        onScenarioChange={setScenario}
       />
 
       <TaxPlanner

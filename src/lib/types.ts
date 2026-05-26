@@ -330,6 +330,27 @@ export interface PropertyInsight {
   warnings: string[];
 }
 
+/** Portfolio-level metrics at the start of a simulation year. */
+export interface PortfolioYearMetrics {
+  year: number;
+  calendarYear: number;
+  month: number;
+  ownedCount: number;
+  rentMonthly: number;
+  noiAnnual: number;
+  debtServiceAnnual: number;
+  capexAnnual: number;
+  cashflowAnnual: number;
+  cashInvested: number;
+  cashOnCash: number | null;
+  capRate: number;
+  portfolioDscr: number | null;
+  equity: number;
+  propertyValue: number;
+  debt: number;
+  ltv: number;
+}
+
 export interface GoalConfig {
   type: 'debtFreeByMonth' | 'equityAtMonth' | 'netWorthAtMonth';
   targetMonth: number;
