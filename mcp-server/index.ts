@@ -5,59 +5,23 @@
  * Configure in Cursor (.cursor/mcp.json):
  *   PORTFOLIO_TRACKER_URL=https://your-app.up.railway.app
  *   PORTFOLIO_API_KEY=<same as Railway PORTFOLIO_API_KEY>
+ *
+ * Or use the hosted Railway endpoint:
+ *   url=https://your-app.up.railway.app/mcp
+ *   Authorization: Bearer <PORTFOLIO_API_KEY>
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
 
-const baseUrl = (process.env.PORTFOLIO_TRACKER_URL ?? '').replace(/\/$/, '');
-const apiKey =
-  process.env.PORTFOLIO_API_KEY ?? process.env.PORTFOLIO_WRITE_KEY ?? '';
-
-function requireRemoteConfig() {
-  if (!baseUrl) {
-    throw new Error(
-      'Set PORTFOLIO_TRACKER_URL to your Railway app URL (e.g. https://….up.railway.app)',
-    );
-  }
-  if (!apiKey) {
-    throw new Error(
-      'Set PORTFOLIO_API_KEY (must match PORTFOLIO_API_KEY on Railway)',
-    );
-  }
+export interface RentalSnowballMcpConfig {
+  baseUrl?: string;
+  apiKey?: string;
 }
 
-async function trackerFetch(path: string, init: RequestInit = {}) {
-  requireRemoteConfig();
-  const headers = new Headers(init.headers);
-  headers.set('Authorization', `Bearer ${apiKey}`);
-  headers.set('Accept', 'application/json');
-  if (init.body) {
-    headers.set('Content-Type', 'application/json');
-  }
-  const res = await fetch(`${baseUrl}${path}`, { ...init, headers });
-  const text = await res.text();
-  let json: unknown;
-  try {
-    json = text ? JSON.parse(text) : {};
-  } catch {
-    throw new Error(`Invalid JSON from ${path}: ${text.slice(0, 200)}`);
-  }
-  if (!res.ok) {
-    const err =
-      json && typeof json === 'object' && 'error' in json
-        ? String((json as { error: string }).error)
-        : res.statusText;
-    throw new Error(`${res.status} ${path}: ${err}`);
-  }
-  return json;
-}
-
-async function analyze(body: Record<string, unknown>) {
-  return trackerFetch('/api/analyze', {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
+function normalizeBaseUrl(url: string | undefined) {
+  return (url ?? '').replace(/\/$/, '');
 }
 
 const strategySchema = z
@@ -88,10 +52,68 @@ const portfolioYearSchema = z
   .optional()
   .describe('Portfolio dashboard year (1 = anchor / current year)');
 
-const server = new McpServer({
-  name: 'rental-snowball-portfolio',
-  version: '1.0.0',
-});
+export function createRentalSnowballMcpServer(
+  config: RentalSnowballMcpConfig = {},
+) {
+  const baseUrl = normalizeBaseUrl(
+    config.baseUrl ?? process.env.PORTFOLIO_TRACKER_URL,
+  );
+  const apiKey =
+    config.apiKey ??
+    process.env.PORTFOLIO_API_KEY ??
+    process.env.PORTFOLIO_WRITE_KEY ??
+    '';
+
+  function requireRemoteConfig() {
+    if (!baseUrl) {
+      throw new Error(
+        'Set PORTFOLIO_TRACKER_URL to your Railway app URL (e.g. https://your-app.up.railway.app)',
+      );
+    }
+    if (!apiKey) {
+      throw new Error(
+        'Set PORTFOLIO_API_KEY (must match PORTFOLIO_API_KEY on Railway)',
+      );
+    }
+  }
+
+  async function trackerFetch(path: string, init: RequestInit = {}) {
+    requireRemoteConfig();
+    const headers = new Headers(init.headers);
+    headers.set('Authorization', `Bearer ${apiKey}`);
+    headers.set('Accept', 'application/json');
+    if (init.body) {
+      headers.set('Content-Type', 'application/json');
+    }
+    const res = await fetch(`${baseUrl}${path}`, { ...init, headers });
+    const text = await res.text();
+    let json: unknown;
+    try {
+      json = text ? JSON.parse(text) : {};
+    } catch {
+      throw new Error(`Invalid JSON from ${path}: ${text.slice(0, 200)}`);
+    }
+    if (!res.ok) {
+      const err =
+        json && typeof json === 'object' && 'error' in json
+          ? String((json as { error: string }).error)
+          : res.statusText;
+      throw new Error(`${res.status} ${path}: ${err}`);
+    }
+    return json;
+  }
+
+  async function analyze(body: Record<string, unknown>) {
+    return trackerFetch('/api/analyze', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+
+  const server = new McpServer({
+    name: 'rental-snowball-portfolio',
+    version: '1.0.0',
+  });
 
 server.tool(
   'get_portfolio',
@@ -253,12 +275,18 @@ server.tool(
   },
 );
 
+  return server;
+}
+
 async function main() {
+  const server = createRentalSnowballMcpServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

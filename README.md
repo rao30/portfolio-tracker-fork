@@ -77,7 +77,20 @@ Without `PORTFOLIO_API_KEY`, portfolio endpoints stay open — fine for local de
 
 ### 2. Cursor MCP config
 
-**Cloud Agents** (recommended): add secrets in [Cloud Agents → Secrets](https://cursor.com/dashboard/cloud-agents), then paste the config from [`.cursor/mcp.json.cloud.example`](.cursor/mcp.json.cloud.example) into **cursor.com/agents → MCP** (or commit `.cursor/mcp.json` in the repo).
+**Cloud Agents** (recommended): add `PORTFOLIO_API_KEY` in [Cloud Agents → Secrets](https://cursor.com/dashboard/cloud-agents), then paste the config from [`.cursor/mcp.json.cloud.example`](.cursor/mcp.json.cloud.example) into **cursor.com/agents → MCP** (or commit `.cursor/mcp.json` in the repo). The hosted MCP endpoint is protected with the same bearer key as the portfolio API:
+
+```json
+{
+  "mcpServers": {
+    "rental-snowball": {
+      "url": "https://portfolio-tracker-production-b019.up.railway.app/mcp",
+      "headers": {
+        "Authorization": "Bearer ${env:PORTFOLIO_API_KEY}"
+      }
+    }
+  }
+}
+```
 
 **Local desktop**: copy [`.cursor/mcp.json.example`](.cursor/mcp.json.example) to `.cursor/mcp.json` and set the same secrets in your shell or Cursor user secrets.
 
@@ -96,7 +109,7 @@ Without `PORTFOLIO_API_KEY`, portfolio endpoints stay open — fine for local de
 }
 ```
 
-`npm run mcp:stdio` builds `mcp-server/dist/index.js` on first start (needed in cloud where `dist/` is not committed).
+`npm run mcp:stdio` builds `mcp-server/dist/index.js` on first start. The Railway app also exposes the same tools over Streamable HTTP at `/mcp`.
 
 ### 3. Tools exposed to the LLM
 

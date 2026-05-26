@@ -1,9 +1,14 @@
 import express from 'express';
 import { existsSync } from 'fs';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createRentalSnowballMcpServer } from './mcp-server/dist/index.js';
 import { analyzeFromPortfolio, listCapabilities } from './server/analytics-handlers.js';
-import { getPortfolioApiKey, requirePortfolioApiKey } from './server/auth.js';
+import {
+  getPortfolioApiKey,
+  requirePortfolioApiKey,
+} from './server/auth.js';
 import {
   isCloudStorageEnabled,
   loadPortfolio,
@@ -105,6 +110,60 @@ app.post('/api/analyze', requirePortfolioApiKey, async (req, res) => {
     res.status(400).json({
       error: err instanceof Error ? err.message : 'Analysis failed',
     });
+  }
+});
+
+function getRequestOrigin(req) {
+  const forwardedProto = req.get('x-forwarded-proto')?.split(',')[0]?.trim();
+  const forwardedHost = req.get('x-forwarded-host')?.split(',')[0]?.trim();
+  const proto = forwardedProto || req.protocol;
+  const host = forwardedHost || req.get('host');
+  return `${proto}://${host}`;
+}
+
+function requireMcpApiKey(req, res, next) {
+  const expected = getPortfolioApiKey();
+  if (!expected) {
+    res.status(503).json({
+      error: 'MCP remote access requires PORTFOLIO_API_KEY on the server',
+    });
+    return;
+  }
+  requirePortfolioApiKey(req, res, next);
+}
+
+app.all('/mcp', requireMcpApiKey, async (req, res) => {
+  if (!['GET', 'POST', 'DELETE'].includes(req.method)) {
+    res.set('Allow', 'GET, POST, DELETE');
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
+  const apiKey = getPortfolioApiKey();
+  const server = createRentalSnowballMcpServer({
+    baseUrl: process.env.PORTFOLIO_TRACKER_URL || getRequestOrigin(req),
+    apiKey,
+  });
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: undefined,
+  });
+
+  res.on('close', () => {
+    server.close().catch((err) => {
+      console.error('MCP close failed:', err);
+    });
+  });
+
+  try {
+    await server.connect(transport);
+    await transport.handleRequest(req, res, req.body);
+  } catch (err) {
+    console.error(`${req.method} /mcp`, err);
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: err instanceof Error ? err.message : 'MCP request failed',
+      });
+    }
   }
 });
 

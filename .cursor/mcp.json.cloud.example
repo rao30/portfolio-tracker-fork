@@ -1,11 +1,9 @@
 {
   "mcpServers": {
     "rental-snowball": {
-      "command": "npm",
-      "args": ["run", "mcp:stdio"],
-      "env": {
-        "PORTFOLIO_TRACKER_URL": "${env:PORTFOLIO_TRACKER_URL}",
-        "PORTFOLIO_API_KEY": "${env:PORTFOLIO_API_KEY}"
+      "url": "https://portfolio-tracker-production-b019.up.railway.app/mcp",
+      "headers": {
+        "Authorization": "Bearer ${env:PORTFOLIO_API_KEY}"
       }
     }
   }
