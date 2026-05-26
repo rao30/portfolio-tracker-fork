@@ -1189,7 +1189,8 @@ export function computePortfolioYearMetrics(
   const noiAnnual = (rentMonthly - opexMonthly) * 12;
   const debtServiceAnnual = snap.monthlyPi * 12;
   const capexAnnual = snap.monthlyCapex * 12;
-  const cashflowAnnual = snap.monthlyCashflow * 12;
+  const rentalCashflowMonthly = computeRentalCashflowAtMonth(portfolio, result, month);
+  const cashflowAnnual = rentalCashflowMonthly * 12;
   const propertyValue = snap.totalPropertyValue;
   const debt = snap.totalLiabilities;
   const equity = snap.totalEquity;
@@ -1197,7 +1198,11 @@ export function computePortfolioYearMetrics(
   const capRate = propertyValue > 0 ? noiAnnual / propertyValue : 0;
   const portfolioDscr =
     debtServiceAnnual > 0 ? noiAnnual / debtServiceAnnual : null;
-  const cashOnCash = cashInvested > 0 ? cashflowAnnual / cashInvested : null;
+  const rentalCashInvested = owned
+    .filter((p) => !isOwnerOccupiedAtMonth(p, month))
+    .reduce((s, p) => s + resolveCashInvested(p), 0);
+  const cashOnCash =
+    rentalCashInvested > 0 ? cashflowAnnual / rentalCashInvested : null;
 
   return {
     year,
@@ -1209,7 +1214,7 @@ export function computePortfolioYearMetrics(
     debtServiceAnnual,
     capexAnnual,
     cashflowAnnual,
-    cashInvested,
+    cashInvested: rentalCashInvested,
     cashOnCash,
     capRate,
     portfolioDscr,
@@ -1277,6 +1282,62 @@ export function isPropertyActiveAtMonth(p: Property, asOfMonth: number): boolean
   return (p.closeMonth ?? 1) <= asOfMonth;
 }
 
+/** House-hack primary while you still live there (no rent yet). */
+export function isOwnerOccupiedAtMonth(p: Property, asOfMonth: number): boolean {
+  if (!isPropertyActiveAtMonth(p, asOfMonth)) return false;
+  if (propertyGrossRentAtMonth(p, asOfMonth) > 0) return false;
+  return /^Primary \d{4}/i.test(p.name);
+}
+
+/** Monthly cashflow for one property at a simulation month (after debt & capex). */
+export function computePropertyCashflowAtMonth(
+  p: Property,
+  portfolio: Portfolio,
+  result: SimulationResult,
+  asOfMonth: number,
+  scenario?: ScenarioConfig | null,
+): number | null {
+  if (!isPropertyActiveAtMonth(p, asOfMonth)) return null;
+
+  const snap = snapshotAtMonth(result, asOfMonth);
+  const balance = snap?.balancesByName[p.name] ?? p.balance;
+  const vacancy = resolveVacancyRate(p, portfolio, scenario);
+  const grossRent = propertyGrownRentAtMonth(p, portfolio, asOfMonth);
+  const effectiveRent = grossRent * (1 - vacancy);
+  const operating = propertyGrownOperatingAtMonth(p, portfolio, asOfMonth);
+  const netRent =
+    effectiveRent - totalMonthlyExpenses(grossRent, operating, p.utilitiesRentRate);
+  const capexRate = resolveCapexRate(p, portfolio, scenario);
+  const capexFlat = p.capexReserveFlat ?? portfolio.defaultCapexReserveFlat;
+  const monthlyCapexReserve = propertyMonthlyCapex(grossRent, capexRate, capexFlat);
+  const refiMonth = result.refinanceSchedule[p.name];
+  const monthlyPayment =
+    refiMonth != null && asOfMonth >= refiMonth
+      ? paymentFromPrincipal(
+          balance,
+          p.balloonRefiAnnualRate ?? portfolio.defaultRefiAnnualRate,
+          p.balloonRefiTermMonths ?? portfolio.defaultRefiTermMonths,
+        )
+      : p.monthlyPayment;
+
+  return netRent - (balance > 0 ? monthlyPayment : 0) - monthlyCapexReserve;
+}
+
+/** Sum rental-portfolio cashflow (excludes owner-occupied primaries). */
+export function computeRentalCashflowAtMonth(
+  portfolio: Portfolio,
+  result: SimulationResult,
+  asOfMonth: number,
+  scenario?: ScenarioConfig | null,
+): number {
+  return portfolio.properties
+    .filter((p) => isPropertyActiveAtMonth(p, asOfMonth) && !isOwnerOccupiedAtMonth(p, asOfMonth))
+    .reduce(
+      (sum, p) => sum + (computePropertyCashflowAtMonth(p, portfolio, result, asOfMonth, scenario) ?? 0),
+      0,
+    );
+}
+
 /** Per-property metrics aligned with portfolio year dashboard (sim snapshot + schedule). */
 export function computePropertyInsightsAtMonth(
   portfolio: Portfolio,
@@ -1323,7 +1384,9 @@ export function computePropertyInsightsAtMonth(
       const monthlyCf =
         netRent - (balance > 0 ? monthlyPayment : 0) - monthlyCapexReserve;
       const annualCf = monthlyCf * 12;
-      const cashOnCash = cashInvested > 0 ? annualCf / cashInvested : 0;
+      const ownerOccupied = isOwnerOccupiedAtMonth(p, asOfMonth);
+      const cashOnCash =
+        !ownerOccupied && cashInvested > 0 ? annualCf / cashInvested : 0;
       const breakEvenOccupancy =
         grossRent > 0
           ? (totalMonthlyExpenses(grossRent, operating, p.utilitiesRentRate) +
@@ -1357,6 +1420,7 @@ export function computePropertyInsightsAtMonth(
         monthlyNetRent: netRent,
         cashflowAnnual: annualCf,
         cashflowMonthly: monthlyCf,
+        excludedFromRentalCashflow: ownerOccupied,
         dscr,
         cashOnCash,
         breakEvenOccupancy,
@@ -1392,7 +1456,9 @@ export function computePropertyInsights(
     const monthlyCf =
       netRent - (p.balance > 0 ? p.monthlyPayment : 0) - monthlyCapexReserve;
     const annualCf = monthlyCf * 12;
-    const cashOnCash = cashInvested > 0 ? annualCf / cashInvested : 0;
+    const ownerOccupied = isOwnerOccupiedAtMonth(p, 1);
+    const cashOnCash =
+      !ownerOccupied && cashInvested > 0 ? annualCf / cashInvested : 0;
     const grossRent = p.monthlyRent;
     const breakEvenOccupancy =
       grossRent > 0
@@ -1416,6 +1482,7 @@ export function computePropertyInsights(
       monthlyNetRent: netRent,
       cashflowAnnual: annualCf,
       cashflowMonthly: monthlyCf,
+      excludedFromRentalCashflow: ownerOccupied,
       dscr,
       cashOnCash,
       breakEvenOccupancy,

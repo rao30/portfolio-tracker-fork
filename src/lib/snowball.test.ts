@@ -16,6 +16,8 @@ import {
   computeSellerFinancingTerms,
   computePropertyInsightsAtMonth,
   computePortfolioYearMetrics,
+  computeRentalCashflowAtMonth,
+  isOwnerOccupiedAtMonth,
   monthForPortfolioYear,
   isDesotoProperty,
   monthForPortfolioYear,
@@ -593,7 +595,10 @@ describe('computePortfolioYearMetrics', () => {
     expect(m!.calendarYear).toBe(2026);
     expect(m!.month).toBe(1);
     expect(m!.ownedCount).toBeGreaterThan(0);
-    expect(m!.cashflowAnnual).toBe(result.history[0]!.monthlyCashflow * 12);
+    const simCashflowAnnual = result.history[0]!.monthlyCashflow * 12;
+    const rentalCashflowAnnual = computeRentalCashflowAtMonth(portfolio, result, 1) * 12;
+    expect(rentalCashflowAnnual).toBeGreaterThan(simCashflowAnnual);
+    expect(m!.cashflowAnnual).toBe(rentalCashflowAnnual);
     expect(m!.noiAnnual).toBe(
       (result.history[0]!.monthlyRent - result.history[0]!.monthlyExpenses) * 12,
     );
@@ -832,6 +837,30 @@ describe('close schedule and balloon', () => {
     expect(rp.history[11].monthlyCashflow).toBeLessThan(0);
     expect(rp.history[12].monthlyCashflow).toBeGreaterThan(650);
     expect(rp.history[12].monthlyCashflow).toBeLessThan(750);
+  });
+
+  it('excludes owner-occupied primary from rental cashflow at year 1', () => {
+    const portfolio = normalizePortfolio(
+      JSON.parse(
+        readFileSync(join(process.cwd(), 'public/data/portfolio.json'), 'utf8'),
+      ),
+    );
+    const primary = portfolio.properties.find((p) => p.name.startsWith('Primary 2026'))!;
+    expect(isOwnerOccupiedAtMonth(primary, 1)).toBe(true);
+    expect(isOwnerOccupiedAtMonth(primary, 13)).toBe(false);
+
+    const result = runSimulation(portfolio, 'highestRate');
+    const insights = computePropertyInsightsAtMonth(portfolio, result, 1);
+    const primaryInsight = insights.find((p) => p.name.startsWith('Primary 2026'));
+    expect(primaryInsight?.excludedFromRentalCashflow).toBe(true);
+
+    const rentalSum = insights
+      .filter((p) => !p.excludedFromRentalCashflow)
+      .reduce((s, p) => s + p.cashflowAnnual, 0);
+    expect(computeRentalCashflowAtMonth(portfolio, result, 1) * 12).toBeCloseTo(
+      rentalSum,
+      0,
+    );
   });
 
   it('property insights at month match owned count for portfolio year', () => {

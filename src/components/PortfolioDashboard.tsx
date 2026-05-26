@@ -53,7 +53,7 @@ export function PortfolioDashboard({
     {
       label: 'Annual cashflow',
       value: formatCurrency(metrics.cashflowAnnual),
-      sub: `${formatCurrency(metrics.cashflowAnnual / 12)}/mo after debt & capex`,
+      sub: `${formatCurrency(metrics.cashflowAnnual / 12)}/mo rentals only · after debt & capex`,
       highlight: metrics.cashflowAnnual >= 0,
       warn: metrics.cashflowAnnual < 0,
     },

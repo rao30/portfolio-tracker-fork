@@ -60,39 +60,54 @@ function CashflowValue({
   );
 }
 
+function rentalInsights(insights: PropertyInsight[]): PropertyInsight[] {
+  return insights.filter((p) => !p.excludedFromRentalCashflow);
+}
+
 function InsightsSummary({ insights }: { insights: PropertyInsight[] }) {
-  const totalAnnual = insights.reduce((s, p) => s + p.cashflowAnnual, 0);
-  const positive = insights.filter((p) => p.cashflowAnnual > 0).length;
-  const negative = insights.filter((p) => p.cashflowAnnual < 0).length;
-  const neutral = insights.length - positive - negative;
+  const rentals = rentalInsights(insights);
+  const ownerOccupied = insights.filter((p) => p.excludedFromRentalCashflow);
+  const totalAnnual = rentals.reduce((s, p) => s + p.cashflowAnnual, 0);
+  const pocketAnnual = ownerOccupied.reduce((s, p) => s + p.cashflowAnnual, 0);
+  const positive = rentals.filter((p) => p.cashflowAnnual > 0).length;
+  const negative = rentals.filter((p) => p.cashflowAnnual < 0).length;
+  const neutral = rentals.length - positive - negative;
 
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-white/10 bg-slate-900/50 px-3 py-2.5">
-      <div>
-        <p className="text-[10px] uppercase tracking-wide text-slate-500">
-          Portfolio cashflow (sum)
-        </p>
-        <CashflowValue
-          annual={totalAnnual}
-          monthly={totalAnnual / 12}
-          size="lg"
-        />
-      </div>
-      <div className="flex flex-wrap gap-3 text-xs">
-        <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-emerald-400">
-          {positive} positive
-        </span>
-        {negative > 0 && (
-          <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-red-400">
-            {negative} negative
+    <div className="mb-4 space-y-2">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-white/10 bg-slate-900/50 px-3 py-2.5">
+        <div>
+          <p className="text-[10px] uppercase tracking-wide text-slate-500">
+            Rental portfolio cashflow
+          </p>
+          <CashflowValue
+            annual={totalAnnual}
+            monthly={totalAnnual / 12}
+            size="lg"
+          />
+        </div>
+        <div className="flex flex-wrap gap-3 text-xs">
+          <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-emerald-400">
+            {positive} positive
           </span>
-        )}
-        {neutral > 0 && (
-          <span className="rounded-full bg-slate-500/15 px-2 py-0.5 text-slate-400">
-            {neutral} break-even
-          </span>
-        )}
+          {negative > 0 && (
+            <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-red-400">
+              {negative} negative
+            </span>
+          )}
+          {neutral > 0 && (
+            <span className="rounded-full bg-slate-500/15 px-2 py-0.5 text-slate-400">
+              {neutral} break-even
+            </span>
+          )}
+        </div>
       </div>
+      {ownerOccupied.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-slate-400">
+          <span className="text-amber-300/90">Out of pocket (owner-occupied, not in sum)</span>
+          <CashflowValue annual={pocketAnnual} monthly={pocketAnnual / 12} size="sm" />
+        </div>
+      )}
     </div>
   );
 }
@@ -111,7 +126,13 @@ export function PropertyInsights({
   const horizons = comparisonAtHorizons(result, [60, 120, 180]);
 
   const sorted = useMemo(
-    () => [...insights].sort((a, b) => b.cashflowAnnual - a.cashflowAnnual),
+    () =>
+      [...insights].sort((a, b) => {
+        if (a.excludedFromRentalCashflow !== b.excludedFromRentalCashflow) {
+          return a.excludedFromRentalCashflow ? 1 : -1;
+        }
+        return b.cashflowAnnual - a.cashflowAnnual;
+      }),
     [insights],
   );
 
@@ -130,15 +151,22 @@ export function PropertyInsights({
               <li
                 key={p.name}
                 className={`rounded-lg border px-3 py-2.5 ${
-                  p.cashflowAnnual < 0
-                    ? 'border-red-500/20 bg-red-500/5'
-                    : p.cashflowAnnual > 0
-                      ? 'border-emerald-500/15 bg-emerald-500/5'
-                      : 'border-white/10 bg-slate-900/30'
+                  p.excludedFromRentalCashflow
+                    ? 'border-amber-500/25 bg-amber-500/5'
+                    : p.cashflowAnnual < 0
+                      ? 'border-red-500/20 bg-red-500/5'
+                      : p.cashflowAnnual > 0
+                        ? 'border-emerald-500/15 bg-emerald-500/5'
+                        : 'border-white/10 bg-slate-900/30'
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <p className="font-medium text-slate-100">{p.name}</p>
+                  <div>
+                    <p className="font-medium text-slate-100">{p.name}</p>
+                    {p.excludedFromRentalCashflow && (
+                      <p className="text-[10px] text-amber-300/90">Owner-occupied</p>
+                    )}
+                  </div>
                   <CashflowValue
                     annual={p.cashflowAnnual}
                     monthly={p.cashflowMonthly}
@@ -241,15 +269,22 @@ export function PropertyInsights({
               <tr
                 key={p.name}
                 className={`border-b border-white/5 text-slate-200 ${
-                  p.cashflowAnnual < 0
-                    ? 'bg-red-500/[0.04]'
-                    : p.warnings.length
-                      ? 'bg-amber-500/5'
-                      : ''
+                  p.excludedFromRentalCashflow
+                    ? 'bg-amber-500/[0.06]'
+                    : p.cashflowAnnual < 0
+                      ? 'bg-red-500/[0.04]'
+                      : p.warnings.length
+                        ? 'bg-amber-500/5'
+                        : ''
                 }`}
               >
                 <td className="py-2.5 pr-3">
                   <div className="font-medium text-slate-100">{p.name}</div>
+                  {p.excludedFromRentalCashflow && (
+                    <div className="text-[10px] text-amber-300/90">
+                      Owner-occupied · out of pocket
+                    </div>
+                  )}
                   {p.warnings.length > 0 && (
                     <div className="mt-0.5 text-[10px] text-amber-400">
                       {p.warnings.join('; ')}
@@ -295,9 +330,15 @@ export function PropertyInsights({
               <td className="py-2.5 pr-3 font-medium">Total</td>
               <td className="py-2.5 pr-3">
                 <CashflowValue
-                  annual={insights.reduce((s, p) => s + p.cashflowAnnual, 0)}
+                  annual={rentalInsights(insights).reduce(
+                    (s, p) => s + p.cashflowAnnual,
+                    0,
+                  )}
                   monthly={
-                    insights.reduce((s, p) => s + p.cashflowAnnual, 0) / 12
+                    rentalInsights(insights).reduce(
+                      (s, p) => s + p.cashflowAnnual,
+                      0,
+                    ) / 12
                   }
                 />
               </td>
@@ -305,7 +346,8 @@ export function PropertyInsights({
                 {formatCurrency(insights.reduce((s, p) => s + p.equity, 0))}
               </td>
               <td colSpan={6} className="py-2.5 text-[10px] text-slate-500">
-                Sorted by cashflow · after debt &amp; capex
+                Rental portfolio only · owner-occupied excluded · after debt &amp;
+                capex
               </td>
             </tr>
           </tfoot>

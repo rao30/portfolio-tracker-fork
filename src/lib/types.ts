@@ -334,6 +334,8 @@ export interface PropertyInsight {
   cashflowAnnual: number;
   /** Monthly cashflow after debt service and capex reserve. */
   cashflowMonthly: number;
+  /** Owner-occupied house hack — not counted in rental portfolio cashflow. */
+  excludedFromRentalCashflow: boolean;
   dscr: number;
   cashOnCash: number;
   breakEvenOccupancy: number;
