@@ -1427,6 +1427,39 @@ export function resolvePropertySchedule(
   };
 }
 
+const DESOTO_EXPENSE_DEFAULTS = {
+  propertyTaxRate: 0.02,
+  annualInsurance: 3100,
+};
+
+/** DeSoto portfolio properties share 2% tax and $3,100/yr insurance. */
+export function isDesotoProperty(name: string): boolean {
+  return (
+    /desoto/i.test(name) ||
+    /shadybrook|larchbrook|idlecreek|summit dr|deborah dr/i.test(name)
+  );
+}
+
+function applyDesotoPortfolioDefaults(portfolio: Portfolio): Portfolio {
+  const properties = portfolio.properties.map((p) => {
+    if (!isDesotoProperty(p.name)) return p;
+    const purchasePrice = p.purchasePrice ?? p.marketValue;
+    const next: Property = {
+      ...p,
+      purchasePrice,
+      propertyTaxRate:
+        p.propertyTaxRate ?? DESOTO_EXPENSE_DEFAULTS.propertyTaxRate,
+      annualInsurance:
+        p.annualInsurance ?? DESOTO_EXPENSE_DEFAULTS.annualInsurance,
+    };
+    return {
+      ...next,
+      monthlyExpenses: resolveMonthlyExpenses(next),
+    };
+  });
+  return { ...portfolio, properties };
+}
+
 /** Normalize raw JSON into a Portfolio (exported for tests and hook). */
 function normalizeExpenseBreakdown(raw: Record<string, unknown> | undefined) {
   if (!raw) return undefined;
@@ -1665,7 +1698,7 @@ export function normalizePortfolio(raw: unknown): Portfolio {
     partialPortfolio,
   );
 
-  return partialPortfolio;
+  return applyDesotoPortfolioDefaults(partialPortfolio);
 }
 
 /** Convert Portfolio back to snake_case JSON shape. */

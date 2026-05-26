@@ -13,14 +13,17 @@ import {
   amortizeOneMonth,
   compareStrategies,
   computeMonthlyPayment,
+  isDesotoProperty,
   normalizePortfolio,
   paymentFromPrincipal,
+  resolveMonthlyExpenses,
   resolvePropertySchedule,
   totalMonthlyExpenses,
   utilitiesFromRent,
   SEED_PROPERTY_NAMES,
   simulateSnowball,
   STRATEGIES,
+  validateProperty,
 } from './snowball';
 
 const fixture: Property[] = [
@@ -532,6 +535,80 @@ describe('normalizePortfolio', () => {
     });
     expect(p.properties[0].closeMonth).toBe(25);
     expect(p.properties[0].closeYear).toBe(2028);
+  });
+
+  it('applies DeSoto tax and insurance defaults on load', () => {
+    const p = normalizePortfolio({
+      extra_monthly_budget: 0,
+      properties: [
+        {
+          name: '116/118 Shadybrook Dr (conventional)',
+          balance: 360000,
+          market_value: 360000,
+          annual_interest_rate: 0.06625,
+          monthly_payment: 2305,
+          monthly_rent: 3600,
+          monthly_expenses: 1080,
+        },
+      ],
+    });
+    expect(isDesotoProperty(p.properties[0].name)).toBe(true);
+    expect(p.properties[0].propertyTaxRate).toBe(0.02);
+    expect(p.properties[0].annualInsurance).toBe(3100);
+    expect(p.properties[0].monthlyExpenses).toBeCloseTo(858.33, 2);
+  });
+});
+
+describe('validateProperty', () => {
+  it('does not warn on high LTV', () => {
+    const property: Property = {
+      name: '116/118 Shadybrook Dr (conventional)',
+      balance: 360000,
+      marketValue: 360000,
+      annualInterestRate: 0.06625,
+      annualAppreciationRate: 0.03,
+      monthlyPayment: 2305,
+      monthlyRent: 3600,
+      monthlyExpenses: resolveMonthlyExpenses({
+        name: 'x',
+        balance: 360000,
+        marketValue: 360000,
+        annualInterestRate: 0.06625,
+        annualAppreciationRate: 0.03,
+        monthlyPayment: 2305,
+        monthlyRent: 3600,
+        monthlyExpenses: 1080,
+        purchasePrice: 360000,
+        propertyTaxRate: 0.02,
+        annualInsurance: 3100,
+      }),
+      purchasePrice: 360000,
+      propertyTaxRate: 0.02,
+      annualInsurance: 3100,
+    };
+    const { warnings } = validateProperty(property, {
+      extraMonthlyBudget: 0,
+      annualRentGrowthRate: 0.025,
+      annualExpenseInflationRate: 0.02,
+      reinvestSurplus: false,
+      monthlyReserveTarget: 0,
+      defaultVacancyRate: 0,
+      defaultCapexReserveRate: 0.1,
+      properties: [property],
+      taxProfile: {
+        annualW2Income: 350000,
+        spouseIsReps: true,
+        marginalTaxRate: 0.32,
+        taxYear: 2026,
+        bonusDepreciationRate: 1,
+        remainingBonusCarryover: 250000,
+        filingStatus: 'mfj',
+        otherPassiveIncome: 0,
+        stateTaxRate: 0,
+      },
+      goals: [],
+    });
+    expect(warnings.some((w) => /LTV/i.test(w))).toBe(false);
   });
 });
 

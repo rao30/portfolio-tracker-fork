@@ -1,5 +1,5 @@
 {
-  "seed_version": 4,
+  "seed_version": 5,
   "simulation_anchor_year": 2026,
   "simulation_anchor_month": 1,
   "default_refi_annual_rate": 0.0675,
@@ -141,7 +141,10 @@
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 2305.12,
       "monthly_rent": 3600,
-      "monthly_expenses": 1080
+      "monthly_expenses": 858.33,
+      "property_tax_rate": 0.02,
+      "annual_insurance": 3100,
+      "purchase_price": 360000
     },
     {
       "name": "144/146 Shadybrook Dr (0% seller-financed, 5yr balloon)",
@@ -160,7 +163,10 @@
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 1916.67,
       "monthly_rent": 3600,
-      "monthly_expenses": 1080
+      "monthly_expenses": 1025,
+      "property_tax_rate": 0.02,
+      "annual_insurance": 3100,
+      "purchase_price": 460000
     },
     {
       "name": "141/143 Shadybrook Dr (conventional)",
@@ -173,7 +179,10 @@
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 2305.12,
       "monthly_rent": 3600,
-      "monthly_expenses": 1080
+      "monthly_expenses": 858.33,
+      "property_tax_rate": 0.02,
+      "annual_insurance": 3100,
+      "purchase_price": 360000
     },
     {
       "name": "125/127 Larchbrook Dr (0% seller-financed, 5yr balloon)",
@@ -192,7 +201,10 @@
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 1966.67,
       "monthly_rent": 3600,
-      "monthly_expenses": 1080
+      "monthly_expenses": 1045,
+      "property_tax_rate": 0.02,
+      "annual_insurance": 3100,
+      "purchase_price": 472000
     },
     {
       "name": "120/122 Idlecreek Dr (conventional)",
@@ -205,7 +217,10 @@
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 2381.96,
       "monthly_rent": 3600,
-      "monthly_expenses": 1080
+      "monthly_expenses": 878.33,
+      "property_tax_rate": 0.02,
+      "annual_insurance": 3100,
+      "purchase_price": 372000
     },
     {
       "name": "800/802 Summit Dr (0% seller-financed, 5yr balloon)",
@@ -224,7 +239,10 @@
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 1966.67,
       "monthly_rent": 3600,
-      "monthly_expenses": 1080
+      "monthly_expenses": 1045,
+      "property_tax_rate": 0.02,
+      "annual_insurance": 3100,
+      "purchase_price": 472000
     },
     {
       "name": "804/806 Summit Dr (conventional)",
@@ -237,7 +255,10 @@
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 2381.96,
       "monthly_rent": 3600,
-      "monthly_expenses": 1080
+      "monthly_expenses": 878.33,
+      "property_tax_rate": 0.02,
+      "annual_insurance": 3100,
+      "purchase_price": 372000
     },
     {
       "name": "1419/1421 Deborah Dr (0% seller-financed, 5yr balloon)",
@@ -256,7 +277,10 @@
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 1583.33,
       "monthly_rent": 3600,
-      "monthly_expenses": 1080
+      "monthly_expenses": 891.67,
+      "property_tax_rate": 0.02,
+      "annual_insurance": 3100,
+      "purchase_price": 380000
     }
   ]
 }
