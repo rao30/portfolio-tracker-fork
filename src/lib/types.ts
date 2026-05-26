@@ -81,7 +81,7 @@ export interface Property {
   closeYear?: number;
   /** Calendar close month 1–12 (portfolio JSON, default 1). */
   closeMonthCalendar?: number;
-  /** Seller loan: months of 0% amortizing payments before refi. */
+  /** Seller loan: months on note before balloon refi. */
   balloonMonths?: number;
   /** Seller loan: amortization term for scheduled payment (e.g. 240). */
   sellerAmortizationMonths?: number;
@@ -95,6 +95,10 @@ export interface Property {
   balloonRefiAnnualRate?: number;
   /** Post-balloon refi term in months (portfolio JSON). */
   balloonRefiTermMonths?: number;
+  /** Max seller proceeds via note (P&I + balloon); yield-maintenance cap. */
+  sellerPayoffCap?: number;
+  /** Seller credit at closing (reduces cash invested). */
+  sellerCredit?: number;
 }
 
 /** Fields required when adding a new property via the UI. */
@@ -187,6 +191,10 @@ export interface PropertyFile {
   refi_month?: number;
   refi_annual_rate?: number;
   refi_term_months?: number;
+  /** Max seller proceeds via note (P&I + balloon). */
+  seller_payoff_cap?: number;
+  /** Seller credit at closing. */
+  seller_credit?: number;
 }
 
 export interface ExpenseBreakdownFile {

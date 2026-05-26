@@ -119,6 +119,7 @@ interface SimState {
   refiSimMonth?: number;
   balloonRefiAnnualRate: number;
   balloonRefiTermMonths: number;
+  sellerPayoffCap?: number;
   originalBalance: number;
   originalMarketValue: number;
   originalGrossRent: number;
@@ -241,6 +242,63 @@ function isBalloonRefiMonth(state: SimState, month: number): boolean {
     month === state.refiSimMonth &&
     state.balance > BALANCE_EPSILON
   );
+}
+
+/**
+ * Yield-maintenance balloon: payoff cap minus aggregate P&I paid since close.
+ * Matches rider language (e.g. $440,000 ? payments made).
+ */
+function applySellerYieldMaintenanceBalloon(state: SimState, refiMonth: number): void {
+  if (state.sellerPayoffCap == null || state.sellerPayoffCap <= 0) return;
+  const monthsPaid = refiMonth - state.closeMonth;
+  if (monthsPaid <= 0) return;
+  const aggregatePaid = state.monthlyPayment * monthsPaid;
+  state.balance = Math.max(0, state.sellerPayoffCap - aggregatePaid);
+}
+
+/**
+ * Derive note principal and payment for IRS-stated rate with a fixed seller payoff cap.
+ * Total P&I through balloon month + remaining balance ? sellerPayoffCap.
+ */
+export function computeSellerFinancingTerms(
+  sellerPayoffCap: number,
+  annualRate = 0.06,
+  amortMonths = 240,
+  balloonMonths = 60,
+): {
+  principal: number;
+  monthlyPayment: number;
+  balloonBalance: number;
+} {
+  if (sellerPayoffCap <= 0 || balloonMonths <= 0 || amortMonths <= 0) {
+    throw new Error('sellerPayoffCap, balloonMonths, and amortMonths must be positive');
+  }
+
+  let lo = 0;
+  let hi = sellerPayoffCap;
+  for (let i = 0; i < 80; i += 1) {
+    const mid = (lo + hi) / 2;
+    const payment = paymentFromPrincipal(mid, annualRate, amortMonths);
+    const totalPaid = payment * balloonMonths;
+    const balloonBalance = sellerPayoffCap - totalPaid;
+    const r = annualRate / 12;
+    let bal = mid;
+    for (let m = 0; m < balloonMonths; m += 1) {
+      const interest = bal * r;
+      bal -= payment - interest;
+    }
+    const scheduleBalloon = bal;
+    if (scheduleBalloon > balloonBalance) {
+      hi = mid;
+    } else {
+      lo = mid;
+    }
+  }
+
+  const principal = (lo + hi) / 2;
+  const monthlyPayment = paymentFromPrincipal(principal, annualRate, amortMonths);
+  const balloonBalance = sellerPayoffCap - monthlyPayment * balloonMonths;
+  return { principal, monthlyPayment, balloonBalance };
 }
 
 /** Convert remaining seller-financed balance into a conventional amortizing loan. */
@@ -399,6 +457,7 @@ function propertyToSimState(p: Property, options: SimulationOptions): SimState {
     refiSimMonth: p.refiSimMonth,
     balloonRefiAnnualRate: p.balloonRefiAnnualRate ?? DEFAULT_BALLOON_REFI_RATE,
     balloonRefiTermMonths: p.balloonRefiTermMonths ?? DEFAULT_BALLOON_REFI_TERM_MONTHS,
+    sellerPayoffCap: p.sellerPayoffCap,
     originalBalance: p.balance,
     originalMarketValue: p.marketValue,
     originalGrossRent: grossRent,
@@ -770,10 +829,13 @@ export function simulateSnowball(
     const paidOffThisMonth: string[] = [];
 
     for (const s of states) {
-      const startBal = s.balance;
-      if (!isPropertyOwned(s, month) || startBal <= BALANCE_EPSILON) continue;
+      if (!isPropertyOwned(s, month) || s.balance <= BALANCE_EPSILON) continue;
 
-      if (isBalloonRefiMonth(s, month)) {
+      const startBal = s.balance;
+      const balloonRefi = isBalloonRefiMonth(s, month);
+
+      if (balloonRefi) {
+        applySellerYieldMaintenanceBalloon(s, month);
         refinanceAfterBalloon(s);
         refinancedThisMonth.push(s.name);
         if (!(s.name in refinanceSchedule)) {
@@ -782,8 +844,9 @@ export function simulateSnowball(
       }
 
       const payment = scheduledPaymentForMonth(s, month);
+      const amortizeBalance = balloonRefi ? s.balance : startBal;
       const result = amortizeOneMonth({
-        balance: startBal,
+        balance: amortizeBalance,
         annualInterestRate: s.annualInterestRate,
         scheduledPayment: payment,
         extraPayment: 0,
@@ -1550,6 +1613,8 @@ function applyOptionalPropertyFields(prop: Property, p: Record<string, unknown>)
     ['placedInServiceYear', 'placed_in_service_year'],
     ['costSegPercent', 'cost_seg_percent'],
     ['bonusEligiblePercent', 'bonus_eligible_percent'],
+    ['sellerPayoffCap', 'seller_payoff_cap'],
+    ['sellerCredit', 'seller_credit'],
   ];
 
   for (const [camel, snake] of optionalNums) {
@@ -1828,6 +1893,12 @@ export function denormalizePortfolio(
       if (p.balloonRefiTermMonths !== undefined) {
         file.refi_term_months = p.balloonRefiTermMonths;
       }
+      if (p.sellerPayoffCap !== undefined) {
+        file.seller_payoff_cap = p.sellerPayoffCap;
+      }
+      if (p.sellerCredit !== undefined) {
+        file.seller_credit = p.sellerCredit;
+      }
       if (p.utilitiesRentRate !== undefined) {
         file.utilities_rent_rate = p.utilitiesRentRate;
       }
@@ -1870,6 +1941,6 @@ export function denormalizePortfolio(
 export const SEED_PROPERTY_NAMES = {
   parkBlvd: 'Park Blvd (Plano, projected post-move-out)',
   shadybrookSeller:
-    '144/146 Shadybrook Dr (0% seller-financed, 5yr balloon)',
+    '144/146 Shadybrook Dr (seller 6%, 5yr balloon)',
   lisaLn: 'Lisa Ln (Cedar Hill)',
 } as const;

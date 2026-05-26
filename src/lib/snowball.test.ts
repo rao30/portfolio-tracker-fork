@@ -13,6 +13,7 @@ import {
   amortizeOneMonth,
   compareStrategies,
   computeMonthlyPayment,
+  computeSellerFinancingTerms,
   computePortfolioYearMetrics,
   isDesotoProperty,
   monthForPortfolioYear,
@@ -792,6 +793,45 @@ describe('close schedule and balloon', () => {
     expect(r.history[61].balancesByName['Balloon Loan']).toBeLessThan(180000);
   });
 
+  it('4-year plan rentals and converted primaries target ~$700/mo net', () => {
+    const raw = JSON.parse(
+      readFileSync(join(process.cwd(), 'public/data/portfolio.json'), 'utf8'),
+    );
+    const portfolio = normalizePortfolio(raw);
+    expect(portfolio.properties.length).toBe(21);
+
+    const extra = portfolio.properties.find((p) =>
+      p.name.startsWith('Additional rental 2026'),
+    )!;
+    const r = simulateSnowball([extra], {
+      payoffOrder: [extra.name],
+      extraMonthlyBudget: 0,
+      snowballCashflow: false,
+      strategyName: 'test',
+      maxMonths: 24,
+      defaultCapexReserveRate: 0.1,
+      allowIncomplete: true,
+    });
+    expect(r.history[0].monthlyCashflow).toBeGreaterThan(650);
+    expect(r.history[0].monthlyCashflow).toBeLessThan(750);
+
+    const primary = portfolio.properties.find((p) =>
+      p.name.startsWith('Primary 2026'),
+    )!;
+    const rp = simulateSnowball([primary], {
+      payoffOrder: [primary.name],
+      extraMonthlyBudget: 0,
+      snowballCashflow: false,
+      strategyName: 'test',
+      maxMonths: 24,
+      defaultCapexReserveRate: 0.1,
+      allowIncomplete: true,
+    });
+    expect(rp.history[11].monthlyCashflow).toBeLessThan(0);
+    expect(rp.history[12].monthlyCashflow).toBeGreaterThan(650);
+    expect(rp.history[12].monthlyCashflow).toBeLessThan(750);
+  });
+
   it('simulates full portfolio.json with staggered closes and balloons', () => {
     const raw = JSON.parse(
       readFileSync(join(process.cwd(), 'public/data/portfolio.json'), 'utf8'),
@@ -844,6 +884,54 @@ describe('close schedule and balloon', () => {
     expect(schedule.refiSimMonth).toBe(73);
     expect(schedule.refiYear).toBe(2032);
     expect(schedule.balloonRefiAnnualRate).toBe(0.0675);
+  });
+
+  it('computeSellerFinancingTerms matches Shadybrook rider cap', () => {
+    const terms = computeSellerFinancingTerms(440000);
+    expect(terms.principal).toBeCloseTo(344057.87, 0);
+    expect(terms.monthlyPayment).toBeCloseTo(2464.94, 1);
+    expect(terms.balloonBalance).toBeCloseTo(292103.6, 0);
+  });
+
+  it('computeSellerFinancingTerms scales Deborah payoff cap', () => {
+    const terms = computeSellerFinancingTerms(360000);
+    expect(terms.principal).toBeGreaterThan(280000);
+    expect(terms.principal).toBeLessThan(282000);
+    expect(terms.monthlyPayment * 60 + terms.balloonBalance).toBeCloseTo(360000, 0);
+  });
+
+  it('applies seller payoff cap at balloon refi (yield maintenance)', () => {
+    const props: Property[] = [
+      {
+        name: 'Shadybrook Seller',
+        balance: 344057.87,
+        marketValue: 450000,
+        annualInterestRate: 0.06,
+        annualAppreciationRate: 0,
+        monthlyPayment: 2464.94,
+        monthlyRent: 3600,
+        monthlyExpenses: 1000,
+        closeMonth: 1,
+        refiSimMonth: 61,
+        sellerPayoffCap: 440000,
+        balloonRefiAnnualRate: 0.0675,
+        balloonRefiTermMonths: 360,
+      },
+    ];
+    const r = simulateSnowball(props, {
+      payoffOrder: ['Shadybrook Seller'],
+      extraMonthlyBudget: 0,
+      snowballCashflow: false,
+      strategyName: 'test',
+      maxMonths: 62,
+      allowUnresolved: true,
+    });
+    const expectedBalloon = 440000 - 2464.94 * 60;
+    expect(r.history[60].refinancedThisMonth).toContain('Shadybrook Seller');
+    const refiBalance = r.history[60].balancesByName['Shadybrook Seller'];
+    expect(refiBalance).toBeLessThan(expectedBalloon);
+    expect(refiBalance).toBeGreaterThan(expectedBalloon * 0.99);
+    expect(r.refinanceSchedule['Shadybrook Seller']).toBe(61);
   });
 
   it('refis on refi_sim month even when extra budget is available', () => {
@@ -935,20 +1023,25 @@ describe('seed portfolio integration', () => {
     },
     {
       name: SEED_PROPERTY_NAMES.shadybrookSeller,
-      balance: 460000,
-      marketValue: 460000,
-      annualInterestRate: 0,
+      balance: 344057.87,
+      marketValue: 450000,
+      annualInterestRate: 0.06,
       annualAppreciationRate: 0.03,
-      monthlyPayment: 1916.67,
+      monthlyPayment: 2464.94,
       monthlyRent: 3600,
       monthlyExpenses: 1025,
+      sellerPayoffCap: 440000,
+      closeMonth: 1,
+      refiSimMonth: 61,
+      balloonRefiAnnualRate: 0.0675,
+      balloonRefiTermMonths: 360,
     },
   ];
 
   it('highest rate starts with Park Blvd and ends with Shadybrook seller', () => {
     const order = STRATEGIES.highestRate(seed);
     expect(order[0]).toBe(SEED_PROPERTY_NAMES.parkBlvd);
-    expect(order[order.length - 1]).toBe(SEED_PROPERTY_NAMES.shadybrookSeller);
+    expect(order[order.length - 1]).toBe(SEED_PROPERTY_NAMES.lisaLn);
   });
 
   it('pays off portfolio in roughly 14-16 years at $5k extra', () => {
@@ -962,19 +1055,16 @@ describe('seed portfolio integration', () => {
     expect(r.monthsToPayoff).toBeLessThanOrEqual(200);
   });
 
-  it('Lisa Ln and Shadybrook seller are last two paid off under highest rate', () => {
+  it('Lisa Ln is paid off after Shadybrook seller under highest rate', () => {
     const r = simulateSnowball(seed, {
       payoffOrder: STRATEGIES.highestRate(seed),
       extraMonthlyBudget: 5000,
       strategyName: 'highestRate',
       defaultCapexReserveRate: 0.1,
     });
-    const months = Object.entries(r.payoffSchedule).sort(
-      (a, b) => b[1] - a[1],
-    );
-    const lastTwo = months.slice(0, 2).map(([name]) => name);
-    expect(lastTwo).toContain(SEED_PROPERTY_NAMES.lisaLn);
-    expect(lastTwo).toContain(SEED_PROPERTY_NAMES.shadybrookSeller);
+    const lisaMonth = r.payoffSchedule[SEED_PROPERTY_NAMES.lisaLn];
+    const shadyMonth = r.payoffSchedule[SEED_PROPERTY_NAMES.shadybrookSeller];
+    expect(lisaMonth).toBeGreaterThan(shadyMonth);
   });
 
 });
