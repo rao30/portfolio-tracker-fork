@@ -1,7 +1,11 @@
 import { Fragment, useState } from 'react';
 import type { ExpenseBreakdown, Portfolio, Property, PropertyDraft } from '../lib/types';
 import { formatCurrency, formatPercent, propertyColor } from '../lib/format';
-import { totalMonthlyExpenses, utilitiesFromRent } from '../lib/snowball';
+import {
+  isPropertyActiveAtMonth,
+  resolveMonthlyExpenses,
+  utilitiesFromRent,
+} from '../lib/snowball';
 import { AddPropertyModal } from './AddPropertyModal';
 import { ExpenseBreakdownEditor } from './ExpenseBreakdownEditor';
 
@@ -12,6 +16,8 @@ interface PropertyTableProps {
   onAdd: (property: PropertyDraft) => void;
   onRemove: (index: number) => void;
   mobileCards?: boolean;
+  /** Simulation month for totals / active rows (matches portfolio year slider). */
+  asOfMonth?: number;
 }
 
 type EditableField = keyof Property;
@@ -70,8 +76,20 @@ const CURRENCY_FIELDS = new Set<EditableField>([
   'cashInvested',
 ]);
 
+function closeYearLabel(p: Property, anchorYear: number): string | null {
+  if (p.closeYear != null) return String(p.closeYear);
+  const closeMonth = p.closeMonth ?? 1;
+  if (closeMonth > 1) {
+    return String(anchorYear + Math.floor((closeMonth - 1) / 12));
+  }
+  return null;
+}
+
 function fieldDisplay(p: Property, field: EditableField): string {
   if (field === 'name') return p.name;
+  if (field === 'monthlyExpenses') {
+    return formatCurrency(resolveMonthlyExpenses(p));
+  }
   if (field === 'utilitiesRentRate') {
     if (p.utilitiesRentRate == null) return '—';
     const amt = utilitiesFromRent(p.monthlyRent, p.utilitiesRentRate);
@@ -149,26 +167,37 @@ function PropertyCard({
   onUpdate,
   onRemove,
   canRemove,
+  inactive = false,
+  closesLabel = null,
 }: {
   property: Property;
   index: number;
   onUpdate: (index: number, field: keyof Property, value: string) => void;
   onRemove: (index: number) => void;
   canRemove: boolean;
+  inactive?: boolean;
+  closesLabel?: string | null;
 }) {
   return (
-    <article className="section-divider px-3 py-3">
+    <article
+      className={`section-divider px-3 py-3 ${inactive ? 'opacity-45' : ''}`}
+    >
       <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <span
-            className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
-            style={{ backgroundColor: propertyColor(property.name) }}
-          />
-          <EditableCell
-            value={rawValue(property, 'name')}
-            display={property.name}
-            onCommit={(v) => onUpdate(index, 'name', v)}
-          />
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <div className="flex min-w-0 items-center gap-2">
+            <span
+              className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: propertyColor(property.name) }}
+            />
+            <EditableCell
+              value={rawValue(property, 'name')}
+              display={property.name}
+              onCommit={(v) => onUpdate(index, 'name', v)}
+            />
+          </div>
+          {closesLabel && (
+            <p className="pl-4 text-[10px] text-slate-500">Closes {closesLabel}</p>
+          )}
         </div>
         <button
           type="button"
@@ -206,17 +235,23 @@ export function PropertyTable({
   onAdd,
   onRemove,
   mobileCards = false,
+  asOfMonth = 1,
 }: PropertyTableProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const { properties } = portfolio;
+  const anchorYear = portfolio.simulationAnchorYear ?? 2026;
   const lastProperty = properties[properties.length - 1];
   const columns = showAdvanced
     ? [...BASIC_COLUMNS, ...ADVANCED_COLUMNS]
     : BASIC_COLUMNS;
 
-  const totals = properties.reduce(
+  const activeProperties = properties.filter((p) =>
+    isPropertyActiveAtMonth(p, asOfMonth),
+  );
+
+  const totals = activeProperties.reduce(
     (acc, p) => {
       const utilities = utilitiesFromRent(p.monthlyRent, p.utilitiesRentRate);
       return {
@@ -240,8 +275,14 @@ export function PropertyTable({
   const totalExpenses = totals.monthlyOperating + totals.monthlyUtilities;
 
   const header = (
-    <div className="mb-3 flex items-center justify-between">
-      <h3 className="text-sm font-semibold text-slate-200">Portfolio</h3>
+    <div className="mb-3 flex items-center justify-between gap-2">
+      <div>
+        <h3 className="text-sm font-semibold text-slate-200">Portfolio</h3>
+        <p className="text-xs text-slate-500">
+          Totals: {activeProperties.length} in service · {properties.length - activeProperties.length}{' '}
+          scheduled later
+        </p>
+      </div>
       <div className="flex gap-2">
         {!mobileCards && (
           <button
@@ -267,16 +308,21 @@ export function PropertyTable({
     return (
       <div className="app-surface overflow-hidden">
         <div className="border-b border-white/10 px-3 pt-3">{header}</div>
-        {properties.map((p, i) => (
-          <PropertyCard
-            key={`${p.name}-${i}`}
-            property={p}
-            index={i}
-            onUpdate={onUpdate}
-            onRemove={onRemove}
-            canRemove={properties.length > 1}
-          />
-        ))}
+        {properties.map((p, i) => {
+          const active = isPropertyActiveAtMonth(p, asOfMonth);
+          return (
+            <PropertyCard
+              key={`${p.name}-${i}`}
+              property={p}
+              index={i}
+              onUpdate={onUpdate}
+              onRemove={onRemove}
+              canRemove={properties.length > 1}
+              inactive={!active}
+              closesLabel={!active ? closeYearLabel(p, anchorYear) : null}
+            />
+          );
+        })}
         <div className="grid grid-cols-2 gap-2 border-t border-white/10 bg-white/[0.02] px-3 py-3 text-xs text-slate-400">
           <div>
             <p>Total balance</p>
@@ -330,12 +376,16 @@ export function PropertyTable({
         </thead>
         <tbody>
           {properties.map((p, i) => {
+            const active = isPropertyActiveAtMonth(p, asOfMonth);
+            const closes = closeYearLabel(p, anchorYear);
             const monthlyInterest = p.balance * (p.annualInterestRate / 12);
             const piWarn = p.balance > 0 && p.monthlyPayment < monthlyInterest - 1e-6;
 
             return (
               <Fragment key={`${p.name}-${i}`}>
-                <tr className="border-b border-white/5">
+                <tr
+                  className={`border-b border-white/5 ${active ? '' : 'opacity-45'}`}
+                >
                   <td className="py-2 pr-2">
                     <span
                       className="inline-block h-3 w-3 rounded-full"
@@ -344,13 +394,28 @@ export function PropertyTable({
                   </td>
                   {columns.map((col) => (
                     <td key={col.key} className="py-2 pr-2">
-                      <EditableCell
-                        value={rawValue(p, col.key)}
-                        display={fieldDisplay(p, col.key)}
-                        onCommit={(v) => onUpdate(i, col.key, v)}
-                        mono={col.mono}
-                        warn={col.key === 'monthlyPayment' && piWarn}
-                      />
+                      {col.key === 'name' ? (
+                        <div>
+                          <EditableCell
+                            value={rawValue(p, col.key)}
+                            display={fieldDisplay(p, col.key)}
+                            onCommit={(v) => onUpdate(i, col.key, v)}
+                          />
+                          {!active && closes && (
+                            <p className="mt-0.5 text-[10px] text-slate-500">
+                              Closes {closes}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <EditableCell
+                          value={rawValue(p, col.key)}
+                          display={fieldDisplay(p, col.key)}
+                          onCommit={(v) => onUpdate(i, col.key, v)}
+                          mono={col.mono}
+                          warn={col.key === 'monthlyPayment' && piWarn}
+                        />
+                      )}
                     </td>
                   ))}
                   <td className="py-2">
@@ -394,7 +459,7 @@ export function PropertyTable({
         <tfoot>
           <tr className="text-xs font-medium text-slate-300">
             <td />
-            <td className="pt-2">Totals</td>
+            <td className="pt-2">Totals (in service)</td>
             <td className="pt-2 font-mono tabular-nums">
               {formatCurrency(totals.balance)}
             </td>

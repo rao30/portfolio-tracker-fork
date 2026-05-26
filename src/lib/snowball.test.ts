@@ -14,7 +14,9 @@ import {
   compareStrategies,
   computeMonthlyPayment,
   computeSellerFinancingTerms,
+  computePropertyInsightsAtMonth,
   computePortfolioYearMetrics,
+  monthForPortfolioYear,
   isDesotoProperty,
   monthForPortfolioYear,
   normalizePortfolio,
@@ -830,6 +832,28 @@ describe('close schedule and balloon', () => {
     expect(rp.history[11].monthlyCashflow).toBeLessThan(0);
     expect(rp.history[12].monthlyCashflow).toBeGreaterThan(650);
     expect(rp.history[12].monthlyCashflow).toBeLessThan(750);
+  });
+
+  it('property insights at month match owned count for portfolio year', () => {
+    const raw = JSON.parse(
+      readFileSync(join(process.cwd(), 'public/data/portfolio.json'), 'utf8'),
+    );
+    const portfolio = normalizePortfolio(raw);
+    const result = runSimulation(portfolio, 'highestRate');
+    const y1 = computePropertyInsightsAtMonth(
+      portfolio,
+      result,
+      monthForPortfolioYear(1),
+    );
+    const y5 = computePropertyInsightsAtMonth(
+      portfolio,
+      result,
+      monthForPortfolioYear(5),
+    );
+    expect(y1.length).toBeLessThan(y5.length);
+    expect(y1.length).toBeGreaterThanOrEqual(7);
+    const metricsY1 = computePortfolioYearMetrics(portfolio, result, 1);
+    expect(y1.length).toBe(metricsY1?.ownedCount);
   });
 
   it('simulates full portfolio.json with staggered closes and balloons', () => {

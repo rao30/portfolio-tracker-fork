@@ -1234,6 +1234,136 @@ export function currentPortfolioMetrics(properties: Property[]): {
   return { totalEquity, totalValue, totalLiabilities, ltv };
 }
 
+/** Gross rent after property events through asOfMonth (no growth). */
+export function propertyGrossRentAtMonth(p: Property, asOfMonth: number): number {
+  let rent = p.monthlyRent;
+  for (const ev of p.events ?? []) {
+    if (ev.month <= asOfMonth && ev.type === 'rentChange' && ev.rent != null) {
+      rent = ev.rent;
+    }
+  }
+  return rent;
+}
+
+/** Scale rent/expenses for months owned through asOfMonth. */
+export function propertyGrownRentAtMonth(
+  p: Property,
+  portfolio: Portfolio,
+  asOfMonth: number,
+): number {
+  const closeMonth = p.closeMonth ?? 1;
+  if (asOfMonth < closeMonth) return 0;
+  const monthsOwned = asOfMonth - closeMonth;
+  const rentGrowth = p.annualRentGrowthRate ?? portfolio.annualRentGrowthRate;
+  const baseRent = propertyGrossRentAtMonth(p, asOfMonth);
+  return baseRent * Math.pow(1 + rentGrowth, monthsOwned / 12);
+}
+
+export function propertyGrownOperatingAtMonth(
+  p: Property,
+  portfolio: Portfolio,
+  asOfMonth: number,
+): number {
+  const closeMonth = p.closeMonth ?? 1;
+  if (asOfMonth < closeMonth) return 0;
+  const monthsOwned = asOfMonth - closeMonth;
+  const expenseInflation =
+    p.annualExpenseInflationRate ?? portfolio.annualExpenseInflationRate;
+  const operating = resolveMonthlyExpenses(p);
+  return operating * Math.pow(1 + expenseInflation, monthsOwned / 12);
+}
+
+export function isPropertyActiveAtMonth(p: Property, asOfMonth: number): boolean {
+  return (p.closeMonth ?? 1) <= asOfMonth;
+}
+
+/** Per-property metrics aligned with portfolio year dashboard (sim snapshot + schedule). */
+export function computePropertyInsightsAtMonth(
+  portfolio: Portfolio,
+  result: SimulationResult,
+  asOfMonth: number,
+  scenario?: ScenarioConfig | null,
+): PropertyInsight[] {
+  const snap = snapshotAtMonth(result, asOfMonth);
+  const payoffOrder = result.order;
+
+  return portfolio.properties
+    .filter((p) => isPropertyActiveAtMonth(p, asOfMonth))
+    .map((p) => {
+      const balance = snap?.balancesByName[p.name] ?? p.balance;
+      const marketValue = snap?.valuesByName[p.name] ?? p.marketValue;
+      const equity = snap?.equityByName[p.name] ?? marketValue - balance;
+      const ltv = marketValue > 0 ? balance / marketValue : 0;
+      const vacancy = resolveVacancyRate(p, portfolio, scenario);
+      const grossRent = propertyGrownRentAtMonth(p, portfolio, asOfMonth);
+      const effectiveRent = grossRent * (1 - vacancy);
+      const operating = propertyGrownOperatingAtMonth(p, portfolio, asOfMonth);
+      const netRent =
+        effectiveRent - totalMonthlyExpenses(grossRent, operating, p.utilitiesRentRate);
+      const capexRate = resolveCapexRate(p, portfolio, scenario);
+      const capexFlat = p.capexReserveFlat ?? portfolio.defaultCapexReserveFlat;
+      const monthlyCapexReserve = propertyMonthlyCapex(grossRent, capexRate, capexFlat);
+      const capRate = marketValue > 0 ? (netRent * 12) / marketValue : 0;
+      const rankIdx = payoffOrder.indexOf(p.name);
+      const noi =
+        (effectiveRent - totalMonthlyExpenses(grossRent, operating, p.utilitiesRentRate)) *
+        12;
+      const refiMonth = result.refinanceSchedule[p.name];
+      const monthlyPayment =
+        refiMonth != null && asOfMonth >= refiMonth
+          ? paymentFromPrincipal(
+              balance,
+              p.balloonRefiAnnualRate ?? portfolio.defaultRefiAnnualRate,
+              p.balloonRefiTermMonths ?? portfolio.defaultRefiTermMonths,
+            )
+          : p.monthlyPayment;
+      const debtService = monthlyPayment * 12;
+      const dscr = debtService > 0 && balance > 0 ? noi / debtService : Infinity;
+      const cashInvested = resolveCashInvested(p);
+      const annualCf =
+        (netRent - (balance > 0 ? monthlyPayment : 0) - monthlyCapexReserve) * 12;
+      const cashOnCash = cashInvested > 0 ? annualCf / cashInvested : 0;
+      const breakEvenOccupancy =
+        grossRent > 0
+          ? (totalMonthlyExpenses(grossRent, operating, p.utilitiesRentRate) +
+              (balance > 0 ? p.monthlyPayment : 0) +
+              monthlyCapexReserve) /
+            grossRent
+          : 0;
+      const monthlyInterest = balance * (p.annualInterestRate / 12);
+      const interestToIncomeRatio = netRent > 0 ? monthlyInterest / netRent : 0;
+      const { warnings } = validateProperty(
+        {
+          ...p,
+          balance,
+          marketValue,
+          monthlyRent: grossRent,
+          monthlyExpenses: operating,
+          monthlyPayment,
+        },
+        portfolio,
+        scenario,
+      );
+
+      return {
+        name: p.name,
+        marketValue,
+        balance,
+        equity,
+        ltv,
+        capRate,
+        payoffRank: rankIdx >= 0 ? rankIdx + 1 : null,
+        monthlyNetRent: netRent,
+        dscr,
+        cashOnCash,
+        breakEvenOccupancy,
+        interestToIncomeRatio,
+        monthlyCapexReserve,
+        warnings,
+      };
+    });
+}
+
 export function computePropertyInsights(
   portfolio: Portfolio,
   payoffOrder: string[],

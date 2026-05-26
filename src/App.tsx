@@ -20,7 +20,8 @@ import { WealthCompositionChart } from './components/WealthCompositionChart';
 import { ChartVariantContext } from './components/chart-theme';
 import {
   compareStrategies,
-  computePropertyInsights,
+  computePropertyInsightsAtMonth,
+  monthForPortfolioYear,
   runSimulation,
   SCENARIO_PRESETS,
   snapshotAtMonth,
@@ -63,7 +64,15 @@ function App() {
     return Math.max(20000, Math.round(piSum * 2));
   }, [portfolio]);
 
-  const { comparisons, activeResult, baselineResult, baseCaseResult, propertyInsights, scenarioDelta } =
+  const {
+    comparisons,
+    activeResult,
+    baselineResult,
+    baseCaseResult,
+    propertyInsights,
+    scenarioDelta,
+    insightMonth,
+  } =
     useMemo(() => {
       if (!portfolio) {
         return {
@@ -94,9 +103,11 @@ function App() {
       const activeResult = runSimulation(portfolio, activeStrategy, scenario);
       const baselineResult = runSimulation(portfolio, 'baseline', scenario);
 
-      const propertyInsights = computePropertyInsights(
+      const insightMonth = monthForPortfolioYear(portfolioYear);
+      const propertyInsights = computePropertyInsightsAtMonth(
         portfolio,
-        activeResult.order,
+        activeResult,
+        insightMonth,
         scenario,
       );
 
@@ -118,8 +129,9 @@ function App() {
         baseCaseResult,
         propertyInsights,
         scenarioDelta,
+        insightMonth,
       };
-    }, [portfolio, activeStrategy, scenario]);
+    }, [portfolio, activeStrategy, scenario, portfolioYear]);
 
   if (loading) {
     return (
@@ -237,11 +249,18 @@ function App() {
               onAdd={addProperty}
               onRemove={removeProperty}
               mobileCards
+              asOfMonth={insightMonth}
             />
             <PropertyInsights
               insights={propertyInsights}
               result={activeResult}
               stacked
+              yearLabel={
+                portfolioYear === 1
+                  ? `${portfolio.simulationAnchorYear ?? 2026} (now)`
+                  : String((portfolio.simulationAnchorYear ?? 2026) + portfolioYear - 1)
+              }
+              ownedCount={propertyInsights.length}
             />
           </div>
         )}
@@ -336,7 +355,16 @@ function App() {
         <CashflowChart result={activeResult} />
       </div>
 
-      <PropertyInsights insights={propertyInsights} result={activeResult} />
+      <PropertyInsights
+        insights={propertyInsights}
+        result={activeResult}
+        yearLabel={
+          portfolioYear === 1
+            ? `${portfolio.simulationAnchorYear ?? 2026} (now)`
+            : String((portfolio.simulationAnchorYear ?? 2026) + portfolioYear - 1)
+        }
+        ownedCount={propertyInsights.length}
+      />
 
       <PropertyTable
         portfolio={portfolio}
@@ -344,6 +372,7 @@ function App() {
         onExpenseBreakdownChange={updateExpenseBreakdown}
         onAdd={addProperty}
         onRemove={removeProperty}
+        asOfMonth={insightMonth}
       />
     </div>
   );

@@ -6,22 +6,33 @@ interface PropertyInsightsProps {
   insights: PropertyInsight[];
   result: SimulationResult;
   stacked?: boolean;
+  /** Calendar label for the selected portfolio year (e.g. "2026 (now)"). */
+  yearLabel?: string;
+  ownedCount?: number;
 }
 
 export function PropertyInsights({
   insights,
   result,
   stacked = false,
+  yearLabel,
+  ownedCount,
 }: PropertyInsightsProps) {
+  const subtitle =
+    yearLabel != null && ownedCount != null
+      ? `${yearLabel} · ${ownedCount} propert${ownedCount === 1 ? 'y' : 'ies'} in service`
+      : null;
   const horizons = comparisonAtHorizons(result, [60, 120, 180]);
 
   if (stacked) {
     return (
       <div className="app-surface divide-y divide-white/10">
         <section className="p-3">
-          <h3 className="mb-3 text-sm font-semibold text-slate-200">
-            Per-property
-          </h3>
+          <h3 className="mb-1 text-sm font-semibold text-slate-200">Per-property</h3>
+          {subtitle && (
+            <p className="mb-3 text-xs text-slate-500">{subtitle}</p>
+          )}
+          {!subtitle && <div className="mb-3" />}
           <ul className="space-y-3">
             {insights.map((p) => (
               <li
@@ -91,9 +102,13 @@ export function PropertyInsights({
   return (
     <div className="space-y-4">
       <div className="glass-card overflow-x-auto p-4">
-        <h3 className="mb-3 text-sm font-semibold text-slate-200">
+        <h3 className="mb-1 text-sm font-semibold text-slate-200">
           Per-property insights
         </h3>
+        {subtitle && (
+          <p className="mb-3 text-xs text-slate-500">{subtitle}</p>
+        )}
+        {!subtitle && <div className="mb-3" />}
         <table className="w-full min-w-[960px] text-left text-xs">
           <thead>
             <tr className="border-b border-white/10 text-slate-400">
