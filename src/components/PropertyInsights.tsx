@@ -16,7 +16,7 @@ export function PropertyInsights({ insights, result }: PropertyInsightsProps) {
         <h3 className="mb-3 text-sm font-semibold text-slate-200">
           Per-property insights
         </h3>
-        <table className="w-full min-w-[720px] text-left text-xs">
+        <table className="w-full min-w-[960px] text-left text-xs">
           <thead>
             <tr className="border-b border-white/10 text-slate-400">
               <th className="pb-2 pr-2 font-medium">Property</th>
@@ -24,14 +24,25 @@ export function PropertyInsights({ insights, result }: PropertyInsightsProps) {
               <th className="pb-2 pr-2 font-medium">Equity</th>
               <th className="pb-2 pr-2 font-medium">LTV</th>
               <th className="pb-2 pr-2 font-medium">Cap rate</th>
-              <th className="pb-2 pr-2 font-medium">Net rent/mo</th>
+              <th className="pb-2 pr-2 font-medium">DSCR</th>
+              <th className="pb-2 pr-2 font-medium">CoC</th>
+              <th className="pb-2 pr-2 font-medium">Break-even occ.</th>
+              <th className="pb-2 pr-2 font-medium">Capex/mo</th>
               <th className="pb-2 font-medium">Payoff rank</th>
             </tr>
           </thead>
           <tbody>
             {insights.map((p) => (
-              <tr key={p.name} className="border-b border-white/5 text-slate-200">
-                <td className="py-2 pr-2">{p.name}</td>
+              <tr
+                key={p.name}
+                className={`border-b border-white/5 text-slate-200 ${p.warnings.length ? 'bg-amber-500/5' : ''}`}
+              >
+                <td className="py-2 pr-2">
+                  <div>{p.name}</div>
+                  {p.warnings.length > 0 && (
+                    <div className="text-[10px] text-amber-400">{p.warnings.join('; ')}</div>
+                  )}
+                </td>
                 <td className="py-2 pr-2 font-mono tabular-nums">
                   {formatCurrency(p.marketValue)}
                 </td>
@@ -45,7 +56,16 @@ export function PropertyInsights({ insights, result }: PropertyInsightsProps) {
                   {formatPercent(p.capRate)}
                 </td>
                 <td className="py-2 pr-2 font-mono tabular-nums">
-                  {formatCurrency(p.monthlyNetRent)}
+                  {Number.isFinite(p.dscr) ? p.dscr.toFixed(2) : '—'}
+                </td>
+                <td className="py-2 pr-2 font-mono tabular-nums">
+                  {formatPercent(p.cashOnCash)}
+                </td>
+                <td className="py-2 pr-2 font-mono tabular-nums">
+                  {formatPercent(p.breakEvenOccupancy)}
+                </td>
+                <td className="py-2 pr-2 font-mono tabular-nums">
+                  {formatCurrency(p.monthlyCapexReserve)}
                 </td>
                 <td className="py-2 font-mono tabular-nums">
                   {p.payoffRank ?? '—'}

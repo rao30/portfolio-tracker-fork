@@ -10,6 +10,8 @@ interface ControlsProps {
   annualExpenseInflationRate: number;
   reinvestSurplus: boolean;
   monthlyReserveTarget: number;
+  defaultVacancyRate: number;
+  defaultCapexReserveRate: number;
   onBudgetChange: (value: number) => void;
   onStrategyChange: (value: StrategyId) => void;
   onPortfolioSettingChange: (
@@ -26,6 +28,8 @@ export function Controls({
   annualExpenseInflationRate,
   reinvestSurplus,
   monthlyReserveTarget,
+  defaultVacancyRate,
+  defaultCapexReserveRate,
   onBudgetChange,
   onStrategyChange,
   onPortfolioSettingChange,
@@ -130,6 +134,49 @@ export function Controls({
             onChange={(e) =>
               onPortfolioSettingChange(
                 'annualExpenseInflationRate',
+                Number(e.target.value),
+              )
+            }
+            className="h-2 w-full cursor-pointer accent-cyan-500"
+          />
+        </div>
+        <div>
+          <label
+            htmlFor="default-vacancy"
+            className="mb-1 block text-xs font-medium text-slate-400"
+          >
+            Default vacancy: {formatPercent(defaultVacancyRate)}
+          </label>
+          <input
+            id="default-vacancy"
+            type="range"
+            min={0}
+            max={0.25}
+            step={0.01}
+            value={defaultVacancyRate}
+            onChange={(e) =>
+              onPortfolioSettingChange('defaultVacancyRate', Number(e.target.value))
+            }
+            className="h-2 w-full cursor-pointer accent-cyan-500"
+          />
+        </div>
+        <div>
+          <label
+            htmlFor="default-capex"
+            className="mb-1 block text-xs font-medium text-slate-400"
+          >
+            Capex reserve (% of gross rent): {formatPercent(defaultCapexReserveRate)}
+          </label>
+          <input
+            id="default-capex"
+            type="range"
+            min={0}
+            max={0.2}
+            step={0.005}
+            value={defaultCapexReserveRate}
+            onChange={(e) =>
+              onPortfolioSettingChange(
+                'defaultCapexReserveRate',
                 Number(e.target.value),
               )
             }

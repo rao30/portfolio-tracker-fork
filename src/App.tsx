@@ -7,12 +7,14 @@ import { Header } from './components/Header';
 import { IncomeVsExpenseChart } from './components/IncomeVsExpenseChart';
 import { InterestChart } from './components/InterestChart';
 import { KpiCards } from './components/KpiCards';
+import { MonteCarloChart } from './components/MonteCarloChart';
 import { NetWorthChart } from './components/NetWorthChart';
 import { PayoffTimeline } from './components/PayoffTimeline';
 import { PropertyInsights } from './components/PropertyInsights';
 import { PropertyTable } from './components/PropertyTable';
 import { ScenarioControls } from './components/ScenarioControls';
 import { StrategyComparison } from './components/StrategyComparison';
+import { TaxPlanner } from './components/TaxPlanner';
 import { WealthCompositionChart } from './components/WealthCompositionChart';
 import {
   compareStrategies,
@@ -33,7 +35,11 @@ function App() {
     source,
     setBudget,
     updatePortfolioSetting,
+    updateTaxProfile,
+    updateAcquisitionTemplate,
+    updateGoals,
     updateProperty,
+    updateExpenseBreakdown,
     addProperty,
     removeProperty,
     resetFromFile,
@@ -63,17 +69,18 @@ function App() {
         };
       }
 
-      const simOpts = {
-        annualRentGrowthRate: portfolio.annualRentGrowthRate,
-        annualExpenseInflationRate: portfolio.annualExpenseInflationRate,
-        reinvestSurplus: portfolio.reinvestSurplus,
-        monthlyReserveTarget: portfolio.monthlyReserveTarget,
-      };
-
       const comparisons = compareStrategies(portfolio.properties, {
         extraMonthlyBudget: portfolio.extraMonthlyBudget,
         includeBaseline: true,
-        simulationOptions: simOpts,
+        simulationOptions: {
+          annualRentGrowthRate: portfolio.annualRentGrowthRate,
+          annualExpenseInflationRate: portfolio.annualExpenseInflationRate,
+          reinvestSurplus: portfolio.reinvestSurplus,
+          monthlyReserveTarget: portfolio.monthlyReserveTarget,
+          defaultVacancyRate: portfolio.defaultVacancyRate,
+          defaultCapexReserveRate: portfolio.defaultCapexReserveRate,
+          defaultCapexReserveFlat: portfolio.defaultCapexReserveFlat,
+        },
       });
 
       const baseCaseResult = runSimulation(portfolio, activeStrategy, SCENARIO_PRESETS[0]);
@@ -81,8 +88,9 @@ function App() {
       const baselineResult = runSimulation(portfolio, 'baseline', scenario);
 
       const propertyInsights = computePropertyInsights(
-        portfolio.properties,
+        portfolio,
         activeResult.order,
+        scenario,
       );
 
       let scenarioDelta: { monthsDelta: number; equityDelta: number } | null = null;
@@ -138,6 +146,8 @@ function App() {
         annualExpenseInflationRate={portfolio.annualExpenseInflationRate}
         reinvestSurplus={portfolio.reinvestSurplus}
         monthlyReserveTarget={portfolio.monthlyReserveTarget}
+        defaultVacancyRate={portfolio.defaultVacancyRate}
+        defaultCapexReserveRate={portfolio.defaultCapexReserveRate}
         onBudgetChange={setBudget}
         onStrategyChange={setActiveStrategy}
         onPortfolioSettingChange={updatePortfolioSetting}
@@ -171,8 +181,15 @@ function App() {
       <KpiCards
         active={activeResult}
         baseline={baselineResult}
-        properties={portfolio.properties}
+        portfolio={portfolio}
         equityHorizon={equityHorizon}
+      />
+
+      <TaxPlanner
+        portfolio={portfolio}
+        strategyId={activeStrategy}
+        onTaxProfileChange={updateTaxProfile}
+        onAcquisitionTemplateChange={updateAcquisitionTemplate}
       />
 
       <NetWorthChart
@@ -185,12 +202,15 @@ function App() {
         <IncomeVsExpenseChart result={activeResult} />
       </div>
 
+      <MonteCarloChart portfolio={portfolio} strategyId={activeStrategy} />
+
       <GoalTracker
         portfolio={portfolio}
         active={activeResult}
         baseline={baselineResult}
         strategyId={activeStrategy}
         scenarioDelta={scenarioDelta}
+        onGoalsChange={updateGoals}
       />
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -212,8 +232,9 @@ function App() {
       <PropertyInsights insights={propertyInsights} result={activeResult} />
 
       <PropertyTable
-        properties={portfolio.properties}
+        portfolio={portfolio}
         onUpdate={updateProperty}
+        onExpenseBreakdownChange={updateExpenseBreakdown}
         onAdd={addProperty}
         onRemove={removeProperty}
       />

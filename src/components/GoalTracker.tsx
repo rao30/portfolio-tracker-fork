@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Portfolio, SimulationResult } from '../lib/types';
 import {
   findBudgetForDebtFreeByMonth,
@@ -18,6 +18,7 @@ interface GoalTrackerProps {
     monthsDelta: number;
     equityDelta: number;
   } | null;
+  onGoalsChange?: (goals: Portfolio['goals']) => void;
 }
 
 export function GoalTracker({
@@ -26,9 +27,20 @@ export function GoalTracker({
   baseline,
   strategyId,
   scenarioDelta,
+  onGoalsChange,
 }: GoalTrackerProps) {
-  const [goalMonth, setGoalMonth] = useState(180);
-  const [goalEquity, setGoalEquity] = useState(2_000_000);
+  const debtFreeGoal = portfolio.goals.find((g) => g.type === 'debtFreeByMonth');
+  const equityGoal = portfolio.goals.find((g) => g.type === 'equityAtMonth');
+
+  const [goalMonth, setGoalMonth] = useState(debtFreeGoal?.targetMonth ?? 180);
+  const [goalEquity, setGoalEquity] = useState(equityGoal?.targetValue ?? 2_000_000);
+
+  useEffect(() => {
+    onGoalsChange?.([
+      { type: 'debtFreeByMonth', targetMonth: goalMonth },
+      { type: 'equityAtMonth', targetMonth: goalMonth, targetValue: goalEquity },
+    ]);
+  }, [goalMonth, goalEquity, onGoalsChange]);
 
   const insights = useMemo(
     () => generateInsights(portfolio, active, baseline, strategyId),
@@ -55,9 +67,7 @@ export function GoalTracker({
   return (
     <div className="space-y-4">
       <div className="glass-card p-4">
-        <h3 className="mb-3 text-sm font-semibold text-slate-200">
-          Insights
-        </h3>
+        <h3 className="mb-3 text-sm font-semibold text-slate-200">Insights</h3>
         <ul className="space-y-2 text-sm text-slate-300">
           {insights.map((text) => (
             <li key={text} className="flex gap-2">
@@ -71,8 +81,8 @@ export function GoalTracker({
               <span>
                 Scenario vs base: debt-free{' '}
                 {scenarioDelta.monthsDelta >= 0 ? 'delayed' : 'accelerated'} by{' '}
-                {formatMonths(Math.abs(scenarioDelta.monthsDelta))}, year-15
-                equity {scenarioDelta.equityDelta >= 0 ? 'higher' : 'lower'} by{' '}
+                {formatMonths(Math.abs(scenarioDelta.monthsDelta))}, year-15 equity{' '}
+                {scenarioDelta.equityDelta >= 0 ? 'higher' : 'lower'} by{' '}
                 {formatCurrency(Math.abs(scenarioDelta.equityDelta))}.
               </span>
             </li>
@@ -133,8 +143,7 @@ export function GoalTracker({
             {formatCurrency(snapshotAtMonth(active, goalMonth)?.totalEquity ?? 0)}
           </p>
           {budgetForEquity !== null &&
-            (snapshotAtMonth(active, goalMonth)?.totalEquity ?? 0) <
-              goalEquity && (
+            (snapshotAtMonth(active, goalMonth)?.totalEquity ?? 0) < goalEquity && (
               <p className="mt-1 text-xs text-cyan-300">
                 Need ~{formatCurrency(budgetForEquity)}/mo extra to reach{' '}
                 {formatCurrency(goalEquity)}

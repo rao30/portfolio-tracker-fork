@@ -27,6 +27,7 @@ export function IncomeVsExpenseChart({ result }: IncomeVsExpenseChartProps) {
     rent: h.monthlyRent,
     expenses: h.monthlyExpenses,
     pi: h.monthlyPi,
+    capex: h.monthlyCapex,
     cashflow: h.monthlyCashflow,
   }));
 
@@ -57,6 +58,7 @@ export function IncomeVsExpenseChart({ result }: IncomeVsExpenseChartProps) {
                 rent: 'Gross rent',
                 expenses: 'Expenses',
                 pi: 'P&I',
+                capex: 'Capex reserve',
                 cashflow: 'Net cashflow',
               };
               return [formatCurrency(value), labels[name] ?? name];
@@ -81,6 +83,13 @@ export function IncomeVsExpenseChart({ result }: IncomeVsExpenseChartProps) {
             type="monotone"
             dataKey="pi"
             stroke="#fbbf24"
+            strokeWidth={2}
+            dot={false}
+          />
+          <Line
+            type="monotone"
+            dataKey="capex"
+            stroke="#a78bfa"
             strokeWidth={2}
             dot={false}
           />

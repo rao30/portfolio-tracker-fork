@@ -4,6 +4,7 @@ import type { Property } from './types';
 import {
   amortizeOneMonth,
   compareStrategies,
+  computeMonthlyPayment,
   normalizePortfolio,
   SEED_PROPERTY_NAMES,
   simulateSnowball,
@@ -358,10 +359,43 @@ describe('simulateSnowball', () => {
       snowballCashflow: false,
       reinvestSurplus: false,
       monthlyReserveTarget: 0,
+      defaultCapexReserveRate: 0,
     });
     const last = r.history[r.history.length - 1];
     expect(last.cashReserveBalance).toBeGreaterThan(0);
     expect(last.netWorth).toBeGreaterThan(last.totalEquity);
+  });
+
+  it('deducts per-property capex reserve from cashflow', () => {
+    const withCapex = simulateSnowball(fixture, {
+      payoffOrder: STRATEGIES.highestRate(fixture),
+      extraMonthlyBudget: 0,
+      snowballCashflow: false,
+      defaultCapexReserveRate: 0.1,
+      maxMonths: 3,
+      allowIncomplete: true,
+    });
+    expect(withCapex.history[0].monthlyCapex).toBeGreaterThan(0);
+  });
+
+  it('applies rent change events', () => {
+    const props: Property[] = [
+      {
+        ...fixture[0],
+        events: [{ month: 2, type: 'rentChange', rent: 2000 }],
+      },
+    ];
+    const r = simulateSnowball(props, {
+      payoffOrder: ['HighRate'],
+      extraMonthlyBudget: 5000,
+      maxMonths: 3,
+      allowIncomplete: true,
+    });
+    expect(r.history[1].monthlyRent).toBeGreaterThan(r.history[0].monthlyRent);
+  });
+
+  it('computeMonthlyPayment handles zero rate', () => {
+    expect(computeMonthlyPayment(240000, 0, 240)).toBeCloseTo(1000, 0);
   });
 
   it('throws when simulation does not converge', () => {
@@ -409,7 +443,7 @@ describe('STRATEGIES ordering', () => {
 describe('compareStrategies', () => {
   it('returns all strategies plus baseline', () => {
     const results = compareStrategies(fixture, { extraMonthlyBudget: 1000 });
-    expect(results.length).toBe(5);
+    expect(results.length).toBe(7);
     expect(results.some((r) => r.strategy === 'baseline')).toBe(true);
   });
 
@@ -441,7 +475,7 @@ describe('compareStrategies', () => {
       extraMonthlyBudget: 1000,
       includeBaseline: false,
     });
-    expect(results.length).toBe(4);
+    expect(results.length).toBe(6);
     expect(results.every((r) => r.strategy !== 'baseline')).toBe(true);
   });
 });
@@ -552,9 +586,10 @@ describe('seed portfolio integration', () => {
       payoffOrder: STRATEGIES.highestRate(seed),
       extraMonthlyBudget: 5000,
       strategyName: 'highestRate',
+      defaultCapexReserveRate: 0.1,
     });
     expect(r.monthsToPayoff).toBeGreaterThanOrEqual(168);
-    expect(r.monthsToPayoff).toBeLessThanOrEqual(192);
+    expect(r.monthsToPayoff).toBeLessThanOrEqual(200);
   });
 
   it('Lisa Ln and DeSoto B are last two paid off under highest rate', () => {
@@ -562,6 +597,7 @@ describe('seed portfolio integration', () => {
       payoffOrder: STRATEGIES.highestRate(seed),
       extraMonthlyBudget: 5000,
       strategyName: 'highestRate',
+      defaultCapexReserveRate: 0.1,
     });
     const months = Object.entries(r.payoffSchedule).sort(
       (a, b) => b[1] - a[1],

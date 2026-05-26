@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Portfolio, PortfolioFile, Property } from './types';
-import { denormalizePortfolio, normalizePortfolio } from './snowball';
+import type {
+  AcquisitionTemplate,
+  GoalConfig,
+  Portfolio,
+  PortfolioFile,
+  Property,
+  TaxProfile,
+} from './types';
+import { denormalizePortfolio, normalizePortfolio, resolveMonthlyExpenses } from './snowball';
+import { bonusDepreciationForYear } from './tax';
 
 const STORAGE_KEY = 'rental-snowball-portfolio';
 
@@ -11,7 +19,10 @@ export type PortfolioSettingKey =
   | 'annualRentGrowthRate'
   | 'annualExpenseInflationRate'
   | 'reinvestSurplus'
-  | 'monthlyReserveTarget';
+  | 'monthlyReserveTarget'
+  | 'defaultVacancyRate'
+  | 'defaultCapexReserveRate'
+  | 'defaultCapexReserveFlat';
 
 export interface UsePortfolioResult {
   portfolio: Portfolio | null;
@@ -20,7 +31,18 @@ export interface UsePortfolioResult {
   source: DataSource;
   setBudget: (budget: number) => void;
   updatePortfolioSetting: (field: PortfolioSettingKey, value: number | boolean) => void;
+  updateTaxProfile: (field: keyof TaxProfile, value: number | boolean | string) => void;
+  updateAcquisitionTemplate: (
+    field: keyof AcquisitionTemplate,
+    value: number | boolean | string,
+  ) => void;
+  updateGoals: (goals: GoalConfig[]) => void;
   updateProperty: (index: number, field: keyof Property, value: string) => void;
+  updateExpenseBreakdown: (
+    index: number,
+    breakdown: import('./types').ExpenseBreakdown,
+  ) => void;
+  updatePropertyBoolean: (index: number, field: keyof Property, value: boolean) => void;
   addProperty: () => void;
   removeProperty: (index: number) => void;
   resetFromFile: () => Promise<void>;
@@ -51,7 +73,6 @@ function loadFromStorage(): Portfolio | null {
   }
 }
 
-/** Load portfolio from localStorage or repo JSON; persist edits locally. */
 export function usePortfolio(): UsePortfolioResult {
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [loading, setLoading] = useState(true);
@@ -112,6 +133,52 @@ export function usePortfolio(): UsePortfolioResult {
     [portfolio, persist],
   );
 
+  const updateTaxProfile = useCallback(
+    (field: keyof TaxProfile, value: number | boolean | string) => {
+      if (!portfolio) return;
+      const next = { ...portfolio.taxProfile, [field]: value };
+      if (field === 'taxYear' && typeof value === 'number') {
+        next.bonusDepreciationRate = bonusDepreciationForYear(value);
+      }
+      persist({ ...portfolio, taxProfile: next }, true);
+    },
+    [portfolio, persist],
+  );
+
+  const updateAcquisitionTemplate = useCallback(
+    (field: keyof AcquisitionTemplate, value: number | boolean | string) => {
+      if (!portfolio) return;
+      persist(
+        {
+          ...portfolio,
+          acquisitionTemplate: { ...portfolio.acquisitionTemplate, [field]: value },
+        },
+        true,
+      );
+    },
+    [portfolio, persist],
+  );
+
+  const updateGoals = useCallback(
+    (goals: GoalConfig[]) => {
+      if (!portfolio) return;
+      persist({ ...portfolio, goals }, true);
+    },
+    [portfolio, persist],
+  );
+
+  const updateExpenseBreakdown = useCallback(
+    (index: number, breakdown: import('./types').ExpenseBreakdown) => {
+      if (!portfolio) return;
+      const props = [...portfolio.properties];
+      const current = { ...props[index], expenseBreakdown: breakdown };
+      current.monthlyExpenses = resolveMonthlyExpenses(current);
+      props[index] = current;
+      persist({ ...portfolio, properties: props }, true);
+    },
+    [portfolio, persist],
+  );
+
   const updateProperty = useCallback(
     (index: number, field: keyof Property, value: string) => {
       if (!portfolio) return;
@@ -119,12 +186,24 @@ export function usePortfolio(): UsePortfolioResult {
       const current = { ...props[index] };
       if (field === 'name') {
         current.name = value;
+      } else if (field === 'useCostSeg') {
+        current.useCostSeg = value === 'true';
       } else {
         const num = parseFloat(value);
         if (Number.isNaN(num)) return;
-        current[field] = num;
+        (current as unknown as Record<string, number>)[field as string] = num;
       }
       props[index] = current;
+      persist({ ...portfolio, properties: props }, true);
+    },
+    [portfolio, persist],
+  );
+
+  const updatePropertyBoolean = useCallback(
+    (index: number, field: keyof Property, value: boolean) => {
+      if (!portfolio) return;
+      const props = [...portfolio.properties];
+      props[index] = { ...props[index], [field]: value };
       persist({ ...portfolio, properties: props }, true);
     },
     [portfolio, persist],
@@ -199,7 +278,12 @@ export function usePortfolio(): UsePortfolioResult {
     source,
     setBudget,
     updatePortfolioSetting,
+    updateTaxProfile,
+    updateAcquisitionTemplate,
+    updateGoals,
     updateProperty,
+    updateExpenseBreakdown,
+    updatePropertyBoolean,
     addProperty,
     removeProperty,
     resetFromFile,
