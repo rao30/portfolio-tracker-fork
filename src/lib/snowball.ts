@@ -65,12 +65,28 @@ export interface SimulationOptions {
   allowUnresolved?: boolean;
 }
 
+/** Monthly utilities from gross rent when a rate is configured. */
+export function utilitiesFromRent(monthlyRent: number, utilitiesRentRate?: number): number {
+  if (!utilitiesRentRate || utilitiesRentRate <= 0) return 0;
+  return monthlyRent * utilitiesRentRate;
+}
+
+/** Total monthly expenses (operating + utilities). */
+export function totalMonthlyExpenses(
+  monthlyRent: number,
+  monthlyOperatingExpenses: number,
+  utilitiesRentRate?: number,
+): number {
+  return monthlyOperatingExpenses + utilitiesFromRent(monthlyRent, utilitiesRentRate);
+}
+
 interface SimState {
   name: string;
   balance: number;
   marketValue: number;
   monthlyRent: number;
   monthlyExpenses: number;
+  utilitiesRentRate?: number;
   monthlyPayment: number;
   annualInterestRate: number;
   rentGrowth: number;
@@ -123,6 +139,14 @@ function allLoansResolved(states: SimState[], month: number): boolean {
   return states.every(
     (s) => isPropertyOwned(s, month) && s.balance <= BALANCE_EPSILON,
   );
+}
+
+function stateUtilities(state: SimState): number {
+  return utilitiesFromRent(state.monthlyRent, state.utilitiesRentRate);
+}
+
+function stateTotalExpenses(state: SimState): number {
+  return state.monthlyExpenses + stateUtilities(state);
 }
 
 function activateProperty(state: SimState): void {
@@ -235,6 +259,7 @@ function initSimStates(
       marketValue: activeAtStart ? p.marketValue : 0,
       monthlyRent: activeAtStart ? originalRent : 0,
       monthlyExpenses: activeAtStart ? p.monthlyExpenses : 0,
+      utilitiesRentRate: p.utilitiesRentRate,
       monthlyPayment: p.monthlyPayment,
       annualInterestRate: p.annualInterestRate + rateShock,
       rentGrowth: p.annualRentGrowthRate ?? portfolioRentGrowth,
@@ -255,7 +280,7 @@ function initSimStates(
 function computeMonthlyCashflow(states: SimState[], month: number): number {
   return states.reduce((sum, s) => {
     if (!isPropertyOwned(s, month)) return sum;
-    const netRent = s.monthlyRent - s.monthlyExpenses;
+    const netRent = s.monthlyRent - stateTotalExpenses(s);
     if (s.balance <= BALANCE_EPSILON) return sum + netRent;
     const pi = scheduledPaymentForMonth(s, month);
     return sum + (netRent - pi);
@@ -330,8 +355,16 @@ function buildEquitySnapshot(
       (sum, p) => sum + (isPropertyOwned(p, month) ? p.monthlyRent : 0),
       0,
     ),
-    monthlyExpenses: states.reduce(
+    monthlyOperatingExpenses: states.reduce(
       (sum, p) => sum + (isPropertyOwned(p, month) ? p.monthlyExpenses : 0),
+      0,
+    ),
+    monthlyUtilities: states.reduce(
+      (sum, p) => sum + (isPropertyOwned(p, month) ? stateUtilities(p) : 0),
+      0,
+    ),
+    monthlyExpenses: states.reduce(
+      (sum, p) => sum + (isPropertyOwned(p, month) ? stateTotalExpenses(p) : 0),
       0,
     ),
     monthlyPi: computeMonthlyPi(states, month),
@@ -552,7 +585,7 @@ export function simulateSnowball(
       0,
     );
     cumulativeExpenses += states.reduce(
-      (sum, st) => sum + (isPropertyOwned(st, month) ? st.monthlyExpenses : 0),
+      (sum, st) => sum + (isPropertyOwned(st, month) ? stateTotalExpenses(st) : 0),
       0,
     );
 
@@ -626,7 +659,7 @@ export function simulateSnowball(
 
   const lastState = states;
   const finalMonthlyCashflow = lastState.reduce(
-    (sum, s) => sum + (s.monthlyRent - s.monthlyExpenses),
+    (sum, s) => sum + (s.monthlyRent - stateTotalExpenses(s)),
     0,
   );
   const finalEquity = lastState.reduce(
@@ -827,7 +860,9 @@ export function computePropertyInsights(
   return properties.map((p) => {
     const equity = p.marketValue - p.balance;
     const ltv = p.marketValue > 0 ? p.balance / p.marketValue : 0;
-    const netRent = p.monthlyRent - p.monthlyExpenses;
+    const netRent =
+      p.monthlyRent -
+      totalMonthlyExpenses(p.monthlyRent, p.monthlyExpenses, p.utilitiesRentRate);
     const capRate = p.marketValue > 0 ? (netRent * 12) / p.marketValue : 0;
     const rankIdx = payoffOrder.indexOf(p.name);
     return {
@@ -1241,6 +1276,10 @@ export function normalizePortfolio(raw: unknown): Portfolio {
       prop.balloonRefiTermMonths = schedule.balloonRefiTermMonths;
     }
 
+    if (typeof p.utilities_rent_rate === 'number') {
+      prop.utilitiesRentRate = p.utilities_rent_rate;
+    }
+
     return prop;
   });
 
@@ -1319,6 +1358,9 @@ export function denormalizePortfolio(
       }
       if (p.balloonRefiTermMonths !== undefined) {
         file.refi_term_months = p.balloonRefiTermMonths;
+      }
+      if (p.utilitiesRentRate !== undefined) {
+        file.utilities_rent_rate = p.utilitiesRentRate;
       }
       return file;
     }),

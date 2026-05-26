@@ -1,5 +1,5 @@
 {
-  "seed_version": 3,
+  "seed_version": 4,
   "simulation_anchor_year": 2026,
   "simulation_anchor_month": 1,
   "default_refi_annual_rate": 0.0675,
@@ -19,7 +19,8 @@
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 939.67,
       "monthly_rent": 3590,
-      "monthly_expenses": 1077
+      "monthly_expenses": 1077,
+      "utilities_rent_rate": 0.15
     },
     {
       "name": "Brookwood (Duncanville)",
@@ -30,7 +31,8 @@
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 1936.67,
       "monthly_rent": 6200,
-      "monthly_expenses": 1860
+      "monthly_expenses": 1860,
+      "utilities_rent_rate": 0.15
     },
     {
       "name": "Ridge Rock (Duncanville)",
@@ -41,7 +43,8 @@
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 2595.45,
       "monthly_rent": 5740,
-      "monthly_expenses": 1722
+      "monthly_expenses": 1722,
+      "utilities_rent_rate": 0.15
     },
     {
       "name": "Wendy (Irving)",
@@ -52,7 +55,8 @@
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 2663.3,
       "monthly_rent": 5470,
-      "monthly_expenses": 1641
+      "monthly_expenses": 1641,
+      "utilities_rent_rate": 0.15
     },
     {
       "name": "Park Blvd (Plano, projected post-move-out)",
@@ -63,7 +67,8 @@
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 3011.06,
       "monthly_rent": 5800,
-      "monthly_expenses": 1740
+      "monthly_expenses": 1740,
+      "utilities_rent_rate": 0.15
     },
     {
       "name": "DeSoto Duplex A (financed)",

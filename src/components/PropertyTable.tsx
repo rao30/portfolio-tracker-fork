@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Property, PropertyDraft } from '../lib/types';
 import { formatCurrency, formatPercent, propertyColor } from '../lib/format';
+import { totalMonthlyExpenses, utilitiesFromRent } from '../lib/snowball';
 import { AddPropertyModal } from './AddPropertyModal';
 
 interface PropertyTableProps {
@@ -19,8 +20,14 @@ function fieldDisplay(p: Property, field: EditableField): string {
     field === 'annualInterestRate' ||
     field === 'annualAppreciationRate' ||
     field === 'annualRentGrowthRate' ||
-    field === 'annualExpenseInflationRate'
+    field === 'annualExpenseInflationRate' ||
+    field === 'utilitiesRentRate'
   ) {
+    if (field === 'utilitiesRentRate') {
+      if (p.utilitiesRentRate == null) return '—';
+      const amt = utilitiesFromRent(p.monthlyRent, p.utilitiesRentRate);
+      return `${formatPercent(p.utilitiesRentRate)} (${formatCurrency(amt)})`;
+    }
     return formatPercent(p[field] ?? 0);
   }
   if (
@@ -99,7 +106,8 @@ const COLUMNS: { key: EditableField; label: string; mono?: boolean }[] = [
   { key: 'annualAppreciationRate', label: 'Appr.', mono: true },
   { key: 'monthlyPayment', label: 'P&I', mono: true },
   { key: 'monthlyRent', label: 'Rent', mono: true },
-  { key: 'monthlyExpenses', label: 'Expenses', mono: true },
+  { key: 'monthlyExpenses', label: 'Operating', mono: true },
+  { key: 'utilitiesRentRate', label: 'Utilities', mono: true },
 ];
 
 const MOBILE_FIELDS: { key: EditableField; label: string }[] = [
@@ -108,7 +116,8 @@ const MOBILE_FIELDS: { key: EditableField; label: string }[] = [
   { key: 'annualInterestRate', label: 'Rate' },
   { key: 'monthlyPayment', label: 'P&I' },
   { key: 'monthlyRent', label: 'Rent' },
-  { key: 'monthlyExpenses', label: 'Expenses' },
+  { key: 'monthlyExpenses', label: 'Operating' },
+  { key: 'utilitiesRentRate', label: 'Utilities' },
 ];
 
 function PropertyCard({
@@ -178,21 +187,27 @@ export function PropertyTable({
   const lastProperty = properties[properties.length - 1];
 
   const totals = properties.reduce(
-    (acc, p) => ({
-      balance: acc.balance + p.balance,
-      marketValue: acc.marketValue + p.marketValue,
-      monthlyPayment: acc.monthlyPayment + p.monthlyPayment,
-      monthlyRent: acc.monthlyRent + p.monthlyRent,
-      monthlyExpenses: acc.monthlyExpenses + p.monthlyExpenses,
-    }),
+    (acc, p) => {
+      const utilities = utilitiesFromRent(p.monthlyRent, p.utilitiesRentRate);
+      return {
+        balance: acc.balance + p.balance,
+        marketValue: acc.marketValue + p.marketValue,
+        monthlyPayment: acc.monthlyPayment + p.monthlyPayment,
+        monthlyRent: acc.monthlyRent + p.monthlyRent,
+        monthlyOperating: acc.monthlyOperating + p.monthlyExpenses,
+        monthlyUtilities: acc.monthlyUtilities + utilities,
+      };
+    },
     {
       balance: 0,
       marketValue: 0,
       monthlyPayment: 0,
       monthlyRent: 0,
-      monthlyExpenses: 0,
+      monthlyOperating: 0,
+      monthlyUtilities: 0,
     },
   );
+  const totalExpenses = totals.monthlyOperating + totals.monthlyUtilities;
 
   const header = (
     <div className="mb-3 flex items-center justify-between">
@@ -243,7 +258,7 @@ export function PropertyTable({
           <div>
             <p>Net rent/mo</p>
             <p className="font-mono text-sm tabular-nums text-slate-200">
-              {formatCurrency(totals.monthlyRent - totals.monthlyExpenses)}
+              {formatCurrency(totals.monthlyRent - totalExpenses)}
             </p>
           </div>
         </div>
@@ -324,7 +339,10 @@ export function PropertyTable({
               {formatCurrency(totals.monthlyRent)}
             </td>
             <td className="pt-2 font-mono tabular-nums">
-              {formatCurrency(totals.monthlyExpenses)}
+              {formatCurrency(totals.monthlyOperating)}
+            </td>
+            <td className="pt-2 font-mono tabular-nums">
+              {formatCurrency(totals.monthlyUtilities)}
             </td>
             <td />
           </tr>

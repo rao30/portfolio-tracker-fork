@@ -6,7 +6,10 @@ export interface Property {
   annualAppreciationRate: number;
   monthlyPayment: number;
   monthlyRent: number;
+  /** Operating expenses excluding utilities. */
   monthlyExpenses: number;
+  /** Share of gross rent for utilities (e.g. 0.15). Scales with rent in simulation. */
+  utilitiesRentRate?: number;
   /** Override portfolio default rent growth for this property. */
   annualRentGrowthRate?: number;
   /** Override portfolio default expense inflation for this property. */
@@ -57,6 +60,10 @@ export interface MonthSnapshot {
   totalLiabilities: number;
   netWorth: number;
   monthlyRent: number;
+  /** Operating expenses (excludes utilities). */
+  monthlyOperatingExpenses: number;
+  monthlyUtilities: number;
+  /** Total expenses (operating + utilities). */
   monthlyExpenses: number;
   monthlyPi: number;
   cumulativeRentCollected: number;
@@ -91,6 +98,7 @@ export interface PropertyFile {
   monthly_payment: number;
   monthly_rent: number;
   monthly_expenses: number;
+  utilities_rent_rate?: number;
   annual_rent_growth_rate?: number;
   annual_expense_inflation_rate?: number;
   /** Simulation month when loan starts (overrides close_year). */

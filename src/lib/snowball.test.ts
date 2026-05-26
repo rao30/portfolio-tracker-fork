@@ -15,6 +15,8 @@ import {
   normalizePortfolio,
   paymentFromPrincipal,
   resolvePropertySchedule,
+  totalMonthlyExpenses,
+  utilitiesFromRent,
   SEED_PROPERTY_NAMES,
   simulateSnowball,
   STRATEGIES,
@@ -496,6 +498,45 @@ describe('normalizePortfolio', () => {
     });
     expect(p.properties[0].closeMonth).toBe(25);
     expect(p.properties[0].closeYear).toBe(2028);
+  });
+});
+
+describe('utilities expense', () => {
+  it('charges 15% of rent as utilities for configured properties', () => {
+    expect(utilitiesFromRent(6200, 0.15)).toBe(930);
+    expect(totalMonthlyExpenses(6200, 1860, 0.15)).toBe(2790);
+  });
+
+  it('reduces cashflow when utilities are enabled', () => {
+    const base: Property = {
+      name: 'Test',
+      balance: 100000,
+      marketValue: 150000,
+      annualInterestRate: 0.05,
+      annualAppreciationRate: 0.03,
+      monthlyPayment: 600,
+      monthlyRent: 4000,
+      monthlyExpenses: 1200,
+    };
+    const withUtilities: Property = { ...base, utilitiesRentRate: 0.15 };
+    const rBase = simulateSnowball([base], {
+      payoffOrder: ['Test'],
+      extraMonthlyBudget: 0,
+      snowballCashflow: false,
+      strategyName: 'test',
+      maxMonths: 1,
+      allowUnresolved: true,
+    });
+    const rUtil = simulateSnowball([withUtilities], {
+      payoffOrder: ['Test'],
+      extraMonthlyBudget: 0,
+      snowballCashflow: false,
+      strategyName: 'test',
+      maxMonths: 1,
+      allowUnresolved: true,
+    });
+    expect(rUtil.history[0].monthlyUtilities).toBeCloseTo(600, 0);
+    expect(rUtil.history[0].monthlyCashflow).toBeLessThan(rBase.history[0].monthlyCashflow);
   });
 });
 
