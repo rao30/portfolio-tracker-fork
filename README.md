@@ -34,6 +34,23 @@ Without Supabase env vars, edits save to `localStorage` in the browser. Use **Ex
 
 **Reset** reloads repo defaults and, when cloud storage is enabled, overwrites the Supabase snapshot.
 
+### Portfolio JSON schedule fields
+
+Simulation timing and seller/refi terms live in [`public/data/portfolio.json`](public/data/portfolio.json), not in code.
+
+| Level | Field | Meaning |
+|-------|--------|---------|
+| Portfolio | `simulation_anchor_year`, `simulation_anchor_month` | Calendar date for simulation month 1 |
+| Portfolio | `default_refi_annual_rate`, `default_refi_term_months` | Fallback refi terms for seller loans |
+| Property | `financing_type` | `conventional` or `seller` |
+| Property | `close_year`, `close_month_calendar` | Acquisition date (calendar) |
+| Property | `balloon_months` | Months on seller financing before refi |
+| Property | `seller_amortization_months` | Seller P&I amortization (e.g. 240) |
+| Property | `refi_year`, `refi_month` | Calendar date when balloon refis |
+| Property | `refi_annual_rate`, `refi_term_months` | Post-balloon conventional loan terms |
+
+The engine converts calendar dates to simulation months from the anchor. Seller `monthly_payment` and `annual_interest_rate` in JSON are the values used until refi.
+
 > Balances and loan terms are sensitive. Use a **private repository**, optional `PORTFOLIO_WRITE_KEY`, and never commit service role keys.
 
 ### Current market values (defaults)

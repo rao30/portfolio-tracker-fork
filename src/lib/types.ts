@@ -11,15 +11,27 @@ export interface Property {
   annualRentGrowthRate?: number;
   /** Override portfolio default expense inflation for this property. */
   annualExpenseInflationRate?: number;
-  /** Simulation month when the loan begins (default 1 = already owned). */
+  /** `conventional` | `seller` — from portfolio JSON. */
+  financingType?: 'conventional' | 'seller';
+  /** Simulation month when the loan begins (derived or explicit in JSON). */
   closeMonth?: number;
-  /** Calendar year of closing; converted using portfolio simulationAnchorYear. */
+  /** Calendar close year (portfolio JSON). */
   closeYear?: number;
-  /** Months after close when remaining balance is due in full (seller balloon). */
+  /** Calendar close month 1–12 (portfolio JSON, default 1). */
+  closeMonthCalendar?: number;
+  /** Seller loan: months of 0% amortizing payments before refi. */
   balloonMonths?: number;
-  /** Post-balloon refi rate (default 6.75%). */
+  /** Seller loan: amortization term for scheduled payment (e.g. 240). */
+  sellerAmortizationMonths?: number;
+  /** Calendar year of balloon refi (portfolio JSON). */
+  refiYear?: number;
+  /** Calendar month of balloon refi 1–12 (portfolio JSON, default 1). */
+  refiMonthCalendar?: number;
+  /** Simulation month when refi occurs (derived from dates in JSON). */
+  refiSimMonth?: number;
+  /** Post-balloon refi rate (portfolio JSON). */
   balloonRefiAnnualRate?: number;
-  /** Post-balloon refi term in months (default 360). */
+  /** Post-balloon refi term in months (portfolio JSON). */
   balloonRefiTermMonths?: number;
 }
 
@@ -81,21 +93,30 @@ export interface PropertyFile {
   monthly_expenses: number;
   annual_rent_growth_rate?: number;
   annual_expense_inflation_rate?: number;
+  /** Simulation month when loan starts (overrides close_year). */
   close_month?: number;
   close_year?: number;
+  /** Calendar month of closing, 1–12 (default 1). */
+  close_month_calendar?: number;
+  financing_type?: 'conventional' | 'seller';
   balloon_months?: number;
-  balloon_refi_annual_rate?: number;
-  balloon_refi_term_months?: number;
+  seller_amortization_months?: number;
+  refi_year?: number;
+  refi_month?: number;
+  refi_annual_rate?: number;
+  refi_term_months?: number;
 }
 
 export interface PortfolioFile {
   extra_monthly_budget: number;
   /** Calendar year for simulation month 1 (default 2026). */
   simulation_anchor_year?: number;
-  /** Default post-balloon refi rate for seller-financed loans (e.g. 0.0675). */
-  balloon_refi_annual_rate?: number;
-  /** Default post-balloon refi term in months (e.g. 360). */
-  balloon_refi_term_months?: number;
+  /** Calendar month for simulation month 1, 1–12 (default 1). */
+  simulation_anchor_month?: number;
+  /** Default post-balloon refi rate when not set per property. */
+  default_refi_annual_rate?: number;
+  /** Default post-balloon refi term when not set per property. */
+  default_refi_term_months?: number;
   annual_rent_growth_rate?: number;
   annual_expense_inflation_rate?: number;
   reinvest_surplus?: boolean;
@@ -111,8 +132,9 @@ export interface Portfolio {
   monthlyReserveTarget: number;
   /** Calendar year represented by simulation month 1. */
   simulationAnchorYear: number;
-  balloonRefiAnnualRate: number;
-  balloonRefiTermMonths: number;
+  simulationAnchorMonth: number;
+  defaultRefiAnnualRate: number;
+  defaultRefiTermMonths: number;
   properties: Property[];
 }
 

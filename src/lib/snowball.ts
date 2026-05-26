@@ -1,4 +1,4 @@
-import { closeMonthFromYear } from './format';
+import { calendarToSimMonth, closeMonthFromYear } from './format';
 import type {
   MonthSnapshot,
   Portfolio,
@@ -77,7 +77,7 @@ interface SimState {
   expenseInflation: number;
   appreciation: number;
   closeMonth: number;
-  balloonMonths?: number;
+  refiSimMonth?: number;
   balloonRefiAnnualRate: number;
   balloonRefiTermMonths: number;
   originalBalance: number;
@@ -90,10 +90,6 @@ function isPropertyOwned(state: SimState, month: number): boolean {
   return month >= state.closeMonth;
 }
 
-function monthsOnLoan(state: SimState, month: number): number {
-  return month - state.closeMonth + 1;
-}
-
 function scheduledPaymentForMonth(state: SimState, month: number): number {
   if (!isPropertyOwned(state, month) || state.balance <= BALANCE_EPSILON) {
     return 0;
@@ -103,9 +99,9 @@ function scheduledPaymentForMonth(state: SimState, month: number): number {
 
 function isBalloonRefiMonth(state: SimState, month: number): boolean {
   return (
-    state.balloonMonths != null &&
+    state.refiSimMonth != null &&
     isPropertyOwned(state, month) &&
-    monthsOnLoan(state, month) === state.balloonMonths &&
+    month === state.refiSimMonth &&
     state.balance > BALANCE_EPSILON
   );
 }
@@ -113,14 +109,14 @@ function isBalloonRefiMonth(state: SimState, month: number): boolean {
 /** Convert remaining seller-financed balance into a conventional amortizing loan. */
 function refinanceAfterBalloon(state: SimState): void {
   if (state.balance <= BALANCE_EPSILON) {
-    state.balloonMonths = undefined;
+    state.refiSimMonth = undefined;
     return;
   }
   const rate = state.balloonRefiAnnualRate;
   const term = state.balloonRefiTermMonths;
   state.annualInterestRate = rate;
   state.monthlyPayment = paymentFromPrincipal(state.balance, rate, term);
-  state.balloonMonths = undefined;
+  state.refiSimMonth = undefined;
 }
 
 function allLoansResolved(states: SimState[], month: number): boolean {
@@ -245,7 +241,7 @@ function initSimStates(
       expenseInflation: p.annualExpenseInflationRate ?? portfolioExpenseInflation,
       appreciation: p.annualAppreciationRate,
       closeMonth,
-      balloonMonths: p.balloonMonths,
+      refiSimMonth: p.refiSimMonth,
       balloonRefiAnnualRate: p.balloonRefiAnnualRate ?? DEFAULT_BALLOON_REFI_RATE,
       balloonRefiTermMonths: p.balloonRefiTermMonths ?? DEFAULT_BALLOON_REFI_TERM_MONTHS,
       originalBalance: p.balance,
@@ -501,6 +497,14 @@ export function simulateSnowball(
       const startBal = s.balance;
       if (!isPropertyOwned(s, month) || startBal <= BALANCE_EPSILON) continue;
 
+      if (isBalloonRefiMonth(s, month)) {
+        refinanceAfterBalloon(s);
+        refinancedThisMonth.push(s.name);
+        if (!(s.name in refinanceSchedule)) {
+          refinanceSchedule[s.name] = month;
+        }
+      }
+
       const payment = scheduledPaymentForMonth(s, month);
       const result = amortizeOneMonth({
         balance: startBal,
@@ -521,13 +525,6 @@ export function simulateSnowball(
         }
       }
 
-      if (isBalloonRefiMonth(s, month)) {
-        refinanceAfterBalloon(s);
-        refinancedThisMonth.push(s.name);
-        if (!(s.name in refinanceSchedule)) {
-          refinanceSchedule[s.name] = month;
-        }
-      }
     }
 
     if (target && extraPool > 0) {
@@ -1001,6 +998,111 @@ function formatMonthsShort(months: number): string {
   return `${years} yr ${rem} mo`;
 }
 
+/** Resolve close/refi calendar fields from portfolio JSON into simulation months. */
+export function resolvePropertySchedule(
+  raw: Record<string, unknown>,
+  anchorYear: number,
+  anchorMonth: number,
+  defaults: { refiRate: number; refiTermMonths: number },
+): {
+  financingType?: 'conventional' | 'seller';
+  closeMonth: number;
+  closeYear?: number;
+  closeMonthCalendar?: number;
+  balloonMonths?: number;
+  sellerAmortizationMonths?: number;
+  refiYear?: number;
+  refiMonthCalendar?: number;
+  refiSimMonth?: number;
+  balloonRefiAnnualRate?: number;
+  balloonRefiTermMonths?: number;
+} {
+  const financingType =
+    raw.financing_type === 'seller'
+      ? 'seller'
+      : raw.financing_type === 'conventional'
+        ? 'conventional'
+        : undefined;
+
+  let closeMonth = 1;
+  let closeYear: number | undefined;
+  let closeMonthCalendar: number | undefined;
+
+  if (typeof raw.close_month === 'number') {
+    closeMonth = raw.close_month;
+  } else if (typeof raw.close_year === 'number') {
+    closeYear = raw.close_year;
+    closeMonthCalendar =
+      typeof raw.close_month_calendar === 'number' ? raw.close_month_calendar : 1;
+    closeMonth = calendarToSimMonth(
+      closeYear,
+      closeMonthCalendar,
+      anchorYear,
+      anchorMonth,
+    );
+  }
+
+  const balloonMonths =
+    typeof raw.balloon_months === 'number' ? raw.balloon_months : undefined;
+  const sellerAmortizationMonths =
+    typeof raw.seller_amortization_months === 'number'
+      ? raw.seller_amortization_months
+      : undefined;
+
+  let refiYear: number | undefined;
+  let refiMonthCalendar: number | undefined;
+  let refiSimMonth: number | undefined;
+
+  if (typeof raw.refi_year === 'number') {
+    refiYear = raw.refi_year;
+    refiMonthCalendar = typeof raw.refi_month === 'number' ? raw.refi_month : 1;
+    refiSimMonth = calendarToSimMonth(
+      refiYear,
+      refiMonthCalendar,
+      anchorYear,
+      anchorMonth,
+    );
+  } else if (balloonMonths != null) {
+    refiSimMonth = closeMonth + balloonMonths;
+  }
+
+  const isSeller =
+    financingType === 'seller' || (balloonMonths != null && raw.annual_interest_rate === 0);
+
+  const refiRate =
+    typeof raw.refi_annual_rate === 'number'
+      ? raw.refi_annual_rate
+      : typeof raw.balloon_refi_annual_rate === 'number'
+        ? raw.balloon_refi_annual_rate
+        : isSeller
+          ? defaults.refiRate
+          : undefined;
+
+  const refiTermMonths =
+    typeof raw.refi_term_months === 'number'
+      ? raw.refi_term_months
+      : typeof raw.balloon_refi_term_months === 'number'
+        ? raw.balloon_refi_term_months
+        : isSeller
+          ? defaults.refiTermMonths
+          : undefined;
+
+  return {
+    financingType:
+      financingType ?? (balloonMonths != null ? 'seller' : undefined),
+    closeMonth,
+    closeYear,
+    closeMonthCalendar,
+    balloonMonths,
+    sellerAmortizationMonths,
+    refiYear,
+    refiMonthCalendar,
+    refiSimMonth: isSeller || balloonMonths != null ? refiSimMonth : undefined,
+    balloonRefiAnnualRate: refiRate,
+    balloonRefiTermMonths: refiTermMonths,
+  };
+}
+
 /** Normalize raw JSON into a Portfolio (exported for tests and hook). */
 export function normalizePortfolio(raw: unknown): Portfolio {
   if (!raw || typeof raw !== 'object') {
@@ -1030,14 +1132,24 @@ export function normalizePortfolio(raw: unknown): Portfolio {
     typeof obj.simulation_anchor_year === 'number'
       ? obj.simulation_anchor_year
       : 2026;
-  const portfolioBalloonRefiRate =
-    typeof obj.balloon_refi_annual_rate === 'number'
-      ? obj.balloon_refi_annual_rate
-      : DEFAULT_BALLOON_REFI_RATE;
-  const portfolioBalloonRefiTerm =
-    typeof obj.balloon_refi_term_months === 'number'
-      ? obj.balloon_refi_term_months
-      : DEFAULT_BALLOON_REFI_TERM_MONTHS;
+  const simulationAnchorMonth =
+    typeof obj.simulation_anchor_month === 'number'
+      ? obj.simulation_anchor_month
+      : 1;
+  const portfolioDefaults = {
+    refiRate:
+      typeof obj.default_refi_annual_rate === 'number'
+        ? obj.default_refi_annual_rate
+        : typeof obj.balloon_refi_annual_rate === 'number'
+          ? obj.balloon_refi_annual_rate
+          : DEFAULT_BALLOON_REFI_RATE,
+    refiTermMonths:
+      typeof obj.default_refi_term_months === 'number'
+        ? obj.default_refi_term_months
+        : typeof obj.balloon_refi_term_months === 'number'
+          ? obj.balloon_refi_term_months
+          : DEFAULT_BALLOON_REFI_TERM_MONTHS,
+  };
 
   const properties: Property[] = obj.properties.map((item, i) => {
     if (!item || typeof item !== 'object') {
@@ -1095,23 +1207,36 @@ export function normalizePortfolio(raw: unknown): Portfolio {
       prop.annualExpenseInflationRate = p.annual_expense_inflation_rate;
     }
 
-    if (typeof p.close_month === 'number') {
-      prop.closeMonth = p.close_month;
-    } else if (typeof p.close_year === 'number') {
-      prop.closeMonth = closeMonthFromYear(p.close_year, simulationAnchorYear);
-      prop.closeYear = p.close_year;
+    const schedule = resolvePropertySchedule(
+      p,
+      simulationAnchorYear,
+      simulationAnchorMonth,
+      portfolioDefaults,
+    );
+    prop.closeMonth = schedule.closeMonth;
+    if (schedule.closeYear !== undefined) prop.closeYear = schedule.closeYear;
+    if (schedule.closeMonthCalendar !== undefined) {
+      prop.closeMonthCalendar = schedule.closeMonthCalendar;
     }
-
-    if (typeof p.balloon_months === 'number') {
-      prop.balloonMonths = p.balloon_months;
-      prop.balloonRefiAnnualRate =
-        typeof p.balloon_refi_annual_rate === 'number'
-          ? p.balloon_refi_annual_rate
-          : portfolioBalloonRefiRate;
-      prop.balloonRefiTermMonths =
-        typeof p.balloon_refi_term_months === 'number'
-          ? p.balloon_refi_term_months
-          : portfolioBalloonRefiTerm;
+    if (schedule.financingType !== undefined) {
+      prop.financingType = schedule.financingType;
+    }
+    if (schedule.balloonMonths !== undefined) {
+      prop.balloonMonths = schedule.balloonMonths;
+    }
+    if (schedule.sellerAmortizationMonths !== undefined) {
+      prop.sellerAmortizationMonths = schedule.sellerAmortizationMonths;
+    }
+    if (schedule.refiYear !== undefined) prop.refiYear = schedule.refiYear;
+    if (schedule.refiMonthCalendar !== undefined) {
+      prop.refiMonthCalendar = schedule.refiMonthCalendar;
+    }
+    if (schedule.refiSimMonth !== undefined) prop.refiSimMonth = schedule.refiSimMonth;
+    if (schedule.balloonRefiAnnualRate !== undefined) {
+      prop.balloonRefiAnnualRate = schedule.balloonRefiAnnualRate;
+    }
+    if (schedule.balloonRefiTermMonths !== undefined) {
+      prop.balloonRefiTermMonths = schedule.balloonRefiTermMonths;
     }
 
     return prop;
@@ -1124,8 +1249,9 @@ export function normalizePortfolio(raw: unknown): Portfolio {
     reinvestSurplus,
     monthlyReserveTarget,
     simulationAnchorYear,
-    balloonRefiAnnualRate: portfolioBalloonRefiRate,
-    balloonRefiTermMonths: portfolioBalloonRefiTerm,
+    simulationAnchorMonth,
+    defaultRefiAnnualRate: portfolioDefaults.refiRate,
+    defaultRefiTermMonths: portfolioDefaults.refiTermMonths,
     properties,
   };
 }
@@ -1137,8 +1263,9 @@ export function denormalizePortfolio(
   return {
     extra_monthly_budget: portfolio.extraMonthlyBudget,
     simulation_anchor_year: portfolio.simulationAnchorYear,
-    balloon_refi_annual_rate: portfolio.balloonRefiAnnualRate,
-    balloon_refi_term_months: portfolio.balloonRefiTermMonths,
+    simulation_anchor_month: portfolio.simulationAnchorMonth,
+    default_refi_annual_rate: portfolio.defaultRefiAnnualRate,
+    default_refi_term_months: portfolio.defaultRefiTermMonths,
     annual_rent_growth_rate: portfolio.annualRentGrowthRate,
     annual_expense_inflation_rate: portfolio.annualExpenseInflationRate,
     reinvest_surplus: portfolio.reinvestSurplus,
@@ -1160,19 +1287,34 @@ export function denormalizePortfolio(
       if (p.annualExpenseInflationRate !== undefined) {
         file.annual_expense_inflation_rate = p.annualExpenseInflationRate;
       }
+      if (p.financingType !== undefined) {
+        file.financing_type = p.financingType;
+      }
       if (p.closeYear !== undefined) {
         file.close_year = p.closeYear;
+        if (p.closeMonthCalendar !== undefined && p.closeMonthCalendar !== 1) {
+          file.close_month_calendar = p.closeMonthCalendar;
+        }
       } else if (p.closeMonth !== undefined && p.closeMonth > 1) {
         file.close_month = p.closeMonth;
       }
       if (p.balloonMonths !== undefined) {
         file.balloon_months = p.balloonMonths;
-        if (p.balloonRefiAnnualRate !== undefined) {
-          file.balloon_refi_annual_rate = p.balloonRefiAnnualRate;
+      }
+      if (p.sellerAmortizationMonths !== undefined) {
+        file.seller_amortization_months = p.sellerAmortizationMonths;
+      }
+      if (p.refiYear !== undefined) {
+        file.refi_year = p.refiYear;
+        if (p.refiMonthCalendar !== undefined && p.refiMonthCalendar !== 1) {
+          file.refi_month = p.refiMonthCalendar;
         }
-        if (p.balloonRefiTermMonths !== undefined) {
-          file.balloon_refi_term_months = p.balloonRefiTermMonths;
-        }
+      }
+      if (p.balloonRefiAnnualRate !== undefined) {
+        file.refi_annual_rate = p.balloonRefiAnnualRate;
+      }
+      if (p.balloonRefiTermMonths !== undefined) {
+        file.refi_term_months = p.balloonRefiTermMonths;
       }
       return file;
     }),

@@ -14,6 +14,7 @@ import {
   compareStrategies,
   normalizePortfolio,
   paymentFromPrincipal,
+  resolvePropertySchedule,
   SEED_PROPERTY_NAMES,
   simulateSnowball,
   STRATEGIES,
@@ -555,8 +556,7 @@ describe('close schedule and balloon', () => {
     });
     const snap = r.history[59];
     expect(snap.balancesByName['Balloon Loan']).toBeCloseTo(180000, 0);
-    expect(snap.refinancedThisMonth).toContain('Balloon Loan');
-    expect(r.refinanceSchedule['Balloon Loan']).toBe(60);
+    expect(snap.refinancedThisMonth).toEqual([]);
   });
 
   it('refis balloon balance into 6.75% 30-year loan for month 61+', () => {
@@ -573,6 +573,9 @@ describe('close schedule and balloon', () => {
         monthlyRent: 0,
         monthlyExpenses: 0,
         balloonMonths: 60,
+        refiYear: 2031,
+        refiMonthCalendar: 1,
+        refiSimMonth: 61,
         balloonRefiAnnualRate: 0.0675,
         balloonRefiTermMonths: 360,
         closeMonth: 1,
@@ -583,14 +586,15 @@ describe('close schedule and balloon', () => {
       extraMonthlyBudget: 0,
       snowballCashflow: false,
       strategyName: 'test',
-      maxMonths: 61,
+      maxMonths: 62,
       allowUnresolved: true,
     });
-    expect(r.history[59].refinancedThisMonth).toContain('Balloon Loan');
     expect(r.history[59].balancesByName['Balloon Loan']).toBeCloseTo(180000, 0);
+    expect(r.history[60].refinancedThisMonth).toContain('Balloon Loan');
+    expect(r.refinanceSchedule['Balloon Loan']).toBe(61);
     const expectedPi = paymentFromPrincipal(180000, 0.0675, 360);
     expect(expectedPi).toBeCloseTo(1167.85, 0);
-    expect(r.history[60].balancesByName['Balloon Loan']).toBeLessThan(180000);
+    expect(r.history[61].balancesByName['Balloon Loan']).toBeLessThan(180000);
   });
 
   it('simulates full portfolio.json with staggered closes and balloons', () => {
@@ -610,11 +614,44 @@ describe('close schedule and balloon', () => {
       p.name.startsWith('116/118'),
     );
     expect(shady116?.closeMonth).toBe(1);
+    expect(shady116?.closeYear).toBe(2026);
+    const seller = portfolio.properties.find((p) =>
+      p.name.startsWith('144/146'),
+    );
+    expect(seller?.refiYear).toBe(2031);
+    expect(seller?.refiSimMonth).toBe(61);
+    expect(seller?.balloonRefiAnnualRate).toBe(0.0675);
     const deborah = portfolio.properties.find((p) => p.name.startsWith('1419'));
     expect(deborah?.closeMonth).toBe(37);
+    expect(deborah?.refiYear).toBe(2034);
+    expect(deborah?.refiSimMonth).toBe(97);
   });
 
-  it('refis at month 60 even when extra budget is available', () => {
+  it('reads close and refi dates from JSON via resolvePropertySchedule', () => {
+    const schedule = resolvePropertySchedule(
+      {
+        financing_type: 'seller',
+        close_year: 2027,
+        close_month_calendar: 1,
+        balloon_months: 60,
+        seller_amortization_months: 240,
+        refi_year: 2032,
+        refi_month: 1,
+        refi_annual_rate: 0.0675,
+        refi_term_months: 360,
+        annual_interest_rate: 0,
+      },
+      2026,
+      1,
+      { refiRate: 0.06, refiTermMonths: 360 },
+    );
+    expect(schedule.closeMonth).toBe(13);
+    expect(schedule.refiSimMonth).toBe(73);
+    expect(schedule.refiYear).toBe(2032);
+    expect(schedule.balloonRefiAnnualRate).toBe(0.0675);
+  });
+
+  it('refis on refi_sim month even when extra budget is available', () => {
     const props: Property[] = [
       {
         name: 'Balloon Loan',
@@ -626,6 +663,7 @@ describe('close schedule and balloon', () => {
         monthlyRent: 0,
         monthlyExpenses: 0,
         balloonMonths: 60,
+        refiSimMonth: 61,
         balloonRefiAnnualRate: 0.0675,
         balloonRefiTermMonths: 360,
         closeMonth: 1,
@@ -634,15 +672,15 @@ describe('close schedule and balloon', () => {
     const r = simulateSnowball(props, {
       payoffOrder: ['Balloon Loan'],
       extraMonthlyBudget: 500,
-      pauseExtraMonths: 59,
+      pauseExtraMonths: 60,
       snowballCashflow: false,
       strategyName: 'test',
-      maxMonths: 61,
+      maxMonths: 62,
       allowUnresolved: true,
     });
-    expect(r.refinanceSchedule['Balloon Loan']).toBe(60);
+    expect(r.refinanceSchedule['Balloon Loan']).toBe(61);
     expect(r.payoffSchedule['Balloon Loan']).toBeUndefined();
-    const refiBalance = r.history[59].balancesByName['Balloon Loan'];
+    const refiBalance = r.history[60].balancesByName['Balloon Loan'];
     expect(refiBalance).toBeGreaterThan(70000);
     expect(refiBalance).toBeLessThan(76000);
   });
