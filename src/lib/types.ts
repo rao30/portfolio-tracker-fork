@@ -200,6 +200,8 @@ export interface TaxProfile {
   marginalTaxRate: number;
   taxYear: number;
   bonusDepreciationRate: number;
+  /** Unused bonus depreciation from prior-year acquisitions (e.g. 2025 carryover into 2026). */
+  remainingBonusCarryover: number;
   filingStatus?: 'mfj' | 'single';
   otherPassiveIncome?: number;
   stateTaxRate?: number;
@@ -211,6 +213,7 @@ export interface TaxProfileFile {
   marginal_tax_rate?: number;
   tax_year?: number;
   bonus_depreciation_rate?: number;
+  remaining_bonus_carryover?: number;
   filing_status?: 'mfj' | 'single';
   other_passive_income?: number;
   state_tax_rate?: number;

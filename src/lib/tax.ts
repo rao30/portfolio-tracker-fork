@@ -10,12 +10,14 @@ import type {
 const DEFAULT_LAND_PERCENT = 0.2;
 const DEFAULT_COST_SEG_PERCENT = 0.25;
 const RESIDENTIAL_LIFE_YEARS = 27.5;
+const DEFAULT_BONUS_CARRYOVER = 250_000;
 
-/** MACRS year-1 depreciation rates for 5-, 7-, and 15-year property. */
-const MACRS_Y1 = { yr5: 0.2, yr7: 0.1429, yr15: 0.05 };
-
-/** Cost seg pool split across asset classes. */
-const COST_SEG_SPLIT = { yr5: 0.4, yr7: 0.25, yr15: 0.35 };
+const MACRS_5 = [0.2, 0.32, 0.192, 0.1152, 0.1152, 0.0576];
+const MACRS_7 = [0.1429, 0.2449, 0.1749, 0.1249, 0.0893, 0.0892, 0.0893, 0.0446];
+const MACRS_15 = [
+  0.05, 0.095, 0.0855, 0.077, 0.0693, 0.0623, 0.059, 0.059, 0.0591, 0.059, 0.0591,
+  0.059, 0.0591, 0.059, 0.0591, 0.0295,
+];
 
 export function bonusDepreciationForYear(taxYear: number): number {
   if (taxYear <= 2022) return 1;
@@ -33,6 +35,7 @@ export function defaultTaxProfile(taxYear = new Date().getFullYear()): TaxProfil
     marginalTaxRate: 0.32,
     taxYear,
     bonusDepreciationRate: bonusDepreciationForYear(taxYear),
+    remainingBonusCarryover: DEFAULT_BONUS_CARRYOVER,
     filingStatus: 'mfj',
     otherPassiveIncome: 0,
     stateTaxRate: 0,
@@ -48,8 +51,13 @@ export interface DepreciationBreakdown {
   costSegPortion: number;
 }
 
+export type PropertyTaxCategory = 'held' | 'newAcquisition' | 'future';
+
 export interface PropertyTaxLoss {
   name: string;
+  category: PropertyTaxCategory;
+  serviceYear: number;
+  yearsInService: number;
   grossRent: number;
   operatingExpenses: number;
   mortgageInterest: number;
@@ -58,28 +66,23 @@ export interface PropertyTaxLoss {
 }
 
 export interface TaxPlannerResult {
-  existingLosses: PropertyTaxLoss[];
-  totalExistingLoss: number;
-  templateLossPerProperty: number;
+  taxYear: number;
+  heldProperties: PropertyTaxLoss[];
+  newAcquisitions: PropertyTaxLoss[];
+  excludedFuture: string[];
+  remainingBonusCarryover: number;
+  totalDepreciation: number;
+  totalHeldLoss: number;
+  totalNewAcquisitionLoss: number;
+  totalTaxLoss: number;
   usableLoss: number;
   carryforwardLoss: number;
   remainingTaxableIncome: number;
   federalTaxSavings: number;
   stateTaxSavings: number;
   totalTaxSavings: number;
-  gapToWipeW2: number;
-  purchaseVolumeNeeded: number;
-  propertiesToBuy: number;
   withoutRepsUsableLoss: number;
   withoutRepsCarryforward: number;
-  strategies: {
-    id: string;
-    label: string;
-    lossPerProperty: number;
-    propertiesNeeded: number;
-    purchaseVolume: number;
-    taxSavings: number;
-  }[];
 }
 
 function resolvePurchasePrice(p: Property): number {
@@ -95,14 +98,40 @@ function resolveCostSegPercent(p: Property): number {
   return p.costSegPercent ?? DEFAULT_COST_SEG_PERCENT;
 }
 
-export function computeFirstYearDepreciation(
+function resolveServiceYear(p: Property, taxYear: number): number {
+  return p.placedInServiceYear ?? p.closeYear ?? taxYear - 3;
+}
+
+export function classifyPropertyForTaxYear(
   p: Property,
-  taxProfile: TaxProfile,
-): DepreciationBreakdown {
+  taxYear: number,
+): PropertyTaxCategory {
+  const serviceYear = p.placedInServiceYear ?? p.closeYear;
+  if (serviceYear == null) return 'held';
+  if (serviceYear > taxYear) return 'future';
+  if (serviceYear === taxYear) return 'newAcquisition';
+  return 'held';
+}
+
+function macrsForYear(schedule: number[], yearIndex: number): number {
+  if (yearIndex < 0 || yearIndex >= schedule.length) return 0;
+  return schedule[yearIndex];
+}
+
+function buildingComponents(p: Property) {
   const purchasePrice = resolvePurchasePrice(p);
   const buildingBasis = purchasePrice * (1 - resolveLandPercent(p));
   const costSegPortion = buildingBasis * resolveCostSegPercent(p);
   const straightLineBasis = buildingBasis - costSegPortion;
+  return { buildingBasis, costSegPortion, straightLineBasis };
+}
+
+/** First-year depreciation for a property placed in service this tax year. */
+export function computeFirstYearDepreciation(
+  p: Property,
+  taxProfile: TaxProfile,
+): DepreciationBreakdown {
+  const { buildingBasis, costSegPortion, straightLineBasis } = buildingComponents(p);
   const straightLine = (straightLineBasis / RESIDENTIAL_LIFE_YEARS) * (11.5 / 12);
 
   const bonusRate =
@@ -111,9 +140,9 @@ export function computeFirstYearDepreciation(
 
   const remainingCostSeg = costSegPortion - bonus;
   const acceleratedMacrs =
-    remainingCostSeg * COST_SEG_SPLIT.yr5 * MACRS_Y1.yr5 +
-    remainingCostSeg * COST_SEG_SPLIT.yr7 * MACRS_Y1.yr7 +
-    remainingCostSeg * COST_SEG_SPLIT.yr15 * MACRS_Y1.yr15;
+    remainingCostSeg * 0.4 * MACRS_5[0] +
+    remainingCostSeg * 0.25 * MACRS_7[0] +
+    remainingCostSeg * 0.35 * MACRS_15[0];
 
   return {
     straightLine,
@@ -125,19 +154,63 @@ export function computeFirstYearDepreciation(
   };
 }
 
-export function computePropertyTaxLoss(
+/** Ongoing annual depreciation — bonus already taken in a prior year. */
+export function computeOngoingAnnualDepreciation(
+  p: Property,
+  taxYear: number,
+): DepreciationBreakdown {
+  const { buildingBasis, costSegPortion, straightLineBasis } = buildingComponents(p);
+  const straightLine = straightLineBasis / RESIDENTIAL_LIFE_YEARS;
+
+  const serviceYear = resolveServiceYear(p, taxYear);
+  const yearsInService = Math.max(1, taxYear - serviceYear + 1);
+  const yearIndex = yearsInService - 1;
+
+  const bonusTakenInServiceYear =
+    costSegPortion * bonusDepreciationForYear(serviceYear) * (p.bonusEligiblePercent ?? 1);
+  const remainingCostSeg = Math.max(0, costSegPortion - bonusTakenInServiceYear);
+
+  const acceleratedMacrs =
+    remainingCostSeg * 0.4 * macrsForYear(MACRS_5, yearIndex) +
+    remainingCostSeg * 0.25 * macrsForYear(MACRS_7, yearIndex) +
+    remainingCostSeg * 0.35 * macrsForYear(MACRS_15, yearIndex);
+
+  return {
+    straightLine,
+    bonus: 0,
+    acceleratedMacrs,
+    total: straightLine + acceleratedMacrs,
+    buildingBasis,
+    costSegPortion,
+  };
+}
+
+export function computePropertyTaxLossForYear(
   p: Property,
   taxProfile: TaxProfile,
-): PropertyTaxLoss {
+): PropertyTaxLoss | null {
+  const category = classifyPropertyForTaxYear(p, taxProfile.taxYear);
+  if (category === 'future') return null;
+
+  const serviceYear = resolveServiceYear(p, taxProfile.taxYear);
+  const yearsInService = Math.max(1, taxProfile.taxYear - serviceYear + 1);
   const grossRent = p.monthlyRent * 12;
   const operatingExpenses = p.monthlyExpenses * 12;
   const mortgageInterest = p.balance * p.annualInterestRate;
-  const depreciation = computeFirstYearDepreciation(p, taxProfile);
+
+  const depreciation =
+    category === 'newAcquisition'
+      ? computeFirstYearDepreciation(p, taxProfile)
+      : computeOngoingAnnualDepreciation(p, taxProfile.taxYear);
+
   const netTaxableLoss =
     depreciation.total + mortgageInterest + operatingExpenses - grossRent;
 
   return {
     name: p.name,
+    category,
+    serviceYear,
+    yearsInService,
     grossRent,
     operatingExpenses,
     mortgageInterest,
@@ -172,34 +245,31 @@ export function computeUsableLoss(
   return { usable, carryforward: Math.max(0, totalLoss - usable) };
 }
 
-export function templateToProperty(
-  template: AcquisitionTemplate,
-  index: number,
+/** @deprecated Use computePropertyTaxLossForYear */
+export function computePropertyTaxLoss(
+  p: Property,
   taxProfile: TaxProfile,
-): Property {
-  const loanAmount = template.purchasePrice * (1 - template.downPaymentPercent);
-  const monthlyPayment = computeMonthlyPayment(
-    loanAmount,
-    template.annualInterestRate,
-    template.loanTermMonths,
+): PropertyTaxLoss {
+  return (
+    computePropertyTaxLossForYear(p, taxProfile) ?? {
+      name: p.name,
+      category: 'future',
+      serviceYear: taxProfile.taxYear,
+      yearsInService: 0,
+      grossRent: 0,
+      operatingExpenses: 0,
+      mortgageInterest: 0,
+      depreciation: {
+        straightLine: 0,
+        bonus: 0,
+        acceleratedMacrs: 0,
+        total: 0,
+        buildingBasis: 0,
+        costSegPortion: 0,
+      },
+      netTaxableLoss: 0,
+    }
   );
-
-  return {
-    name: `${template.label} #${index + 1}`,
-    balance: loanAmount,
-    marketValue: template.purchasePrice,
-    annualInterestRate: template.annualInterestRate,
-    annualAppreciationRate: 0.03,
-    monthlyPayment,
-    monthlyRent: template.monthlyRent,
-    monthlyExpenses: template.monthlyExpenses,
-    purchasePrice: template.purchasePrice,
-    landPercent: template.landPercent,
-    placedInServiceYear: taxProfile.taxYear,
-    useCostSeg: template.useCostSeg,
-    costSegPercent: template.costSegPercent,
-    cashInvested: template.purchasePrice * template.downPaymentPercent,
-  };
 }
 
 export function computeMonthlyPayment(
@@ -213,22 +283,12 @@ export function computeMonthlyPayment(
   return (principal * r * Math.pow(1 + r, termMonths)) / (Math.pow(1 + r, termMonths) - 1);
 }
 
-function computeTemplateLoss(
-  template: AcquisitionTemplate,
-  taxProfile: TaxProfile,
-  useCostSeg: boolean,
-  costSegPercent: number,
-): number {
-  const prop = templateToProperty(template, 0, taxProfile);
-  prop.useCostSeg = useCostSeg;
-  prop.costSegPercent = costSegPercent;
-  return computePropertyTaxLoss(prop, taxProfile).netTaxableLoss;
-}
-
 export function buildAcquisitionTemplateFromPortfolio(
   portfolio: Portfolio,
 ): AcquisitionTemplate {
-  const props = portfolio.properties;
+  const props = portfolio.properties.filter(
+    (p) => classifyPropertyForTaxYear(p, portfolio.taxProfile.taxYear) !== 'future',
+  );
   if (props.length === 0) {
     return {
       label: 'Typical acquisition',
@@ -273,115 +333,102 @@ export function buildAcquisitionTemplateFromPortfolio(
   };
 }
 
-export function computeTaxPlannerResult(
-  portfolio: Portfolio,
-  templateOverride?: Partial<AcquisitionTemplate>,
-): TaxPlannerResult {
+export function computeTaxPlannerResult(portfolio: Portfolio): TaxPlannerResult {
   const taxProfile = portfolio.taxProfile;
-  const template = { ...portfolio.acquisitionTemplate, ...templateOverride };
+  const taxYear = taxProfile.taxYear;
 
-  const existingLosses = portfolio.properties.map((p) =>
-    computePropertyTaxLoss(p, taxProfile),
-  );
-  const totalExistingLoss = existingLosses.reduce(
-    (s, l) => s + Math.max(0, l.netTaxableLoss),
-    0,
-  );
+  const heldProperties: PropertyTaxLoss[] = [];
+  const newAcquisitions: PropertyTaxLoss[] = [];
+  const excludedFuture: string[] = [];
 
-  const templateLossPerProperty = computeTemplateLoss(
-    template,
-    taxProfile,
-    template.useCostSeg,
-    template.costSegPercent,
-  );
-
-  const { usable, carryforward } = computeUsableLoss(totalExistingLoss, taxProfile);
-
-  const income = taxProfile.annualW2Income + (taxProfile.otherPassiveIncome ?? 0);
-  const remainingTaxableIncome = Math.max(0, income - usable);
-  const gapToWipeW2 = Math.max(0, remainingTaxableIncome);
-
-  let propertiesToBuy = 0;
-  let purchaseVolumeNeeded = 0;
-  if (templateLossPerProperty > 0 && gapToWipeW2 > 0) {
-    propertiesToBuy = Math.ceil(gapToWipeW2 / templateLossPerProperty);
-    purchaseVolumeNeeded = propertiesToBuy * template.purchasePrice;
+  for (const p of portfolio.properties) {
+    const loss = computePropertyTaxLossForYear(p, taxProfile);
+    if (!loss) {
+      excludedFuture.push(p.name);
+      continue;
+    }
+    if (loss.category === 'held') heldProperties.push(loss);
+    else newAcquisitions.push(loss);
   }
 
-  const fullUsable = computeUsableLoss(
-    totalExistingLoss + propertiesToBuy * templateLossPerProperty,
-    taxProfile,
-  );
-  const federalTaxSavings = fullUsable.usable * taxProfile.marginalTaxRate;
-  const stateTaxSavings = fullUsable.usable * (taxProfile.stateTaxRate ?? 0);
+  const propertyDepreciation =
+    [...heldProperties, ...newAcquisitions].reduce(
+      (s, l) => s + l.depreciation.total,
+      0,
+    );
+  const remainingBonusCarryover = taxProfile.remainingBonusCarryover;
+  const totalDepreciation = propertyDepreciation + remainingBonusCarryover;
+
+  const sumLoss = (items: PropertyTaxLoss[]) =>
+    items.reduce((s, l) => s + Math.max(0, l.netTaxableLoss), 0);
+
+  const totalHeldLoss = sumLoss(heldProperties);
+  const totalNewAcquisitionLoss = sumLoss(newAcquisitions);
+
+  const propertyTaxLoss = sumLoss([...heldProperties, ...newAcquisitions]);
+  const totalTaxLoss = propertyTaxLoss + remainingBonusCarryover;
+
+  const { usable, carryforward } = computeUsableLoss(totalTaxLoss, taxProfile);
+  const income = taxProfile.annualW2Income + (taxProfile.otherPassiveIncome ?? 0);
+  const remainingTaxableIncome = Math.max(0, income - usable);
+  const federalTaxSavings = usable * taxProfile.marginalTaxRate;
+  const stateTaxSavings = usable * (taxProfile.stateTaxRate ?? 0);
 
   const withoutRepsProfile = { ...taxProfile, spouseIsReps: false };
-  const withoutReps = computeUsableLoss(totalExistingLoss, withoutRepsProfile);
-
-  const strategies = [
-    {
-      id: 'conservative',
-      label: 'Conservative (straight-line only)',
-      costSeg: false,
-      costSegPercent: 0,
-    },
-    {
-      id: 'moderate',
-      label: 'Moderate (cost seg + bonus)',
-      costSeg: true,
-      costSegPercent: template.costSegPercent,
-    },
-    {
-      id: 'aggressive',
-      label: 'Aggressive (30% cost seg pool)',
-      costSeg: true,
-      costSegPercent: 0.3,
-    },
-  ].map(({ id, label, costSeg, costSegPercent }) => {
-    const lossPerProperty = computeTemplateLoss(
-      template,
-      taxProfile,
-      costSeg,
-      costSegPercent,
-    );
-    const propsNeeded =
-      lossPerProperty > 0 && gapToWipeW2 > 0
-        ? Math.ceil(gapToWipeW2 / lossPerProperty)
-        : 0;
-    const combinedLoss = totalExistingLoss + propsNeeded * lossPerProperty;
-    const stratUsable = computeUsableLoss(combinedLoss, taxProfile);
-    return {
-      id,
-      label,
-      lossPerProperty,
-      propertiesNeeded: propsNeeded,
-      purchaseVolume: propsNeeded * template.purchasePrice,
-      taxSavings:
-        stratUsable.usable * taxProfile.marginalTaxRate +
-        stratUsable.usable * (taxProfile.stateTaxRate ?? 0),
-    };
-  });
+  const withoutReps = computeUsableLoss(totalTaxLoss, withoutRepsProfile);
 
   return {
-    existingLosses,
-    totalExistingLoss,
-    templateLossPerProperty,
+    taxYear,
+    heldProperties,
+    newAcquisitions,
+    excludedFuture,
+    remainingBonusCarryover,
+    totalDepreciation,
+    totalHeldLoss,
+    totalNewAcquisitionLoss,
+    totalTaxLoss,
     usableLoss: usable,
     carryforwardLoss: carryforward,
     remainingTaxableIncome,
     federalTaxSavings,
     stateTaxSavings,
     totalTaxSavings: federalTaxSavings + stateTaxSavings,
-    gapToWipeW2,
-    purchaseVolumeNeeded,
-    propertiesToBuy,
     withoutRepsUsableLoss: withoutReps.usable,
     withoutRepsCarryforward: withoutReps.carryforward,
-    strategies,
   };
 }
 
-/** Inject N template acquisitions into a portfolio copy for simulation. */
+export function templateToProperty(
+  template: AcquisitionTemplate,
+  index: number,
+  taxProfile: TaxProfile,
+): Property {
+  const loanAmount = template.purchasePrice * (1 - template.downPaymentPercent);
+  const monthlyPayment = computeMonthlyPayment(
+    loanAmount,
+    template.annualInterestRate,
+    template.loanTermMonths,
+  );
+
+  return {
+    name: `${template.label} #${index + 1}`,
+    balance: loanAmount,
+    marketValue: template.purchasePrice,
+    annualInterestRate: template.annualInterestRate,
+    annualAppreciationRate: 0.03,
+    monthlyPayment,
+    monthlyRent: template.monthlyRent,
+    monthlyExpenses: template.monthlyExpenses,
+    purchasePrice: template.purchasePrice,
+    landPercent: template.landPercent,
+    placedInServiceYear: taxProfile.taxYear,
+    closeYear: taxProfile.taxYear,
+    useCostSeg: template.useCostSeg,
+    costSegPercent: template.costSegPercent,
+    cashInvested: template.purchasePrice * template.downPaymentPercent,
+  };
+}
+
 export function addTemplateAcquisitions(
   portfolio: Portfolio,
   count: number,
@@ -406,6 +453,8 @@ export function normalizeTaxProfile(raw?: TaxProfileFile, taxYear?: number): Tax
     taxYear: year,
     bonusDepreciationRate:
       raw?.bonus_depreciation_rate ?? bonusDepreciationForYear(year),
+    remainingBonusCarryover:
+      raw?.remaining_bonus_carryover ?? defaults.remainingBonusCarryover,
     filingStatus: raw?.filing_status ?? defaults.filingStatus,
     otherPassiveIncome: raw?.other_passive_income ?? 0,
     stateTaxRate: raw?.state_tax_rate ?? 0,
@@ -419,6 +468,7 @@ export function denormalizeTaxProfile(profile: TaxProfile): TaxProfileFile {
     marginal_tax_rate: profile.marginalTaxRate,
     tax_year: profile.taxYear,
     bonus_depreciation_rate: profile.bonusDepreciationRate,
+    remaining_bonus_carryover: profile.remainingBonusCarryover,
     filing_status: profile.filingStatus,
     other_passive_income: profile.otherPassiveIncome,
     state_tax_rate: profile.stateTaxRate,
@@ -443,6 +493,10 @@ export function normalizeAcquisitionTemplate(
         taxProfile: defaultTaxProfile(),
         acquisitionTemplate: {} as AcquisitionTemplate,
         goals: [],
+        simulationAnchorYear: 2026,
+        simulationAnchorMonth: 1,
+        defaultRefiAnnualRate: 0.0675,
+        defaultRefiTermMonths: 360,
         properties: [],
       });
 

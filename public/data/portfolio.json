@@ -16,6 +16,7 @@
     "spouse_is_reps": true,
     "marginal_tax_rate": 0.32,
     "tax_year": 2026,
+    "remaining_bonus_carryover": 250000,
     "state_tax_rate": 0
   },
   "properties": [

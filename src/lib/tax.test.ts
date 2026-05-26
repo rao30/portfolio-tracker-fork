@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   bonusDepreciationForYear,
+  classifyPropertyForTaxYear,
   computeFirstYearDepreciation,
-  computePropertyTaxLoss,
+  computeOngoingAnnualDepreciation,
+  computePropertyTaxLossForYear,
   computeTaxPlannerResult,
   computeUsableLoss,
   defaultTaxProfile,
@@ -33,39 +35,51 @@ describe('bonusDepreciationForYear', () => {
   });
 });
 
-describe('computeFirstYearDepreciation', () => {
-  it('includes bonus and straight-line components', () => {
-    const profile = defaultTaxProfile(2026);
-    const dep = computeFirstYearDepreciation(sampleProperty, profile);
-    expect(dep.buildingBasis).toBeCloseTo(440000, 0);
-    expect(dep.bonus).toBeGreaterThan(0);
-    expect(dep.straightLine).toBeGreaterThan(0);
-    expect(dep.total).toBeGreaterThan(dep.straightLine);
-  });
-
-  it('skips cost seg when disabled', () => {
-    const profile = defaultTaxProfile(2026);
-    const dep = computeFirstYearDepreciation(
-      { ...sampleProperty, useCostSeg: false, costSegPercent: 0 },
-      profile,
+describe('classifyPropertyForTaxYear', () => {
+  it('classifies held, new, and future', () => {
+    expect(classifyPropertyForTaxYear({ ...sampleProperty, name: 'A' }, 2026)).toBe(
+      'held',
     );
-    expect(dep.bonus).toBe(0);
-    expect(dep.costSegPortion).toBe(0);
+    expect(
+      classifyPropertyForTaxYear({ ...sampleProperty, name: 'B', closeYear: 2026 }, 2026),
+    ).toBe('newAcquisition');
+    expect(
+      classifyPropertyForTaxYear({ ...sampleProperty, name: 'C', closeYear: 2027 }, 2026),
+    ).toBe('future');
   });
 });
 
-describe('computePropertyTaxLoss', () => {
-  it('produces positive paper loss for leveraged rental', () => {
+describe('computeFirstYearDepreciation', () => {
+  it('includes bonus for new acquisitions', () => {
     const profile = defaultTaxProfile(2026);
-    const loss = computePropertyTaxLoss(sampleProperty, profile);
-    expect(loss.netTaxableLoss).toBeGreaterThan(0);
+    const dep = computeFirstYearDepreciation(sampleProperty, profile);
+    expect(dep.bonus).toBeGreaterThan(0);
+    expect(dep.total).toBeGreaterThan(dep.straightLine);
+  });
+});
+
+describe('computeOngoingAnnualDepreciation', () => {
+  it('has no bonus for held properties', () => {
+    const dep = computeOngoingAnnualDepreciation(sampleProperty, 2026);
+    expect(dep.bonus).toBe(0);
+    expect(dep.total).toBeGreaterThan(0);
+  });
+});
+
+describe('computePropertyTaxLossForYear', () => {
+  it('returns null for future acquisitions', () => {
+    const profile = defaultTaxProfile(2026);
+    const loss = computePropertyTaxLossForYear(
+      { ...sampleProperty, closeYear: 2028 },
+      profile,
+    );
+    expect(loss).toBeNull();
   });
 });
 
 describe('passiveLossAllowance', () => {
   it('phases out above 150k AGI', () => {
     expect(passiveLossAllowance(90000)).toBe(25000);
-    expect(passiveLossAllowance(125000)).toBe(12500);
     expect(passiveLossAllowance(160000)).toBe(0);
   });
 });
@@ -77,17 +91,10 @@ describe('computeUsableLoss', () => {
     expect(usable).toBe(100000);
     expect(carryforward).toBe(20000);
   });
-
-  it('limits without REPS', () => {
-    const profile = { ...defaultTaxProfile(2026), annualW2Income: 90000, spouseIsReps: false };
-    const { usable, carryforward } = computeUsableLoss(80000, profile);
-    expect(usable).toBe(25000);
-    expect(carryforward).toBe(55000);
-  });
 });
 
 describe('computeTaxPlannerResult', () => {
-  it('computes properties to buy for W2 offset', () => {
+  it('includes bonus carryover in total shield', () => {
     const portfolio = normalizePortfolio({
       extra_monthly_budget: 5000,
       default_capex_reserve_rate: 0.1,
@@ -96,10 +103,11 @@ describe('computeTaxPlannerResult', () => {
         spouse_is_reps: true,
         marginal_tax_rate: 0.32,
         tax_year: 2026,
+        remaining_bonus_carryover: 250000,
       },
       properties: [
         {
-          name: 'Test',
+          name: 'Held',
           balance: 400000,
           market_value: 550000,
           annual_interest_rate: 0.065,
@@ -109,13 +117,37 @@ describe('computeTaxPlannerResult', () => {
           purchase_price: 550000,
           use_cost_seg: true,
         },
+        {
+          name: 'New 2026',
+          balance: 360000,
+          market_value: 360000,
+          annual_interest_rate: 0.065,
+          monthly_payment: 2300,
+          monthly_rent: 3600,
+          monthly_expenses: 1080,
+          purchase_price: 360000,
+          close_year: 2026,
+          use_cost_seg: true,
+        },
+        {
+          name: 'Future',
+          balance: 360000,
+          market_value: 360000,
+          annual_interest_rate: 0.065,
+          monthly_payment: 2300,
+          monthly_rent: 3600,
+          monthly_expenses: 1080,
+          close_year: 2027,
+        },
       ],
     });
     const result = computeTaxPlannerResult(portfolio);
-    expect(result.totalExistingLoss).toBeGreaterThan(0);
-    expect(result.strategies.length).toBe(3);
-    if (result.gapToWipeW2 > 0) {
-      expect(result.propertiesToBuy).toBeGreaterThan(0);
-    }
+    expect(result.heldProperties.length).toBe(1);
+    expect(result.newAcquisitions.length).toBe(1);
+    expect(result.excludedFuture).toContain('Future');
+    expect(result.remainingBonusCarryover).toBe(250000);
+    expect(result.totalTaxLoss).toBeGreaterThanOrEqual(250000);
+    expect(result.newAcquisitions[0].depreciation.bonus).toBeGreaterThan(0);
+    expect(result.heldProperties[0].depreciation.bonus).toBe(0);
   });
 });

@@ -337,9 +337,7 @@ function App() {
 
       <TaxPlanner
         portfolio={portfolio}
-        strategyId={activeStrategy}
         onTaxProfileChange={updateTaxProfile}
-        onAcquisitionTemplateChange={updateAcquisitionTemplate}
       />
 
       <NetWorthChart
