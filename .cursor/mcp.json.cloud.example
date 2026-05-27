@@ -3,7 +3,7 @@
     "rental-snowball": {
       "url": "https://portfolio-tracker-production-b019.up.railway.app/mcp",
       "headers": {
-        "Authorization": "Bearer ${env:PORTFOLIO_API_KEY}"
+        "X-Portfolio-Key": "<paste-your-64-char-PORTFOLIO_API_KEY-from-railway>"
       }
     }
   }

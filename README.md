@@ -77,7 +77,7 @@ Without `PORTFOLIO_API_KEY`, portfolio endpoints stay open — fine for local de
 
 ### 2. Cursor MCP config
 
-**Cloud Agents** (recommended): add `PORTFOLIO_API_KEY` in [Cloud Agents → Secrets](https://cursor.com/dashboard/cloud-agents), then paste the config from [`.cursor/mcp.json.cloud.example`](.cursor/mcp.json.cloud.example) into **cursor.com/agents → MCP** (or commit `.cursor/mcp.json` in the repo). The hosted MCP endpoint is protected with the same bearer key as the portfolio API:
+**Cloud Agents** (recommended): paste the config below into **cursor.com/agents → MCP**. **Paste your real API key in the header** — Cursor does **not** substitute `${env:PORTFOLIO_API_KEY}` in remote MCP headers (Railway logs will show `env_placeholder_not_substituted` and `tokenLength: 24`). Copy the same value from Railway → Variables → `PORTFOLIO_API_KEY` (64 hex chars from `openssl rand -hex 32`):
 
 ```json
 {
@@ -85,12 +85,14 @@ Without `PORTFOLIO_API_KEY`, portfolio endpoints stay open — fine for local de
     "rental-snowball": {
       "url": "https://portfolio-tracker-production-b019.up.railway.app/mcp",
       "headers": {
-        "Authorization": "Bearer ${env:PORTFOLIO_API_KEY}"
+        "X-Portfolio-Key": "<paste-your-64-char-PORTFOLIO_API_KEY-here>"
       }
     }
   }
 }
 ```
+
+Or use `Authorization` with the `Bearer ` prefix: `"Bearer <paste-key-here>"`. The UI will mask the value after save — that is normal.
 
 **Local desktop**: copy [`.cursor/mcp.json.example`](.cursor/mcp.json.example) to `.cursor/mcp.json` and set the same secrets in your shell or Cursor user secrets.
 
@@ -115,7 +117,7 @@ Without `PORTFOLIO_API_KEY`, portfolio endpoints stay open — fine for local de
 
 | Symptom | Likely cause |
 |---------|----------------|
-| Railway `POST /mcp` → **401** right after enabling MCP | Cursor is not sending your API key, or `${env:PORTFOLIO_API_KEY}` was not substituted (logs show `env_placeholder_not_substituted`). Paste `Bearer <key>` in the MCP header field, or use `X-Portfolio-Key: ${env:PORTFOLIO_API_KEY}`. Ensure Cloud Agents **Secrets** matches Railway `PORTFOLIO_API_KEY`. |
+| Railway `POST /mcp` → **401**, logs show `env_placeholder_not_substituted`, `tokenLength: 24` | Cursor sent the literal `${env:PORTFOLIO_API_KEY}` text. **Paste the full 64-char key** in MCP headers; do not use `${env:...}` for hosted URL MCP. |
 | Cursor **“unexpected response”** | Cursor probed `/.well-known/oauth-*` and used to get the SPA HTML. The server now returns `404` JSON on those paths. Redeploy after pulling this fix. |
 | MCP works in curl but not Cursor | Start a **new** agent after saving MCP config. |
 

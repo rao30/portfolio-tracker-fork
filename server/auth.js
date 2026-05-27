@@ -100,7 +100,10 @@ export function requirePortfolioApiKey(req, res, next) {
 
   const body = {
     error: 'Unauthorized',
-    hint: 'Set Authorization: Bearer <PORTFOLIO_API_KEY> or X-Portfolio-Key header',
+    hint:
+      diagnostics.failureReason === 'env_placeholder_not_substituted'
+        ? 'Cursor sent the literal "${env:PORTFOLIO_API_KEY}" string. In Agents → MCP, paste your full 64-char Railway key into the header value (not ${env:...}).'
+        : 'Set Authorization: Bearer <PORTFOLIO_API_KEY> or X-Portfolio-Key header',
   };
   if (process.env.LOG_AUTH_DEBUG === 'true') {
     body.auth = diagnostics;
