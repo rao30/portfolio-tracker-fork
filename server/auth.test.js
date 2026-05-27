@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  describePortfolioAuthAttempt,
   extractPortfolioToken,
   getPortfolioApiKey,
   isPortfolioApiAuthorized,
@@ -38,6 +39,29 @@ describe('portfolio API auth', () => {
         headers: { authorization: 'Bearer expected' },
       }),
     ).toBe(true);
+    delete process.env.PORTFOLIO_API_KEY;
+  });
+
+  it('diagnoses missing vs env-placeholder auth without leaking secrets', () => {
+    process.env.PORTFOLIO_API_KEY = 'expected-key';
+    expect(
+      describePortfolioAuthAttempt({
+        headers: {},
+        path: '/mcp',
+      }).failureReason,
+    ).toBe('missing_credentials');
+    expect(
+      describePortfolioAuthAttempt({
+        headers: {
+          authorization: 'Bearer ${env:PORTFOLIO_API_KEY}',
+        },
+        path: '/mcp',
+      }),
+    ).toMatchObject({
+      failureReason: 'env_placeholder_not_substituted',
+      literalEnvPlaceholder: true,
+      tokenLength: '${env:PORTFOLIO_API_KEY}'.length,
+    });
     delete process.env.PORTFOLIO_API_KEY;
   });
 });

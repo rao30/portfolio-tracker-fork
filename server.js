@@ -33,6 +33,18 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
+/** Cursor probes OAuth metadata; SPA catch-all returned HTML and broke MCP discovery. */
+function rejectOAuthDiscovery(_req, res) {
+  res.status(404).json({
+    error: 'OAuth not supported',
+    hint: 'Use Authorization: Bearer <PORTFOLIO_API_KEY> or X-Portfolio-Key on /mcp',
+  });
+}
+
+app.get('/.well-known/oauth-authorization-server', rejectOAuthDiscovery);
+app.get('/.well-known/oauth-protected-resource', rejectOAuthDiscovery);
+app.get('/.well-known/oauth-protected-resource/*', rejectOAuthDiscovery);
+
 app.get('/api/portfolio', requirePortfolioApiKey, async (_req, res) => {
   try {
     const result = await loadPortfolio();

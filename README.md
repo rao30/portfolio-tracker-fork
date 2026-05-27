@@ -111,6 +111,22 @@ Without `PORTFOLIO_API_KEY`, portfolio endpoints stay open — fine for local de
 
 `npm run mcp:stdio` builds `mcp-server/dist/index.js` on first start. The Railway app also exposes the same tools over Streamable HTTP at `/mcp`.
 
+### Troubleshooting MCP (401 / “unexpected response”)
+
+| Symptom | Likely cause |
+|---------|----------------|
+| Railway `POST /mcp` → **401** right after enabling MCP | Cursor is not sending your API key, or `${env:PORTFOLIO_API_KEY}` was not substituted (logs show `env_placeholder_not_substituted`). Paste `Bearer <key>` in the MCP header field, or use `X-Portfolio-Key: ${env:PORTFOLIO_API_KEY}`. Ensure Cloud Agents **Secrets** matches Railway `PORTFOLIO_API_KEY`. |
+| Cursor **“unexpected response”** | Cursor probed `/.well-known/oauth-*` and used to get the SPA HTML. The server now returns `404` JSON on those paths. Redeploy after pulling this fix. |
+| MCP works in curl but not Cursor | Start a **new** agent after saving MCP config. |
+
+On Railway deploy logs, failed MCP auth lines look like:
+
+```text
+[auth] POST /mcp unauthorized {"failureReason":"missing_credentials",...}
+```
+
+Set `LOG_AUTH_DEBUG=true` on Railway to include the same object in the `401` JSON body (still no secrets).
+
 ### 3. Tools exposed to the LLM
 
 | Tool | What it does |
