@@ -9,6 +9,8 @@ import {
   getPortfolioApiKey,
   requirePortfolioApiKey,
 } from './server/auth.js';
+import { buildWwwAuthenticateHeader } from './server/oauth.js';
+import { createOAuthRouter } from './server/oauth-routes.js';
 import {
   isCloudStorageEnabled,
   loadPortfolio,
@@ -25,25 +27,24 @@ const host = '0.0.0.0';
 
 app.use(express.json({ limit: '1mb' }));
 
+function getRequestOrigin(req) {
+  const forwardedProto = req.get('x-forwarded-proto')?.split(',')[0]?.trim();
+  const forwardedHost = req.get('x-forwarded-host')?.split(',')[0]?.trim();
+  const proto = forwardedProto || req.protocol;
+  const host = forwardedHost || req.get('host');
+  return `${proto}://${host}`;
+}
+
 app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
     cloudStorage: isCloudStorageEnabled(),
     apiKeyRequired: Boolean(getPortfolioApiKey()),
+    oauthEnabled: Boolean(getPortfolioApiKey()),
   });
 });
 
-/** Cursor probes OAuth metadata; SPA catch-all returned HTML and broke MCP discovery. */
-function rejectOAuthDiscovery(_req, res) {
-  res.status(404).json({
-    error: 'OAuth not supported',
-    hint: 'Use Authorization: Bearer <PORTFOLIO_API_KEY> or X-Portfolio-Key on /mcp',
-  });
-}
-
-app.get('/.well-known/oauth-authorization-server', rejectOAuthDiscovery);
-app.get('/.well-known/oauth-protected-resource', rejectOAuthDiscovery);
-app.get('/.well-known/oauth-protected-resource/*', rejectOAuthDiscovery);
+app.use(createOAuthRouter(getRequestOrigin));
 
 app.get('/api/portfolio', requirePortfolioApiKey, async (_req, res) => {
   try {
@@ -125,14 +126,6 @@ app.post('/api/analyze', requirePortfolioApiKey, async (req, res) => {
   }
 });
 
-function getRequestOrigin(req) {
-  const forwardedProto = req.get('x-forwarded-proto')?.split(',')[0]?.trim();
-  const forwardedHost = req.get('x-forwarded-host')?.split(',')[0]?.trim();
-  const proto = forwardedProto || req.protocol;
-  const host = forwardedHost || req.get('host');
-  return `${proto}://${host}`;
-}
-
 function requireMcpApiKey(req, res, next) {
   const expected = getPortfolioApiKey();
   if (!expected) {
@@ -141,7 +134,9 @@ function requireMcpApiKey(req, res, next) {
     });
     return;
   }
-  requirePortfolioApiKey(req, res, next);
+  requirePortfolioApiKey(req, res, next, {
+    wwwAuthenticate: (r) => buildWwwAuthenticateHeader(getRequestOrigin(r)),
+  });
 }
 
 app.all('/mcp', requireMcpApiKey, async (req, res) => {

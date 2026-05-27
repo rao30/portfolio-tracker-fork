@@ -113,12 +113,25 @@ Or use `Authorization` with the `Bearer ` prefix: `"Bearer <paste-key-here>"`. T
 
 `npm run mcp:stdio` builds `mcp-server/dist/index.js` on first start. The Railway app also exposes the same tools over Streamable HTTP at `/mcp`.
 
+### ChatGPT (OAuth)
+
+ChatGPT custom apps require **OAuth 2.1** (not custom headers). This server implements discovery, dynamic client registration, PKCE, and a browser login that accepts your `PORTFOLIO_API_KEY`.
+
+| ChatGPT field | Value |
+|---------------|--------|
+| MCP Server URL | `https://portfolio-tracker-production-b019.up.railway.app/mcp` |
+| Authentication | **OAuth** |
+
+After **Scan Tools**, complete the browser login and paste the same `PORTFOLIO_API_KEY` you use in Cursor. ChatGPT stores a bearer access token and sends it on each MCP call.
+
+Cursor can keep using `X-Portfolio-Key` or `Authorization: Bearer <key>` — both still work alongside OAuth tokens.
+
 ### Troubleshooting MCP (401 / “unexpected response”)
 
 | Symptom | Likely cause |
 |---------|----------------|
 | Railway `POST /mcp` → **401**, logs show `env_placeholder_not_substituted`, `tokenLength: 24` | Cursor sent the literal `${env:PORTFOLIO_API_KEY}` text. **Paste the full 64-char key** in MCP headers; do not use `${env:...}` for hosted URL MCP. |
-| Cursor **“unexpected response”** | Cursor probed `/.well-known/oauth-*` and used to get the SPA HTML. The server now returns `404` JSON on those paths. Redeploy after pulling this fix. |
+| Cursor **“unexpected response”** on OAuth probe | Redeploy latest `main`; well-known endpoints now return OAuth metadata JSON (not SPA HTML). |
 | MCP works in curl but not Cursor | Start a **new** agent after saving MCP config. |
 
 On Railway deploy logs, failed MCP auth lines look like:

@@ -1,3 +1,11 @@
+import { getAccessToken } from './oauth-store.js';
+
+function isValidOAuthAccessToken(token) {
+  if (!getPortfolioApiKey()) return false;
+  if (!token) return false;
+  return Boolean(getAccessToken(token));
+}
+
 /**
  * Optional API key protection for portfolio read/write and analytics routes.
  * Set PORTFOLIO_API_KEY on Railway (recommended). PORTFOLIO_WRITE_KEY is still
@@ -22,7 +30,10 @@ export function extractPortfolioToken(req) {
 export function isPortfolioApiAuthorized(req) {
   const expected = getPortfolioApiKey();
   if (!expected) return true;
-  return extractPortfolioToken(req) === expected;
+  const token = extractPortfolioToken(req);
+  if (!token) return false;
+  if (token === expected) return true;
+  return isValidOAuthAccessToken(token);
 }
 
 /**
@@ -62,7 +73,9 @@ export function describePortfolioAuthAttempt(req) {
   } else if (token !== expected) {
     failureReason = literalEnvPlaceholder
       ? 'env_placeholder_not_substituted'
-      : 'wrong_token';
+      : isValidOAuthAccessToken(token)
+        ? 'ok'
+        : 'wrong_token';
   }
 
   return {
@@ -81,8 +94,11 @@ export function describePortfolioAuthAttempt(req) {
   };
 }
 
-/** Express middleware — 401 when key is configured and missing/wrong. */
-export function requirePortfolioApiKey(req, res, next) {
+/**
+ * Express middleware — 401 when key is configured and missing/wrong.
+ * @param {{ wwwAuthenticate?: (req: import('express').Request) => string }} [options]
+ */
+export function requirePortfolioApiKey(req, res, next, options = {}) {
   if (isPortfolioApiAuthorized(req)) {
     next();
     return;
@@ -98,12 +114,16 @@ export function requirePortfolioApiKey(req, res, next) {
     );
   }
 
+  if (options.wwwAuthenticate) {
+    res.set('WWW-Authenticate', options.wwwAuthenticate(req));
+  }
+
   const body = {
     error: 'Unauthorized',
     hint:
       diagnostics.failureReason === 'env_placeholder_not_substituted'
         ? 'Cursor sent the literal "${env:PORTFOLIO_API_KEY}" string. In Agents → MCP, paste your full 64-char Railway key into the header value (not ${env:...}).'
-        : 'Set Authorization: Bearer <PORTFOLIO_API_KEY> or X-Portfolio-Key header',
+        : 'Use OAuth (ChatGPT) or Authorization: Bearer <PORTFOLIO_API_KEY> / X-Portfolio-Key',
   };
   if (process.env.LOG_AUTH_DEBUG === 'true') {
     body.auth = diagnostics;
