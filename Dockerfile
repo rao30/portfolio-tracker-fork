@@ -26,6 +26,7 @@ COPY --from=build /app/dist ./dist
 COPY server.js ./
 COPY server ./server
 COPY --from=build /app/server/portfolio-analytics.mjs ./server/portfolio-analytics.mjs
+COPY --from=build /app/mcp-server/dist ./mcp-server/dist
 COPY public ./public
 EXPOSE 3000
 CMD ["node", "server.js"]
