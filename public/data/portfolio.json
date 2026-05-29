@@ -1,5 +1,5 @@
 {
-  "seed_version": 9,
+  "seed_version": 10,
   "simulation_anchor_year": 2026,
   "simulation_anchor_month": 1,
   "default_refi_annual_rate": 0.0675,
@@ -31,7 +31,12 @@
       "monthly_payment": 939.67,
       "monthly_rent": 3590,
       "monthly_expenses": 1077,
-      "utilities_rent_rate": 0.15,
+      "utility_breakdown": {
+        "cleaning_maintenance": 65,
+        "electricity": 332,
+        "water_sewer": 174,
+        "internet": 109
+      },
       "purchase_price": 320000,
       "use_cost_seg": true
     },
@@ -45,7 +50,12 @@
       "monthly_payment": 1936.67,
       "monthly_rent": 6200,
       "monthly_expenses": 1860,
-      "utilities_rent_rate": 0.15,
+      "utility_breakdown": {
+        "cleaning_maintenance": 65,
+        "electricity": 488,
+        "water_sewer": 227,
+        "internet": 148
+      },
       "purchase_price": 550000,
       "use_cost_seg": true
     },
@@ -59,7 +69,11 @@
       "monthly_payment": 2595.45,
       "monthly_rent": 5740,
       "monthly_expenses": 1722,
-      "utilities_rent_rate": 0.15,
+      "utility_breakdown": {
+        "cleaning_maintenance": 65,
+        "electricity": 476,
+        "water_sewer": 183
+      },
       "purchase_price": 620000,
       "use_cost_seg": true
     },
@@ -73,7 +87,12 @@
       "monthly_payment": 2663.3,
       "monthly_rent": 5470,
       "monthly_expenses": 1641,
-      "utilities_rent_rate": 0.15,
+      "utility_breakdown": {
+        "cleaning_maintenance": 65,
+        "internet": 90,
+        "electricity": 476,
+        "water_sewer": 132
+      },
       "purchase_price": 630000,
       "use_cost_seg": true
     },
@@ -87,7 +106,10 @@
       "monthly_payment": 3011.06,
       "monthly_rent": 5800,
       "monthly_expenses": 1740,
-      "utilities_rent_rate": 0.15,
+      "utility_breakdown": {
+        "electricity": 296,
+        "water_sewer": 175
+      },
       "purchase_price": 720000,
       "use_cost_seg": true
     },

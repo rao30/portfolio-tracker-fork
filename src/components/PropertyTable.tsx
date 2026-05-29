@@ -4,7 +4,7 @@ import { formatCurrency, formatPercent, propertyColor } from '../lib/format';
 import {
   isPropertyActiveAtMonth,
   resolveMonthlyExpenses,
-  utilitiesFromRent,
+  resolveMonthlyUtilities,
 } from '../lib/snowball';
 import { AddPropertyModal } from './AddPropertyModal';
 import { ExpenseBreakdownEditor } from './ExpenseBreakdownEditor';
@@ -31,7 +31,7 @@ const BASIC_COLUMNS: { key: EditableField; label: string; mono?: boolean }[] = [
   { key: 'monthlyPayment', label: 'P&I', mono: true },
   { key: 'monthlyRent', label: 'Rent', mono: true },
   { key: 'monthlyExpenses', label: 'Operating', mono: true },
-  { key: 'utilitiesRentRate', label: 'Utilities', mono: true },
+  { key: 'monthlyUtilities', label: 'Utilities', mono: true },
 ];
 
 const ADVANCED_COLUMNS: { key: EditableField; label: string; mono?: boolean }[] = [
@@ -51,7 +51,7 @@ const MOBILE_FIELDS: { key: EditableField; label: string }[] = [
   { key: 'monthlyPayment', label: 'P&I' },
   { key: 'monthlyRent', label: 'Rent' },
   { key: 'monthlyExpenses', label: 'Operating' },
-  { key: 'utilitiesRentRate', label: 'Utilities' },
+  { key: 'monthlyUtilities', label: 'Utilities' },
 ];
 
 const PERCENT_FIELDS = new Set<EditableField>([
@@ -63,7 +63,6 @@ const PERCENT_FIELDS = new Set<EditableField>([
   'capexReserveRate',
   'landPercent',
   'costSegPercent',
-  'utilitiesRentRate',
 ]);
 
 const CURRENCY_FIELDS = new Set<EditableField>([
@@ -72,6 +71,7 @@ const CURRENCY_FIELDS = new Set<EditableField>([
   'monthlyPayment',
   'monthlyRent',
   'monthlyExpenses',
+  'monthlyUtilities',
   'purchasePrice',
   'cashInvested',
 ]);
@@ -90,10 +90,9 @@ function fieldDisplay(p: Property, field: EditableField): string {
   if (field === 'monthlyExpenses') {
     return formatCurrency(resolveMonthlyExpenses(p));
   }
-  if (field === 'utilitiesRentRate') {
-    if (p.utilitiesRentRate == null) return '—';
-    const amt = utilitiesFromRent(p.monthlyRent, p.utilitiesRentRate);
-    return `${formatPercent(p.utilitiesRentRate)} (${formatCurrency(amt)})`;
+  if (field === 'monthlyUtilities') {
+    const amt = resolveMonthlyUtilities(p);
+    return amt > 0 ? formatCurrency(amt) : '—';
   }
   const val = p[field];
   if (val === undefined) return '—';
@@ -253,7 +252,7 @@ export function PropertyTable({
 
   const totals = activeProperties.reduce(
     (acc, p) => {
-      const utilities = utilitiesFromRent(p.monthlyRent, p.utilitiesRentRate);
+      const utilities = resolveMonthlyUtilities(p);
       return {
         balance: acc.balance + p.balance,
         marketValue: acc.marketValue + p.marketValue,

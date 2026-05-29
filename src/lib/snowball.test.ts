@@ -25,7 +25,9 @@ import {
   runSimulation,
   paymentFromPrincipal,
   resolveMonthlyExpenses,
+  resolveMonthlyUtilities,
   resolvePropertySchedule,
+  sumUtilityBreakdown,
   totalMonthlyExpenses,
   utilitiesFromRent,
   SEED_PROPERTY_NAMES,
@@ -685,9 +687,29 @@ describe('validateProperty', () => {
 });
 
 describe('utilities expense', () => {
-  it('charges 15% of rent as utilities for configured properties', () => {
+  it('supports legacy rent-rate utilities', () => {
     expect(utilitiesFromRent(6200, 0.15)).toBe(930);
-    expect(totalMonthlyExpenses(6200, 1860, 0.15)).toBe(2790);
+    expect(totalMonthlyExpenses(6200, 1860, undefined, 0.15)).toBe(2790);
+  });
+
+  it('uses fixed monthly utilities from utility_breakdown', () => {
+    const p: Property = {
+      name: 'Test',
+      balance: 100000,
+      marketValue: 150000,
+      annualInterestRate: 0.05,
+      annualAppreciationRate: 0.03,
+      monthlyPayment: 600,
+      monthlyRent: 4000,
+      monthlyExpenses: 1200,
+      utilityBreakdown: {
+        electricity: 300,
+        waterSewer: 100,
+        cleaningMaintenance: 65,
+      },
+    };
+    expect(resolveMonthlyUtilities(p)).toBe(465);
+    expect(totalMonthlyExpenses(4000, 1200, 465)).toBe(1665);
   });
 
   it('reduces cashflow when utilities are enabled', () => {
@@ -701,7 +723,10 @@ describe('utilities expense', () => {
       monthlyRent: 4000,
       monthlyExpenses: 1200,
     };
-    const withUtilities: Property = { ...base, utilitiesRentRate: 0.15 };
+    const withUtilities: Property = {
+      ...base,
+      monthlyUtilities: 600,
+    };
     const rBase = simulateSnowball([base], {
       payoffOrder: ['Test'],
       extraMonthlyBudget: 0,
@@ -720,6 +745,23 @@ describe('utilities expense', () => {
     });
     expect(rUtil.history[0].monthlyUtilities).toBeCloseTo(600, 0);
     expect(rUtil.history[0].monthlyCashflow).toBeLessThan(rBase.history[0].monthlyCashflow);
+  });
+
+  it('loads 2025 actual utility averages for owned portfolio properties', () => {
+    const portfolio = normalizePortfolio(
+      JSON.parse(
+        readFileSync(join(process.cwd(), 'public/data/portfolio.json'), 'utf-8'),
+      ),
+    );
+    const lisa = portfolio.properties.find((p) => p.name.includes('Lisa'))!;
+    expect(sumUtilityBreakdown(lisa.utilityBreakdown)).toBe(680);
+    const brookwood = portfolio.properties.find((p) => p.name.includes('Brookwood'))!;
+    expect(resolveMonthlyUtilities(brookwood)).toBe(928);
+    const wendy = portfolio.properties.find((p) => p.name.includes('Wendy'))!;
+    expect(resolveMonthlyUtilities(wendy)).toBe(763);
+    expect(
+      portfolio.properties.every((p) => p.utilitiesRentRate == null),
+    ).toBe(true);
   });
 });
 

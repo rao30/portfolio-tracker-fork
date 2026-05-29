@@ -50,7 +50,9 @@ Simulation timing and seller/refi terms live in [`public/data/portfolio.json`](p
 | Property | `seller_amortization_months` | Seller P&I amortization (e.g. 240) |
 | Property | `refi_year`, `refi_month` | Calendar date when balloon refis |
 | Property | `refi_annual_rate`, `refi_term_months` | Post-balloon conventional loan terms |
-| Property | `utilities_rent_rate` | Utilities as a share of gross rent (e.g. `0.15`); scales with rent in simulation |
+| Property | `utility_breakdown` | Zillow monthly expense lines (electricity, water, internet, etc.) as $/mo averages from actuals |
+| Property | `monthly_utilities` | Optional flat override ($/mo); inflates with `annual_expense_inflation_rate`, not rent growth |
+| Property | `utilities_rent_rate` | Deprecated — use `utility_breakdown` instead |
 
 The engine converts calendar dates to simulation months from the anchor. Seller `monthly_payment` and `annual_interest_rate` in JSON are the values used until refi.
 

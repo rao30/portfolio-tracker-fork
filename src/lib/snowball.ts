@@ -11,6 +11,8 @@ import type {
   PropertyInsight,
   ScenarioConfig,
   SimulationResult,
+  UtilityBreakdown,
+  UtilityBreakdownFile,
 } from './types';
 import {
   denormalizeAcquisitionTemplate,
@@ -83,19 +85,50 @@ export interface SimulationOptions {
   allowUnresolved?: boolean;
 }
 
-/** Monthly utilities from gross rent when a rate is configured. */
+/** Monthly utilities from gross rent when a rate is configured (legacy). */
 export function utilitiesFromRent(monthlyRent: number, utilitiesRentRate?: number): number {
   if (!utilitiesRentRate || utilitiesRentRate <= 0) return 0;
   return monthlyRent * utilitiesRentRate;
+}
+
+export function sumUtilityBreakdown(b?: UtilityBreakdown): number {
+  if (!b) return 0;
+  return (
+    (b.cleaningMaintenance ?? 0) +
+    (b.yardSnowRemoval ?? 0) +
+    (b.garbage ?? 0) +
+    (b.gas ?? 0) +
+    (b.electricity ?? 0) +
+    (b.waterSewer ?? 0) +
+    (b.internet ?? 0) +
+    (b.hoaDues ?? 0) +
+    (b.other ?? 0)
+  );
+}
+
+/** Resolved landlord-paid utilities ($/mo). */
+export function resolveMonthlyUtilities(p: Property): number {
+  if (p.monthlyUtilities != null && p.monthlyUtilities > 0) return p.monthlyUtilities;
+  const fromBreakdown = sumUtilityBreakdown(p.utilityBreakdown);
+  if (fromBreakdown > 0) return fromBreakdown;
+  if (p.expenseBreakdown?.utilities != null && p.expenseBreakdown.utilities > 0) {
+    return p.expenseBreakdown.utilities;
+  }
+  return utilitiesFromRent(p.monthlyRent, p.utilitiesRentRate);
 }
 
 /** Total monthly expenses (operating + utilities). */
 export function totalMonthlyExpenses(
   monthlyRent: number,
   monthlyOperatingExpenses: number,
+  monthlyUtilities?: number,
   utilitiesRentRate?: number,
 ): number {
-  return monthlyOperatingExpenses + utilitiesFromRent(monthlyRent, utilitiesRentRate);
+  const utils =
+    monthlyUtilities != null && monthlyUtilities > 0
+      ? monthlyUtilities
+      : utilitiesFromRent(monthlyRent, utilitiesRentRate);
+  return monthlyOperatingExpenses + utils;
 }
 
 interface SimState {
@@ -105,6 +138,7 @@ interface SimState {
   grossMonthlyRent: number;
   monthlyRent: number;
   monthlyExpenses: number;
+  monthlyUtilities: number;
   utilitiesRentRate?: number;
   monthlyPayment: number;
   annualInterestRate: number;
@@ -125,6 +159,7 @@ interface SimState {
   originalGrossRent: number;
   originalRent: number;
   originalExpenses: number;
+  originalUtilities: number;
 }
 
 export { computeMonthlyPayment };
@@ -147,13 +182,17 @@ export function resolveMonthlyExpenses(p: Property): number {
     b?.managementPercent != null
       ? p.monthlyRent * b.managementPercent
       : (b?.management ?? 0);
+  const utilitiesInOperating =
+    p.utilityBreakdown == null &&
+    p.monthlyUtilities == null &&
+    p.utilitiesRentRate == null;
   const sum =
     (propertyTax ?? 0) +
     (insurance ?? 0) +
     (b?.hoa ?? 0) +
     mgmt +
     (b?.maintenance ?? 0) +
-    (b?.utilities ?? 0) +
+    (utilitiesInOperating ? (b?.utilities ?? 0) : 0) +
     (b?.other ?? 0);
   return sum > 0 ? sum : p.monthlyExpenses;
 }
@@ -210,7 +249,11 @@ export function validateProperty(
   const vacancy = resolveVacancyRate(p, portfolio, scenario);
   const effectiveRent = p.monthlyRent * (1 - vacancy);
   const operating = resolveMonthlyExpenses(p);
-  const totalExpenses = totalMonthlyExpenses(p.monthlyRent, operating, p.utilitiesRentRate);
+  const totalExpenses = totalMonthlyExpenses(
+    p.monthlyRent,
+    operating,
+    resolveMonthlyUtilities(p),
+  );
   const capex = propertyMonthlyCapex(p.monthlyRent, capexRate, capexFlat);
   const netCf =
     effectiveRent - totalExpenses - (p.balance > 0 ? p.monthlyPayment : 0) - capex;
@@ -321,7 +364,7 @@ function allLoansResolved(states: SimState[], month: number): boolean {
 }
 
 function stateUtilities(state: SimState): number {
-  return utilitiesFromRent(state.monthlyRent, state.utilitiesRentRate);
+  return state.monthlyUtilities;
 }
 
 function stateTotalExpenses(state: SimState): number {
@@ -334,6 +377,7 @@ function activateProperty(state: SimState): void {
   state.grossMonthlyRent = state.originalGrossRent;
   state.monthlyRent = state.originalRent;
   state.monthlyExpenses = state.originalExpenses;
+  state.monthlyUtilities = state.originalUtilities;
 }
 
 function applyExtraToNames(
@@ -414,6 +458,7 @@ function compoundGrowth(states: SimState[], month: number): void {
     s.grossMonthlyRent *= monthlyGrowthFactor(s.rentGrowth);
     s.monthlyRent = s.grossMonthlyRent * (1 - s.vacancyRate);
     s.monthlyExpenses *= monthlyGrowthFactor(s.expenseInflation);
+    s.monthlyUtilities *= monthlyGrowthFactor(s.expenseInflation);
   }
 }
 
@@ -435,6 +480,7 @@ function propertyToSimState(p: Property, options: SimulationOptions): SimState {
   const grossRent = p.monthlyRent;
   const effectiveRent = grossRent * (1 - vacancy);
   const operating = resolveMonthlyExpenses(p);
+  const utilities = resolveMonthlyUtilities(p);
 
   return {
     name: p.name,
@@ -443,6 +489,7 @@ function propertyToSimState(p: Property, options: SimulationOptions): SimState {
     grossMonthlyRent: activeAtStart ? grossRent : 0,
     monthlyRent: activeAtStart ? effectiveRent : 0,
     monthlyExpenses: activeAtStart ? operating : 0,
+    monthlyUtilities: activeAtStart ? utilities : 0,
     utilitiesRentRate: p.utilitiesRentRate,
     monthlyPayment: p.monthlyPayment,
     annualInterestRate: p.annualInterestRate + rateShock,
@@ -463,6 +510,7 @@ function propertyToSimState(p: Property, options: SimulationOptions): SimState {
     originalGrossRent: grossRent,
     originalRent: effectiveRent,
     originalExpenses: operating,
+    originalUtilities: utilities,
   };
 }
 
@@ -1306,7 +1354,7 @@ export function computePropertyCashflowAtMonth(
   const effectiveRent = grossRent * (1 - vacancy);
   const operating = propertyGrownOperatingAtMonth(p, portfolio, asOfMonth);
   const netRent =
-    effectiveRent - totalMonthlyExpenses(grossRent, operating, p.utilitiesRentRate);
+    effectiveRent - totalMonthlyExpenses(grossRent, operating, resolveMonthlyUtilities(p));
   const capexRate = resolveCapexRate(p, portfolio, scenario);
   const capexFlat = p.capexReserveFlat ?? portfolio.defaultCapexReserveFlat;
   const monthlyCapexReserve = propertyMonthlyCapex(grossRent, capexRate, capexFlat);
@@ -1360,14 +1408,14 @@ export function computePropertyInsightsAtMonth(
       const effectiveRent = grossRent * (1 - vacancy);
       const operating = propertyGrownOperatingAtMonth(p, portfolio, asOfMonth);
       const netRent =
-        effectiveRent - totalMonthlyExpenses(grossRent, operating, p.utilitiesRentRate);
+        effectiveRent - totalMonthlyExpenses(grossRent, operating, resolveMonthlyUtilities(p));
       const capexRate = resolveCapexRate(p, portfolio, scenario);
       const capexFlat = p.capexReserveFlat ?? portfolio.defaultCapexReserveFlat;
       const monthlyCapexReserve = propertyMonthlyCapex(grossRent, capexRate, capexFlat);
       const capRate = marketValue > 0 ? (netRent * 12) / marketValue : 0;
       const rankIdx = payoffOrder.indexOf(p.name);
       const noi =
-        (effectiveRent - totalMonthlyExpenses(grossRent, operating, p.utilitiesRentRate)) *
+        (effectiveRent - totalMonthlyExpenses(grossRent, operating, resolveMonthlyUtilities(p))) *
         12;
       const refiMonth = result.refinanceSchedule[p.name];
       const monthlyPayment =
@@ -1389,7 +1437,7 @@ export function computePropertyInsightsAtMonth(
         !ownerOccupied && cashInvested > 0 ? annualCf / cashInvested : 0;
       const breakEvenOccupancy =
         grossRent > 0
-          ? (totalMonthlyExpenses(grossRent, operating, p.utilitiesRentRate) +
+          ? (totalMonthlyExpenses(grossRent, operating, resolveMonthlyUtilities(p)) +
               (balance > 0 ? p.monthlyPayment : 0) +
               monthlyCapexReserve) /
             grossRent
@@ -1443,13 +1491,13 @@ export function computePropertyInsights(
     const effectiveRent = p.monthlyRent * (1 - vacancy);
     const operating = resolveMonthlyExpenses(p);
     const netRent =
-      effectiveRent - totalMonthlyExpenses(p.monthlyRent, operating, p.utilitiesRentRate);
+      effectiveRent - totalMonthlyExpenses(p.monthlyRent, operating, resolveMonthlyUtilities(p));
     const capexRate = resolveCapexRate(p, portfolio, scenario);
     const capexFlat = p.capexReserveFlat ?? portfolio.defaultCapexReserveFlat;
     const monthlyCapexReserve = propertyMonthlyCapex(p.monthlyRent, capexRate, capexFlat);
     const capRate = p.marketValue > 0 ? (netRent * 12) / p.marketValue : 0;
     const rankIdx = payoffOrder.indexOf(p.name);
-    const noi = (effectiveRent - totalMonthlyExpenses(p.monthlyRent, operating, p.utilitiesRentRate)) * 12;
+    const noi = (effectiveRent - totalMonthlyExpenses(p.monthlyRent, operating, resolveMonthlyUtilities(p))) * 12;
     const debtService = p.monthlyPayment * 12;
     const dscr = debtService > 0 && p.balance > 0 ? noi / debtService : Infinity;
     const cashInvested = resolveCashInvested(p);
@@ -1462,7 +1510,7 @@ export function computePropertyInsights(
     const grossRent = p.monthlyRent;
     const breakEvenOccupancy =
       grossRent > 0
-        ? (totalMonthlyExpenses(p.monthlyRent, operating, p.utilitiesRentRate) +
+        ? (totalMonthlyExpenses(p.monthlyRent, operating, resolveMonthlyUtilities(p)) +
             (p.balance > 0 ? p.monthlyPayment : 0) +
             monthlyCapexReserve) /
           grossRent
@@ -1802,6 +1850,39 @@ function applyDesotoPortfolioDefaults(portfolio: Portfolio): Portfolio {
   return { ...portfolio, properties };
 }
 
+function normalizeUtilityBreakdown(
+  raw: UtilityBreakdownFile | undefined,
+): UtilityBreakdown | undefined {
+  if (!raw) return undefined;
+  const b: UtilityBreakdown = {};
+  if (typeof raw.cleaning_maintenance === 'number') {
+    b.cleaningMaintenance = raw.cleaning_maintenance;
+  }
+  if (typeof raw.yard_snow_removal === 'number') b.yardSnowRemoval = raw.yard_snow_removal;
+  if (typeof raw.garbage === 'number') b.garbage = raw.garbage;
+  if (typeof raw.gas === 'number') b.gas = raw.gas;
+  if (typeof raw.electricity === 'number') b.electricity = raw.electricity;
+  if (typeof raw.water_sewer === 'number') b.waterSewer = raw.water_sewer;
+  if (typeof raw.internet === 'number') b.internet = raw.internet;
+  if (typeof raw.hoa_dues === 'number') b.hoaDues = raw.hoa_dues;
+  if (typeof raw.other === 'number') b.other = raw.other;
+  return Object.keys(b).length > 0 ? b : undefined;
+}
+
+function denormalizeUtilityBreakdown(b: UtilityBreakdown): UtilityBreakdownFile {
+  const file: UtilityBreakdownFile = {};
+  if (b.cleaningMaintenance != null) file.cleaning_maintenance = b.cleaningMaintenance;
+  if (b.yardSnowRemoval != null) file.yard_snow_removal = b.yardSnowRemoval;
+  if (b.garbage != null) file.garbage = b.garbage;
+  if (b.gas != null) file.gas = b.gas;
+  if (b.electricity != null) file.electricity = b.electricity;
+  if (b.waterSewer != null) file.water_sewer = b.waterSewer;
+  if (b.internet != null) file.internet = b.internet;
+  if (b.hoaDues != null) file.hoa_dues = b.hoaDues;
+  if (b.other != null) file.other = b.other;
+  return file;
+}
+
 /** Normalize raw JSON into a Portfolio (exported for tests and hook). */
 function normalizeExpenseBreakdown(raw: Record<string, unknown> | undefined) {
   if (!raw) return undefined;
@@ -2010,6 +2091,16 @@ export function normalizePortfolio(raw: unknown): Portfolio {
 
     applyOptionalPropertyFields(prop, p);
 
+    const utilityBreakdown = normalizeUtilityBreakdown(
+      p.utility_breakdown as UtilityBreakdownFile | undefined,
+    );
+    if (utilityBreakdown) prop.utilityBreakdown = utilityBreakdown;
+    if (typeof p.monthly_utilities === 'number') {
+      prop.monthlyUtilities = p.monthly_utilities;
+    } else if (utilityBreakdown) {
+      prop.monthlyUtilities = sumUtilityBreakdown(utilityBreakdown);
+    }
+
     return prop;
   });
 
@@ -2120,6 +2211,11 @@ export function denormalizePortfolio(
       }
       if (p.utilitiesRentRate !== undefined) {
         file.utilities_rent_rate = p.utilitiesRentRate;
+      }
+      if (p.utilityBreakdown) {
+        file.utility_breakdown = denormalizeUtilityBreakdown(p.utilityBreakdown);
+      } else if (p.monthlyUtilities != null && p.monthlyUtilities > 0) {
+        file.monthly_utilities = p.monthlyUtilities;
       }
       if (p.vacancyRate !== undefined) file.vacancy_rate = p.vacancyRate;
       if (p.capexReserveRate !== undefined) file.capex_reserve_rate = p.capexReserveRate;

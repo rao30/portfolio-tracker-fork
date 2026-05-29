@@ -1,3 +1,16 @@
+/** Zillow “Monthly Expenses” lines (landlord-paid, $/mo averages). */
+export interface UtilityBreakdown {
+  cleaningMaintenance?: number;
+  yardSnowRemoval?: number;
+  garbage?: number;
+  gas?: number;
+  electricity?: number;
+  waterSewer?: number;
+  internet?: number;
+  hoaDues?: number;
+  other?: number;
+}
+
 export interface ExpenseBreakdown {
   propertyTax?: number;
   insurance?: number;
@@ -45,7 +58,13 @@ export interface Property {
   monthlyRent: number;
   /** Operating expenses excluding utilities. */
   monthlyExpenses: number;
-  /** Share of gross rent for utilities (e.g. 0.15). Scales with rent in simulation. */
+  /** Fixed landlord-paid utilities ($/mo); inflates with expense inflation. */
+  monthlyUtilities?: number;
+  /** Zillow category detail from actuals; summed when monthlyUtilities omitted. */
+  utilityBreakdown?: UtilityBreakdown;
+  /**
+   * @deprecated Use monthlyUtilities / utilityBreakdown. Scales with rent in simulation.
+   */
   utilitiesRentRate?: number;
   /** Override portfolio default rent growth for this property. */
   annualRentGrowthRate?: number;
@@ -160,6 +179,8 @@ export interface PropertyFile {
   monthly_payment: number;
   monthly_rent: number;
   monthly_expenses: number;
+  monthly_utilities?: number;
+  utility_breakdown?: UtilityBreakdownFile;
   utilities_rent_rate?: number;
   annual_rent_growth_rate?: number;
   annual_expense_inflation_rate?: number;
@@ -195,6 +216,18 @@ export interface PropertyFile {
   seller_payoff_cap?: number;
   /** Seller credit at closing. */
   seller_credit?: number;
+}
+
+export interface UtilityBreakdownFile {
+  cleaning_maintenance?: number;
+  yard_snow_removal?: number;
+  garbage?: number;
+  gas?: number;
+  electricity?: number;
+  water_sewer?: number;
+  internet?: number;
+  hoa_dues?: number;
+  other?: number;
 }
 
 export interface ExpenseBreakdownFile {
