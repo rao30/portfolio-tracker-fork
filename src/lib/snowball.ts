@@ -1809,6 +1809,12 @@ const DESOTO_EXPENSE_DEFAULTS = {
 /** Appraised / ARV for DeSoto duplex acquisitions (loan balance is separate). */
 export const DESOTO_DUPLEX_MARKET_VALUE = 450_000;
 
+/** Gross rent for standard DeSoto duplex ($1,950/side). */
+export const DESOTO_DUPLEX_MONTHLY_RENT = 3900;
+
+/** Gross rent for 1419/1421 Deborah ($1,500/side). */
+export const DESOTO_DEBORAH_MONTHLY_RENT = 3000;
+
 /** DeSoto portfolio properties share 2% tax and $3,100/yr insurance. */
 export function isDesotoProperty(name: string): boolean {
   return (
@@ -1833,10 +1839,15 @@ function applyDesotoPortfolioDefaults(portfolio: Portfolio): Portfolio {
       purchasePrice = Math.max(purchasePrice, DESOTO_DUPLEX_MARKET_VALUE);
     }
 
+    const monthlyRent = /deborah/i.test(p.name)
+      ? DESOTO_DEBORAH_MONTHLY_RENT
+      : DESOTO_DUPLEX_MONTHLY_RENT;
+
     const next: Property = {
       ...p,
       marketValue,
       purchasePrice,
+      monthlyRent,
       propertyTaxRate:
         p.propertyTaxRate ?? DESOTO_EXPENSE_DEFAULTS.propertyTaxRate,
       annualInsurance:

@@ -19,6 +19,8 @@ import {
   computeRentalCashflowAtMonth,
   isOwnerOccupiedAtMonth,
   monthForPortfolioYear,
+  DESOTO_DEBORAH_MONTHLY_RENT,
+  DESOTO_DUPLEX_MONTHLY_RENT,
   isDesotoProperty,
   monthForPortfolioYear,
   normalizePortfolio,
@@ -580,6 +582,25 @@ describe('normalizePortfolio', () => {
     expect(p.properties[0].propertyTaxRate).toBe(0.02);
     expect(p.properties[0].annualInsurance).toBe(3100);
     expect(p.properties[0].monthlyExpenses).toBeCloseTo(858.33, 2);
+    expect(p.properties[0].monthlyRent).toBe(DESOTO_DUPLEX_MONTHLY_RENT);
+  });
+
+  it('applies Deborah duplex rent at $1,500/side', () => {
+    const p = normalizePortfolio({
+      extra_monthly_budget: 0,
+      properties: [
+        {
+          name: '1419/1421 Deborah Dr (seller 6%, 5yr balloon)',
+          balance: 281501.9,
+          market_value: 380000,
+          annual_interest_rate: 0.06,
+          monthly_payment: 2016.77,
+          monthly_rent: 3600,
+          monthly_expenses: 891.67,
+        },
+      ],
+    });
+    expect(p.properties[0].monthlyRent).toBe(DESOTO_DEBORAH_MONTHLY_RENT);
   });
 
   it('sets conventional DeSoto duplex market value to 450k when JSON used loan balance', () => {
@@ -601,6 +622,24 @@ describe('normalizePortfolio', () => {
     expect(p.properties[0].marketValue).toBe(450_000);
     expect(p.properties[0].purchasePrice).toBe(450_000);
     expect(p.properties[0].marketValue - p.properties[0].balance).toBe(90_000);
+    expect(p.properties[0].monthlyRent).toBe(DESOTO_DUPLEX_MONTHLY_RENT);
+  });
+
+  it('loads seed duplex rents at $3,900 and Deborah at $3,000', () => {
+    const portfolio = normalizePortfolio(
+      JSON.parse(
+        readFileSync(join(process.cwd(), 'public/data/portfolio.json'), 'utf-8'),
+      ),
+    );
+    const duplexes = portfolio.properties.filter(
+      (p) => isDesotoProperty(p.name) && !/deborah/i.test(p.name),
+    );
+    expect(duplexes.length).toBe(7);
+    expect(duplexes.every((p) => p.monthlyRent === DESOTO_DUPLEX_MONTHLY_RENT)).toBe(
+      true,
+    );
+    const deborah = portfolio.properties.find((p) => /deborah/i.test(p.name))!;
+    expect(deborah.monthlyRent).toBe(DESOTO_DEBORAH_MONTHLY_RENT);
   });
 });
 
@@ -1144,7 +1183,7 @@ describe('seed portfolio integration', () => {
       annualInterestRate: 0.06,
       annualAppreciationRate: 0.03,
       monthlyPayment: 2464.94,
-      monthlyRent: 3600,
+      monthlyRent: 3900,
       monthlyExpenses: 1025,
       sellerPayoffCap: 440000,
       closeMonth: 1,
