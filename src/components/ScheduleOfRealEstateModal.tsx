@@ -4,6 +4,8 @@ import {
   formatCurrency,
   formatLtv,
   formatPercent,
+  formatSimulationMonthLabel,
+  formatSimulationMonthShort,
   currentSimulationMonth,
 } from '../lib/format';
 import {
@@ -12,11 +14,7 @@ import {
   type ScheduleRow,
 } from '../lib/scheduleOfRealEstate';
 import { downloadScheduleExcel } from '../lib/scheduleOfRealEstateExcel';
-import {
-  maxPortfolioDashboardYear,
-  monthForPortfolioYear,
-  runSimulation,
-} from '../lib/snowball';
+import { runSimulation } from '../lib/snowball';
 
 interface ScheduleOfRealEstateModalProps {
   open: boolean;
@@ -42,41 +40,44 @@ export function ScheduleOfRealEstateModal({
   open,
   onClose,
   portfolio,
-  result,
+  result: _result,
   scenario,
 }: ScheduleOfRealEstateModalProps) {
-  const maxYear = useMemo(() => maxPortfolioDashboardYear(result), [result]);
-  const defaultYear = useMemo(() => {
-    const asOfMonth = currentSimulationMonth(
-      portfolio.simulationAnchorYear ?? 2026,
-      portfolio.simulationAnchorMonth ?? 1,
-    );
-    const clamped = Math.max(1, Math.min(asOfMonth, result.history.length));
-    return Math.floor((clamped - 1) / 12) + 1;
-  }, [portfolio, result]);
-  const [year, setYear] = useState(defaultYear);
-
-  useEffect(() => {
-    if (open) setYear(defaultYear);
-  }, [open, defaultYear]);
+  const anchorYear = portfolio.simulationAnchorYear ?? 2026;
+  const anchorMonth = portfolio.simulationAnchorMonth ?? 1;
 
   const scheduleResult = useMemo(
     () => runSimulation(portfolio, 'baseline', scenario ?? undefined),
     [portfolio, scenario],
   );
 
+  const maxMonth = scheduleResult.history.length;
+
+  const defaultMonth = useMemo(() => {
+    const asOfMonth = currentSimulationMonth(anchorYear, anchorMonth);
+    return Math.max(1, Math.min(asOfMonth, maxMonth));
+  }, [anchorYear, anchorMonth, maxMonth]);
+
+  const [asOfMonth, setAsOfMonth] = useState(defaultMonth);
+
+  useEffect(() => {
+    if (open) setAsOfMonth(defaultMonth);
+  }, [open, defaultMonth]);
+
   const schedule = useMemo(() => {
     if (!open) return null;
-    const asOfMonth = monthForPortfolioYear(year);
     return buildScheduleOfRealEstate(portfolio, scheduleResult, asOfMonth, scenario);
-  }, [open, portfolio, scheduleResult, year, scenario]);
+  }, [open, portfolio, scheduleResult, asOfMonth, scenario]);
+
+  const timelineStart = formatSimulationMonthShort(1, anchorYear, anchorMonth);
+  const timelineEnd = formatSimulationMonthShort(maxMonth, anchorYear, anchorMonth);
+  const monthLabel = formatSimulationMonthLabel(asOfMonth, anchorYear, anchorMonth);
+
+  const stepMonth = (delta: number) => {
+    setAsOfMonth((current) => Math.max(1, Math.min(maxMonth, current + delta)));
+  };
 
   if (!open || !schedule) return null;
-
-  const yearLabel =
-    year === 1
-      ? `${schedule.calendarYear} (now)`
-      : String(schedule.calendarYear);
 
   return (
     <div
@@ -101,8 +102,8 @@ export function ScheduleOfRealEstateModal({
                 exclude debt service
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                As of {schedule.asOfLabel} · {schedule.propertyCount} properties · excludes
-                projected acquisitions not yet closed
+                As of {schedule.asOfLabel} · {schedule.propertyCount} properties owned · excludes
+                acquisitions not yet closed
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -123,101 +124,134 @@ export function ScheduleOfRealEstateModal({
             </div>
           </div>
 
-          <div className="mt-4 min-w-[12rem] max-w-xs">
-            <label
-              htmlFor="schedule-year"
-              className="mb-1 block text-xs font-medium text-slate-400"
-            >
-              As-of year ({yearLabel})
-            </label>
-            <input
-              id="schedule-year"
-              type="range"
-              min={1}
-              max={maxYear}
-              step={1}
-              value={year}
-              onChange={(e) => setYear(Number(e.target.value))}
-              className="h-2 w-full cursor-pointer accent-cyan-500"
-            />
-            <div className="mt-1 flex justify-between font-mono text-[10px] tabular-nums text-slate-500">
-              <span>{portfolio.simulationAnchorYear ?? 2026}</span>
-              <span>
-                {(portfolio.simulationAnchorYear ?? 2026) + maxYear - 1}
+          <div className="mt-4 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label
+                htmlFor="schedule-month"
+                className="text-xs font-medium text-slate-400"
+              >
+                As-of month
+              </label>
+              <span className="font-mono text-xs tabular-nums text-slate-300">
+                {monthLabel}
+                <span className="text-slate-500"> · sim month {asOfMonth}</span>
               </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => stepMonth(-1)}
+                disabled={asOfMonth <= 1}
+                className="rounded-lg border border-white/10 px-2.5 py-1.5 text-sm text-slate-200 transition hover:bg-white/5 disabled:opacity-30"
+                aria-label="Previous month"
+              >
+                −
+              </button>
+              <input
+                id="schedule-month"
+                type="range"
+                min={1}
+                max={maxMonth}
+                step={1}
+                value={asOfMonth}
+                onChange={(e) => setAsOfMonth(Number(e.target.value))}
+                className="h-2 min-w-0 flex-1 cursor-pointer accent-cyan-500"
+              />
+              <button
+                type="button"
+                onClick={() => stepMonth(1)}
+                disabled={asOfMonth >= maxMonth}
+                className="rounded-lg border border-white/10 px-2.5 py-1.5 text-sm text-slate-200 transition hover:bg-white/5 disabled:opacity-30"
+                aria-label="Next month"
+              >
+                +
+              </button>
+            </div>
+
+            <div className="flex justify-between font-mono text-[10px] tabular-nums text-slate-500">
+              <span>{timelineStart}</span>
+              <span>{timelineEnd}</span>
             </div>
           </div>
         </div>
 
         <div className="overflow-auto p-4 sm:p-5">
-          <table className="w-full min-w-[56rem] border-collapse text-left text-xs">
-            <thead>
-              <tr className="border-b border-white/10 text-[10px] uppercase tracking-wide text-slate-500">
-                {SCHEDULE_PREVIEW_COLUMNS.map((col) => (
-                  <th key={col.key} className="px-2 py-2 font-medium">
-                    {col.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {schedule.rows.map((row) => (
-                <tr
-                  key={row.propertyDescription}
-                  className="border-b border-white/5 text-slate-300 hover:bg-white/[0.03]"
-                >
+          {schedule.propertyCount === 0 ? (
+            <p className="text-sm text-slate-400">
+              No properties owned as of {monthLabel}. Step forward to the month after a close
+              date to include that property.
+            </p>
+          ) : (
+            <table className="w-full min-w-[56rem] border-collapse text-left text-xs">
+              <thead>
+                <tr className="border-b border-white/10 text-[10px] uppercase tracking-wide text-slate-500">
                   {SCHEDULE_PREVIEW_COLUMNS.map((col) => (
-                    <td
-                      key={col.key}
-                      className={`px-2 py-2 ${
-                        col.format === 'text' ? 'max-w-[14rem] truncate' : 'font-mono tabular-nums'
-                      }`}
-                    >
-                      {formatCellValue(row, col.format, col.key)}
-                    </td>
+                    <th key={col.key} className="px-2 py-2 font-medium">
+                      {col.label}
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="border-t border-white/10 font-semibold text-slate-200">
-                {SCHEDULE_PREVIEW_COLUMNS.map((col) => {
-                  if (col.key === 'propertyDescription') {
-                    return (
-                      <td key={col.key} className="px-2 py-2">
-                        TOTAL
+              </thead>
+              <tbody>
+                {schedule.rows.map((row) => (
+                  <tr
+                    key={row.propertyDescription}
+                    className="border-b border-white/5 text-slate-300 hover:bg-white/[0.03]"
+                  >
+                    {SCHEDULE_PREVIEW_COLUMNS.map((col) => (
+                      <td
+                        key={col.key}
+                        className={`px-2 py-2 ${
+                          col.format === 'text' ? 'max-w-[14rem] truncate' : 'font-mono tabular-nums'
+                        }`}
+                      >
+                        {formatCellValue(row, col.format, col.key)}
                       </td>
-                    );
-                  }
-                  const totalsKey = col.key as keyof typeof schedule.totals;
-                  if (!(totalsKey in schedule.totals)) {
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-white/10 font-semibold text-slate-200">
+                  {SCHEDULE_PREVIEW_COLUMNS.map((col) => {
+                    if (col.key === 'propertyDescription') {
+                      return (
+                        <td key={col.key} className="px-2 py-2">
+                          TOTAL
+                        </td>
+                      );
+                    }
+                    const totalsKey = col.key as keyof typeof schedule.totals;
+                    if (!(totalsKey in schedule.totals)) {
+                      return <td key={col.key} className="px-2 py-2">—</td>;
+                    }
+                    const value = schedule.totals[totalsKey];
+                    if (col.format === 'currency') {
+                      return (
+                        <td key={col.key} className="px-2 py-2 font-mono tabular-nums">
+                          {formatCurrency(value)}
+                        </td>
+                      );
+                    }
+                    if (col.format === 'percent') {
+                      return (
+                        <td key={col.key} className="px-2 py-2 font-mono tabular-nums">
+                          {formatLtv(value)}
+                        </td>
+                      );
+                    }
                     return <td key={col.key} className="px-2 py-2">—</td>;
-                  }
-                  const value = schedule.totals[totalsKey];
-                  if (col.format === 'currency') {
-                    return (
-                      <td key={col.key} className="px-2 py-2 font-mono tabular-nums">
-                        {formatCurrency(value)}
-                      </td>
-                    );
-                  }
-                  if (col.format === 'percent') {
-                    return (
-                      <td key={col.key} className="px-2 py-2 font-mono tabular-nums">
-                        {formatLtv(value)}
-                      </td>
-                    );
-                  }
-                  return <td key={col.key} className="px-2 py-2">—</td>;
-                })}
-              </tr>
-            </tfoot>
-          </table>
+                  })}
+                </tr>
+              </tfoot>
+            </table>
+          )}
         </div>
 
         <div className="border-t border-white/10 px-4 py-3 text-[10px] text-slate-500 sm:px-5">
-          Excel export includes financing type, remaining term, debt service, cash invested, and
-          notes. Download for lender or CPA packages.
+          Step one month at a time to see when each acquisition enters the schedule. Excel export
+          reflects the selected month.
         </div>
       </div>
     </div>

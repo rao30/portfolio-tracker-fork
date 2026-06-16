@@ -121,6 +121,28 @@ export function currentSimulationMonth(
   );
 }
 
+/** Human-readable calendar label for a simulation month. */
+export function formatSimulationMonthLabel(
+  simMonth: number,
+  anchorYear: number,
+  anchorMonth = 1,
+): string {
+  const { year, month } = simMonthToCalendar(simMonth, anchorYear, anchorMonth);
+  const date = new Date(year, month - 1, 1);
+  return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+/** Short label, e.g. "Jun 2026". */
+export function formatSimulationMonthShort(
+  simMonth: number,
+  anchorYear: number,
+  anchorMonth = 1,
+): string {
+  const { year, month } = simMonthToCalendar(simMonth, anchorYear, anchorMonth);
+  const date = new Date(year, month - 1, 1);
+  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
 /** Simulation month when a property closes in January of closeYear. */
 export function closeMonthFromYear(
   closeYear: number,

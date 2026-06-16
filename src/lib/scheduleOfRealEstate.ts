@@ -1,5 +1,5 @@
 import type { Portfolio, Property, ScenarioConfig, SimulationResult } from './types';
-import { formatMonths } from './format';
+import { formatMonths, simMonthToCalendar } from './format';
 import { DEFAULT_PROJECTED_CLOSE_MONTH } from './snowball';
 import {
   computePropertyInsightsAtMonth,
@@ -173,9 +173,9 @@ export function buildScheduleOfRealEstate(
   scenario?: ScenarioConfig | null,
 ): ScheduleOfRealEstate {
   const anchorYear = portfolio.simulationAnchorYear ?? 2026;
-  const calendarYear = anchorYear + Math.floor((asOfMonth - 1) / 12);
-  const monthInCalendarYear = ((asOfMonth - 1) % 12) + 1;
-  const asOfDate = new Date(calendarYear, monthInCalendarYear - 1, 1);
+  const anchorMonth = portfolio.simulationAnchorMonth ?? 1;
+  const calendar = simMonthToCalendar(asOfMonth, anchorYear, anchorMonth);
+  const asOfDate = new Date(calendar.year, calendar.month - 1, 1);
   const asOfLabel = asOfDate.toLocaleDateString('en-US', {
     month: 'long',
     year: 'numeric',
@@ -255,7 +255,7 @@ export function buildScheduleOfRealEstate(
     title: 'Schedule of Real Estate',
     asOfDate: asOfDate.toISOString().slice(0, 10),
     asOfLabel,
-    calendarYear,
+    calendarYear: calendar.year,
     simulationMonth: asOfMonth,
     propertyCount: rows.length,
     rows,
