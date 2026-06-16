@@ -8,6 +8,7 @@ import { analyzeFromPortfolio, listCapabilities } from './server/analytics-handl
 import {
   getPortfolioApiKey,
   requirePortfolioApiKey,
+  requirePortfolioWebAccess,
 } from './server/auth.js';
 import { buildWwwAuthenticateHeader } from './server/oauth.js';
 import { createOAuthRouter } from './server/oauth-routes.js';
@@ -46,7 +47,7 @@ app.get('/api/health', (_req, res) => {
 
 app.use(createOAuthRouter(getRequestOrigin));
 
-app.get('/api/portfolio', requirePortfolioApiKey, async (_req, res) => {
+app.get('/api/portfolio', requirePortfolioWebAccess, async (_req, res) => {
   try {
     const result = await loadPortfolio();
     res.json({
@@ -54,6 +55,8 @@ app.get('/api/portfolio', requirePortfolioApiKey, async (_req, res) => {
       source: result.source,
       updatedAt: result.updatedAt,
       cloudStorage: isCloudStorageEnabled(),
+      seedVersion: result.data?.seed_version,
+      upgradedFromVersion: result.upgradedFromVersion,
     });
   } catch (err) {
     console.error('GET /api/portfolio', err);
@@ -63,7 +66,7 @@ app.get('/api/portfolio', requirePortfolioApiKey, async (_req, res) => {
   }
 });
 
-app.post('/api/portfolio/reset', requirePortfolioApiKey, async (_req, res) => {
+app.post('/api/portfolio/reset', requirePortfolioWebAccess, async (_req, res) => {
   try {
     const result = await resetPortfolioToSeed();
     res.json({
@@ -71,6 +74,7 @@ app.post('/api/portfolio/reset', requirePortfolioApiKey, async (_req, res) => {
       source: result.source,
       updatedAt: result.updatedAt,
       cloudStorage: isCloudStorageEnabled(),
+      seedVersion: result.data?.seed_version,
     });
   } catch (err) {
     console.error('POST /api/portfolio/reset', err);
@@ -80,7 +84,7 @@ app.post('/api/portfolio/reset', requirePortfolioApiKey, async (_req, res) => {
   }
 });
 
-app.put('/api/portfolio', requirePortfolioApiKey, async (req, res) => {
+app.put('/api/portfolio', requirePortfolioWebAccess, async (req, res) => {
   if (!isCloudStorageEnabled()) {
     res.status(503).json({ error: 'Cloud storage is not configured' });
     return;

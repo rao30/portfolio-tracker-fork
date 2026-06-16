@@ -107,7 +107,7 @@ export function Header({
           className={`rounded-full px-3 py-1 text-xs font-medium ${sourceBadgeClass(source)}`}
         >
           {source === 'cloud'
-            ? 'Synced to cloud'
+            ? 'Synced to Supabase'
             : source === 'local'
               ? 'Local edits (browser cache)'
               : 'Loaded from repo defaults'}

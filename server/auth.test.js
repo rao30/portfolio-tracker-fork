@@ -4,6 +4,8 @@ import {
   extractPortfolioToken,
   getPortfolioApiKey,
   isPortfolioApiAuthorized,
+  isSameOriginBrowserRequest,
+  isPortfolioWebAccessAuthorized,
 } from './auth.js';
 
 describe('portfolio API auth', () => {
@@ -39,6 +41,33 @@ describe('portfolio API auth', () => {
         headers: { authorization: 'Bearer expected' },
       }),
     ).toBe(true);
+    delete process.env.PORTFOLIO_API_KEY;
+  });
+
+  it('allows same-origin browser requests without a key', () => {
+    process.env.PORTFOLIO_API_KEY = 'expected';
+    expect(
+      isSameOriginBrowserRequest({
+        headers: {
+          origin: 'https://portfolio.example.com',
+          host: 'portfolio.example.com',
+          'sec-fetch-site': 'same-origin',
+        },
+      }),
+    ).toBe(true);
+    expect(
+      isPortfolioWebAccessAuthorized({
+        headers: {
+          origin: 'https://portfolio.example.com',
+          host: 'portfolio.example.com',
+        },
+      }),
+    ).toBe(true);
+    expect(
+      isPortfolioWebAccessAuthorized({
+        headers: { host: 'portfolio.example.com' },
+      }),
+    ).toBe(false);
     delete process.env.PORTFOLIO_API_KEY;
   });
 

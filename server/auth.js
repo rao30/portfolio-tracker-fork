@@ -36,6 +36,44 @@ export function isPortfolioApiAuthorized(req) {
   return isValidOAuthAccessToken(token);
 }
 
+function headerValue(req, name) {
+  if (typeof req.get === 'function') {
+    return req.get(name);
+  }
+  const headers = req.headers ?? {};
+  const key = name.toLowerCase();
+  const value = headers[name] ?? headers[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function requestHost(req) {
+  const forwarded = headerValue(req, 'x-forwarded-host');
+  if (forwarded) return forwarded.split(',')[0].trim();
+  return headerValue(req, 'host') ?? '';
+}
+
+/** Browser requests from the deployed SPA (same host as the API). */
+export function isSameOriginBrowserRequest(req) {
+  const secFetchSite = headerValue(req, 'sec-fetch-site');
+  if (secFetchSite === 'same-origin' || secFetchSite === 'same-site') {
+    return true;
+  }
+
+  const origin = headerValue(req, 'origin');
+  const host = requestHost(req);
+  if (!origin || !host) return false;
+
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+}
+
+export function isPortfolioWebAccessAuthorized(req) {
+  return isPortfolioApiAuthorized(req) || isSameOriginBrowserRequest(req);
+}
+
 /**
  * Safe auth diagnostics for logs (never includes secrets or token values).
  */
@@ -98,6 +136,36 @@ export function describePortfolioAuthAttempt(req) {
  * Express middleware — 401 when key is configured and missing/wrong.
  * @param {{ wwwAuthenticate?: (req: import('express').Request) => string }} [options]
  */
+/**
+ * Portfolio UI routes: API key, OAuth token, or same-origin browser session.
+ * MCP and external clients still require a key via requirePortfolioApiKey.
+ */
+export function requirePortfolioWebAccess(req, res, next, options = {}) {
+  if (isPortfolioWebAccessAuthorized(req)) {
+    next();
+    return;
+  }
+
+  const diagnostics = describePortfolioAuthAttempt(req);
+  const logMcp =
+    req.path === '/mcp' || process.env.LOG_AUTH_DEBUG === 'true';
+  if (logMcp) {
+    console.warn(
+      `[auth] ${req.method} ${req.path} unauthorized (web)`,
+      JSON.stringify(diagnostics),
+    );
+  }
+
+  if (options.wwwAuthenticate) {
+    res.set('WWW-Authenticate', options.wwwAuthenticate(req));
+  }
+
+  res.status(401).json({
+    error: 'Unauthorized',
+    hint: 'Open the portfolio tracker in your browser or use Authorization: Bearer <PORTFOLIO_API_KEY>',
+  });
+}
+
 export function requirePortfolioApiKey(req, res, next, options = {}) {
   if (isPortfolioApiAuthorized(req)) {
     next();

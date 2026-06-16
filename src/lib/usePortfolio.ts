@@ -82,6 +82,24 @@ interface ApiPortfolioResponse {
   source: DataSource;
   updatedAt: string | null;
   cloudStorage: boolean;
+  seedVersion?: number;
+  upgradedFromVersion?: number;
+}
+
+interface HealthResponse {
+  ok: boolean;
+  cloudStorage: boolean;
+  apiKeyRequired: boolean;
+}
+
+async function loadHealth(): Promise<HealthResponse | null> {
+  try {
+    const res = await fetch('/api/health');
+    if (!res.ok) return null;
+    return (await res.json()) as HealthResponse;
+  } catch {
+    return null;
+  }
 }
 
 function portfolioApiKey(): string | undefined {
@@ -98,13 +116,21 @@ function apiHeaders(jsonBody = false): HeadersInit {
   return headers;
 }
 
-async function loadFromApi(): Promise<ApiPortfolioResponse | null> {
+async function loadFromApi(): Promise<{
+  response: ApiPortfolioResponse | null;
+  error?: string;
+}> {
   try {
     const res = await fetch('/api/portfolio', { headers: apiHeaders() });
-    if (!res.ok) return null;
-    return (await res.json()) as ApiPortfolioResponse;
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      const hint =
+        typeof body.hint === 'string' ? body.hint : `HTTP ${res.status}`;
+      return { response: null, error: hint };
+    }
+    return { response: (await res.json()) as ApiPortfolioResponse };
   } catch {
-    return null;
+    return { response: null, error: 'Could not reach portfolio API' };
   }
 }
 
@@ -169,18 +195,34 @@ export function usePortfolio(): UsePortfolioResult {
     let cancelled = false;
     (async () => {
       try {
-        const api = await loadFromApi();
+        const health = await loadHealth();
         if (cancelled) return;
 
-        if (api?.cloudStorage) setCloudEnabled(true);
+        const cloudStorage = health?.cloudStorage ?? false;
+        setCloudEnabled(cloudStorage);
+
+        const { response: api, error: apiError } = await loadFromApi();
+        if (cancelled) return;
 
         if (api?.portfolio) {
           const normalized = normalizePortfolio(api.portfolio);
           setPortfolio(normalized);
           setSource(api.source === 'cloud' ? 'cloud' : 'file');
           saveLocal(normalized);
-          setSyncStatus(api.cloudStorage ? 'saved' : 'idle');
+          setSyncStatus(cloudStorage ? 'saved' : 'idle');
+          if (api.upgradedFromVersion != null) {
+            console.info(
+              `Portfolio seed upgraded in cloud: v${api.upgradedFromVersion} → v${api.seedVersion ?? normalized.seedVersion}`,
+            );
+          }
           return;
+        }
+
+        if (cloudStorage) {
+          throw new Error(
+            apiError ??
+              'Cloud storage is enabled but the portfolio could not be loaded. Refresh or try Reset to defaults.',
+          );
         }
 
         const stored = loadFromStorage();
