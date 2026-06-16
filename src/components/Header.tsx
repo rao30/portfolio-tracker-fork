@@ -6,6 +6,7 @@ interface HeaderProps {
   cloudEnabled: boolean;
   onReset: () => void;
   onExport: () => void;
+  onScheduleOfRealEstate?: () => void;
   compact?: boolean;
 }
 
@@ -51,6 +52,7 @@ export function Header({
   cloudEnabled,
   onReset,
   onExport,
+  onScheduleOfRealEstate,
   compact = false,
 }: HeaderProps) {
   const sync = syncLabel(syncStatus, cloudEnabled);
@@ -135,6 +137,15 @@ export function Header({
         >
           Reset to defaults
         </button>
+        {onScheduleOfRealEstate ? (
+          <button
+            type="button"
+            onClick={onScheduleOfRealEstate}
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-slate-200 transition hover:bg-white/10"
+          >
+            Schedule of Real Estate
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={onExport}

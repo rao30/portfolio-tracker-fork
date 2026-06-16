@@ -13,6 +13,7 @@ import { PayoffTimeline } from './components/PayoffTimeline';
 import { PortfolioDashboard } from './components/PortfolioDashboard';
 import { PropertyInsights } from './components/PropertyInsights';
 import { PropertyTable } from './components/PropertyTable';
+import { ScheduleOfRealEstateModal } from './components/ScheduleOfRealEstateModal';
 import { ScenarioControls } from './components/ScenarioControls';
 import { StrategyComparison } from './components/StrategyComparison';
 import { TaxPlanner } from './components/TaxPlanner';
@@ -57,6 +58,7 @@ function App() {
   const [activeStrategy, setActiveStrategy] = useState<StrategyId>('highestRate');
   const [scenario, setScenario] = useState<ScenarioConfig>(SCENARIO_PRESETS[0]);
   const [portfolioYear, setPortfolioYear] = useState(1);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
 
   const budgetMax = useMemo(() => {
     if (!portfolio) return 20000;
@@ -184,6 +186,7 @@ function App() {
               cloudEnabled={cloudEnabled}
               onReset={() => void resetFromFile()}
               onExport={exportJson}
+              onScheduleOfRealEstate={() => setScheduleOpen(true)}
               compact
             />
             <div className="app-surface space-y-4 p-4">
@@ -278,6 +281,13 @@ function App() {
               </button>
               <button
                 type="button"
+                onClick={() => setScheduleOpen(true)}
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200"
+              >
+                Schedule of Real Estate
+              </button>
+              <button
+                type="button"
                 onClick={exportJson}
                 className="rounded-lg bg-cyan-600 px-3 py-2 text-sm font-medium text-white"
               >
@@ -291,6 +301,15 @@ function App() {
         )}
 
         <MobileNav active={mobileTab} onChange={setMobileTab} />
+
+        <ScheduleOfRealEstateModal
+          open={scheduleOpen}
+          onClose={() => setScheduleOpen(false)}
+          portfolio={portfolio}
+          result={activeResult}
+          year={portfolioYear}
+          scenario={scenario}
+        />
       </div>
     );
   }
@@ -303,6 +322,16 @@ function App() {
         cloudEnabled={cloudEnabled}
         onReset={() => void resetFromFile()}
         onExport={exportJson}
+        onScheduleOfRealEstate={() => setScheduleOpen(true)}
+      />
+
+      <ScheduleOfRealEstateModal
+        open={scheduleOpen}
+        onClose={() => setScheduleOpen(false)}
+        portfolio={portfolio}
+        result={activeResult}
+        year={portfolioYear}
+        scenario={scenario}
       />
 
       <Controls {...controlProps} />
