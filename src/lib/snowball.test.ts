@@ -559,8 +559,9 @@ describe('normalizePortfolio', () => {
         },
       ],
     });
-    expect(p.properties[0].closeMonth).toBe(25);
+    expect(p.properties[0].closeMonth).toBe(36);
     expect(p.properties[0].closeYear).toBe(2028);
+    expect(p.properties[0].closeMonthCalendar).toBe(12);
   });
 
   it('applies DeSoto tax and insurance defaults on load', () => {
@@ -659,7 +660,7 @@ describe('computePortfolioYearMetrics', () => {
     expect(m!.ownedCount).toBeGreaterThan(0);
     const simCashflowAnnual = result.history[0]!.monthlyCashflow * 12;
     const rentalCashflowAnnual = computeRentalCashflowAtMonth(portfolio, result, 1) * 12;
-    expect(rentalCashflowAnnual).toBeGreaterThan(simCashflowAnnual);
+    expect(rentalCashflowAnnual).toBeGreaterThanOrEqual(simCashflowAnnual);
     expect(m!.cashflowAnnual).toBe(rentalCashflowAnnual);
     expect(m!.noiAnnual).toBe(
       (result.history[0]!.monthlyRent - result.history[0]!.monthlyExpenses) * 12,
@@ -921,8 +922,8 @@ describe('close schedule and balloon', () => {
       defaultCapexReserveRate: 0.1,
       allowIncomplete: true,
     });
-    expect(r.history[0].monthlyCashflow).toBeGreaterThan(650);
-    expect(r.history[0].monthlyCashflow).toBeLessThan(750);
+    expect(r.history[11].monthlyCashflow).toBeGreaterThan(650);
+    expect(r.history[11].monthlyCashflow).toBeLessThan(750);
 
     const primary = portfolio.properties.find((p) =>
       p.name.startsWith('Primary 2026'),
@@ -932,7 +933,7 @@ describe('close schedule and balloon', () => {
       extraMonthlyBudget: 0,
       snowballCashflow: false,
       strategyName: 'test',
-      maxMonths: 24,
+      maxMonths: 36,
       defaultCapexReserveRate: 0.1,
       allowIncomplete: true,
     });
@@ -948,18 +949,19 @@ describe('close schedule and balloon', () => {
       ),
     );
     const primary = portfolio.properties.find((p) => p.name.startsWith('Primary 2026'))!;
-    expect(isOwnerOccupiedAtMonth(primary, 1)).toBe(true);
+    expect(isOwnerOccupiedAtMonth(primary, 1)).toBe(false);
+    expect(isOwnerOccupiedAtMonth(primary, 12)).toBe(true);
     expect(isOwnerOccupiedAtMonth(primary, 13)).toBe(false);
 
     const result = runSimulation(portfolio, 'highestRate');
-    const insights = computePropertyInsightsAtMonth(portfolio, result, 1);
-    const primaryInsight = insights.find((p) => p.name.startsWith('Primary 2026'));
+    const insightsMonth12 = computePropertyInsightsAtMonth(portfolio, result, 12);
+    const primaryInsight = insightsMonth12.find((p) => p.name.startsWith('Primary 2026'));
     expect(primaryInsight?.excludedFromRentalCashflow).toBe(true);
 
-    const rentalSum = insights
+    const rentalSum = insightsMonth12
       .filter((p) => !p.excludedFromRentalCashflow)
       .reduce((s, p) => s + p.cashflowAnnual, 0);
-    expect(computeRentalCashflowAtMonth(portfolio, result, 1) * 12).toBeCloseTo(
+    expect(computeRentalCashflowAtMonth(portfolio, result, 12) * 12).toBeCloseTo(
       rentalSum,
       0,
     );
@@ -982,7 +984,7 @@ describe('close schedule and balloon', () => {
       monthForPortfolioYear(5),
     );
     expect(y1.length).toBeLessThan(y5.length);
-    expect(y1.length).toBeGreaterThanOrEqual(7);
+    expect(y1.length).toBeGreaterThanOrEqual(5);
     const metricsY1 = computePortfolioYearMetrics(portfolio, result, 1);
     expect(y1.length).toBe(metricsY1?.ownedCount);
   });
@@ -1003,18 +1005,21 @@ describe('close schedule and balloon', () => {
     const shady116 = portfolio.properties.find((p) =>
       p.name.startsWith('116/118'),
     );
-    expect(shady116?.closeMonth).toBe(1);
+    expect(shady116?.closeMonth).toBe(6);
     expect(shady116?.closeYear).toBe(2026);
+    expect(shady116?.closeMonthCalendar).toBe(6);
     const seller = portfolio.properties.find((p) =>
       p.name.startsWith('144/146'),
     );
     expect(seller?.refiYear).toBe(2031);
-    expect(seller?.refiSimMonth).toBe(61);
+    expect(seller?.refiMonthCalendar).toBe(6);
+    expect(seller?.refiSimMonth).toBe(66);
     expect(seller?.balloonRefiAnnualRate).toBe(0.0675);
     const deborah = portfolio.properties.find((p) => p.name.startsWith('1419'));
-    expect(deborah?.closeMonth).toBe(37);
+    expect(deborah?.closeMonth).toBe(48);
     expect(deborah?.refiYear).toBe(2034);
-    expect(deborah?.refiSimMonth).toBe(97);
+    expect(deborah?.refiMonthCalendar).toBe(12);
+    expect(deborah?.refiSimMonth).toBe(108);
   });
 
   it('reads close and refi dates from JSON via resolvePropertySchedule', () => {
@@ -1037,6 +1042,8 @@ describe('close schedule and balloon', () => {
     );
     expect(schedule.closeMonth).toBe(13);
     expect(schedule.refiSimMonth).toBe(73);
+    expect(schedule.refiYear).toBe(2032);
+    expect(schedule.refiMonthCalendar).toBe(1);
     expect(schedule.refiYear).toBe(2032);
     expect(schedule.balloonRefiAnnualRate).toBe(0.0675);
   });

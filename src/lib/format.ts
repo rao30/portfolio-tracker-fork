@@ -94,6 +94,33 @@ export function calendarToSimMonth(
   return (year - anchorYear) * 12 + (month - anchorMonth) + 1;
 }
 
+/** Calendar year/month for a simulation month given the anchor date for month 1. */
+export function simMonthToCalendar(
+  simMonth: number,
+  anchorYear: number,
+  anchorMonth = 1,
+): { year: number; month: number } {
+  const zeroBased = anchorMonth - 1 + simMonth - 1;
+  return {
+    year: anchorYear + Math.floor(zeroBased / 12),
+    month: (zeroBased % 12) + 1,
+  };
+}
+
+/** Simulation month for today's calendar date vs portfolio anchor. */
+export function currentSimulationMonth(
+  anchorYear: number,
+  anchorMonth = 1,
+  asOf = new Date(),
+): number {
+  return calendarToSimMonth(
+    asOf.getFullYear(),
+    asOf.getMonth() + 1,
+    anchorYear,
+    anchorMonth,
+  );
+}
+
 /** Simulation month when a property closes in January of closeYear. */
 export function closeMonthFromYear(
   closeYear: number,

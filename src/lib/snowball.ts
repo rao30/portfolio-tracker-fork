@@ -1,4 +1,4 @@
-import { calendarToSimMonth } from './format';
+import { calendarToSimMonth, simMonthToCalendar } from './format';
 import { computeMonthlyPayment } from './tax';
 import type {
   ExpenseBreakdown,
@@ -28,6 +28,8 @@ const DEFAULT_EXPENSE_INFLATION = 0.02;
 export const DEFAULT_CAPEX_RESERVE_RATE = 0.05;
 export const DEFAULT_VACANCY_RATE = 0.05;
 const DEFAULT_BALLOON_REFI_RATE = 0.0675;
+/** Default calendar month for projected acquisitions without an explicit close date. */
+export const DEFAULT_PROJECTED_CLOSE_MONTH = 12;
 const DEFAULT_BALLOON_REFI_TERM_MONTHS = 360;
 
 /** Fixed-rate monthly P&I from principal, annual rate, and term. */
@@ -1731,7 +1733,9 @@ export function resolvePropertySchedule(
   } else if (typeof raw.close_year === 'number') {
     closeYear = raw.close_year;
     closeMonthCalendar =
-      typeof raw.close_month_calendar === 'number' ? raw.close_month_calendar : 1;
+      typeof raw.close_month_calendar === 'number'
+        ? raw.close_month_calendar
+        : DEFAULT_PROJECTED_CLOSE_MONTH;
     closeMonth = calendarToSimMonth(
       closeYear,
       closeMonthCalendar,
@@ -1751,7 +1755,12 @@ export function resolvePropertySchedule(
   let refiMonthCalendar: number | undefined;
   let refiSimMonth: number | undefined;
 
-  if (typeof raw.refi_year === 'number') {
+  if (balloonMonths != null) {
+    refiSimMonth = closeMonth + balloonMonths;
+    const refiCal = simMonthToCalendar(refiSimMonth, anchorYear, anchorMonth);
+    refiYear = refiCal.year;
+    refiMonthCalendar = refiCal.month;
+  } else if (typeof raw.refi_year === 'number') {
     refiYear = raw.refi_year;
     refiMonthCalendar = typeof raw.refi_month === 'number' ? raw.refi_month : 1;
     refiSimMonth = calendarToSimMonth(
@@ -1760,8 +1769,6 @@ export function resolvePropertySchedule(
       anchorYear,
       anchorMonth,
     );
-  } else if (balloonMonths != null) {
-    refiSimMonth = closeMonth + balloonMonths;
   }
 
   const isSeller =
@@ -2190,8 +2197,9 @@ export function denormalizePortfolio(
       }
       if (p.closeYear !== undefined) {
         file.close_year = p.closeYear;
-        if (p.closeMonthCalendar !== undefined && p.closeMonthCalendar !== 1) {
-          file.close_month_calendar = p.closeMonthCalendar;
+        const closeCal = p.closeMonthCalendar ?? DEFAULT_PROJECTED_CLOSE_MONTH;
+        if (closeCal !== DEFAULT_PROJECTED_CLOSE_MONTH) {
+          file.close_month_calendar = closeCal;
         }
       } else if (p.closeMonth !== undefined && p.closeMonth > 1) {
         file.close_month = p.closeMonth;
@@ -2204,7 +2212,7 @@ export function denormalizePortfolio(
       }
       if (p.refiYear !== undefined) {
         file.refi_year = p.refiYear;
-        if (p.refiMonthCalendar !== undefined && p.refiMonthCalendar !== 1) {
+        if (p.refiMonthCalendar !== undefined) {
           file.refi_month = p.refiMonthCalendar;
         }
       }

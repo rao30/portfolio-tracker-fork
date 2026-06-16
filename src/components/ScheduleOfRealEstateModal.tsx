@@ -4,6 +4,7 @@ import {
   formatCurrency,
   formatLtv,
   formatPercent,
+  currentSimulationMonth,
 } from '../lib/format';
 import {
   buildScheduleOfRealEstate,
@@ -14,6 +15,7 @@ import { downloadScheduleExcel } from '../lib/scheduleOfRealEstateExcel';
 import {
   maxPortfolioDashboardYear,
   monthForPortfolioYear,
+  runSimulation,
 } from '../lib/snowball';
 
 interface ScheduleOfRealEstateModalProps {
@@ -21,7 +23,6 @@ interface ScheduleOfRealEstateModalProps {
   onClose: () => void;
   portfolio: Portfolio;
   result: SimulationResult;
-  year: number;
   scenario?: ScenarioConfig | null;
 }
 
@@ -42,21 +43,33 @@ export function ScheduleOfRealEstateModal({
   onClose,
   portfolio,
   result,
-  year: initialYear,
   scenario,
 }: ScheduleOfRealEstateModalProps) {
   const maxYear = useMemo(() => maxPortfolioDashboardYear(result), [result]);
-  const [year, setYear] = useState(initialYear);
+  const defaultYear = useMemo(() => {
+    const asOfMonth = currentSimulationMonth(
+      portfolio.simulationAnchorYear ?? 2026,
+      portfolio.simulationAnchorMonth ?? 1,
+    );
+    const clamped = Math.max(1, Math.min(asOfMonth, result.history.length));
+    return Math.floor((clamped - 1) / 12) + 1;
+  }, [portfolio, result]);
+  const [year, setYear] = useState(defaultYear);
 
   useEffect(() => {
-    if (open) setYear(initialYear);
-  }, [open, initialYear]);
+    if (open) setYear(defaultYear);
+  }, [open, defaultYear]);
+
+  const scheduleResult = useMemo(
+    () => runSimulation(portfolio, 'baseline', scenario ?? undefined),
+    [portfolio, scenario],
+  );
 
   const schedule = useMemo(() => {
     if (!open) return null;
     const asOfMonth = monthForPortfolioYear(year);
-    return buildScheduleOfRealEstate(portfolio, result, asOfMonth, scenario);
-  }, [open, portfolio, result, year, scenario]);
+    return buildScheduleOfRealEstate(portfolio, scheduleResult, asOfMonth, scenario);
+  }, [open, portfolio, scheduleResult, year, scenario]);
 
   if (!open || !schedule) return null;
 
@@ -88,7 +101,8 @@ export function ScheduleOfRealEstateModal({
                 exclude debt service
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                As of {schedule.asOfLabel} · {schedule.propertyCount} properties
+                As of {schedule.asOfLabel} · {schedule.propertyCount} properties · excludes
+                projected acquisitions not yet closed
               </p>
             </div>
             <div className="flex flex-wrap gap-2">

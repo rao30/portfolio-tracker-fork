@@ -1,5 +1,6 @@
 import type { Portfolio, Property, ScenarioConfig, SimulationResult } from './types';
 import { formatMonths } from './format';
+import { DEFAULT_PROJECTED_CLOSE_MONTH } from './snowball';
 import {
   computePropertyInsightsAtMonth,
   isPropertyActiveAtMonth,
@@ -125,7 +126,7 @@ function inferPropertyType(name: string): string {
 
 function formatDateAcquired(p: Property): string {
   if (p.closeYear != null) {
-    const month = p.closeMonthCalendar ?? 1;
+    const month = p.closeMonthCalendar ?? DEFAULT_PROJECTED_CLOSE_MONTH;
     const date = new Date(p.closeYear, month - 1, 1);
     return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
   }

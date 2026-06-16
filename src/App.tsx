@@ -307,7 +307,6 @@ function App() {
           onClose={() => setScheduleOpen(false)}
           portfolio={portfolio}
           result={activeResult}
-          year={portfolioYear}
           scenario={scenario}
         />
       </div>
@@ -330,7 +329,6 @@ function App() {
         onClose={() => setScheduleOpen(false)}
         portfolio={portfolio}
         result={activeResult}
-        year={portfolioYear}
         scenario={scenario}
       />
 
