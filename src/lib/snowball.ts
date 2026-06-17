@@ -23,8 +23,8 @@ import {
 
 const BALANCE_EPSILON = 0.01;
 const DEFAULT_APPRECIATION = 0.03;
-const DEFAULT_RENT_GROWTH = 0.025;
-const DEFAULT_EXPENSE_INFLATION = 0.02;
+export const DEFAULT_RENT_GROWTH = 0.02;
+export const DEFAULT_EXPENSE_INFLATION = 0.015;
 export const DEFAULT_CAPEX_RESERVE_RATE = 0.05;
 export const DEFAULT_VACANCY_RATE = 0.05;
 const DEFAULT_BALLOON_REFI_RATE = 0.0675;
@@ -1375,6 +1375,20 @@ export function propertyGrownOperatingAtMonth(
   return operating * Math.pow(1 + expenseInflation, monthsOwned / 12);
 }
 
+export function propertyGrownUtilitiesAtMonth(
+  p: Property,
+  portfolio: Portfolio,
+  asOfMonth: number,
+): number {
+  const closeMonth = p.closeMonth ?? 1;
+  if (asOfMonth < closeMonth) return 0;
+  const monthsOwned = asOfMonth - closeMonth;
+  const expenseInflation =
+    p.annualExpenseInflationRate ?? portfolio.annualExpenseInflationRate;
+  const utilities = resolveMonthlyUtilities(p);
+  return utilities * Math.pow(1 + expenseInflation, monthsOwned / 12);
+}
+
 export function isPropertyActiveAtMonth(p: Property, asOfMonth: number): boolean {
   return (p.closeMonth ?? 1) <= asOfMonth;
 }
@@ -1402,8 +1416,9 @@ export function computePropertyCashflowAtMonth(
   const grossRent = propertyGrownRentAtMonth(p, portfolio, asOfMonth);
   const effectiveRent = grossRent * (1 - vacancy);
   const operating = propertyGrownOperatingAtMonth(p, portfolio, asOfMonth);
+  const utilities = propertyGrownUtilitiesAtMonth(p, portfolio, asOfMonth);
   const netRent =
-    effectiveRent - totalMonthlyExpenses(grossRent, operating, resolveMonthlyUtilities(p));
+    effectiveRent - totalMonthlyExpenses(grossRent, operating, utilities);
   const capexRate = resolveCapexRate(p, portfolio, scenario);
   const capexFlat = p.capexReserveFlat ?? portfolio.defaultCapexReserveFlat;
   const monthlyCapexReserve = propertyMonthlyCapex(grossRent, capexRate, capexFlat);
@@ -1456,15 +1471,16 @@ export function computePropertyInsightsAtMonth(
       const grossRent = propertyGrownRentAtMonth(p, portfolio, asOfMonth);
       const effectiveRent = grossRent * (1 - vacancy);
       const operating = propertyGrownOperatingAtMonth(p, portfolio, asOfMonth);
+      const utilities = propertyGrownUtilitiesAtMonth(p, portfolio, asOfMonth);
       const netRent =
-        effectiveRent - totalMonthlyExpenses(grossRent, operating, resolveMonthlyUtilities(p));
+        effectiveRent - totalMonthlyExpenses(grossRent, operating, utilities);
       const capexRate = resolveCapexRate(p, portfolio, scenario);
       const capexFlat = p.capexReserveFlat ?? portfolio.defaultCapexReserveFlat;
       const monthlyCapexReserve = propertyMonthlyCapex(grossRent, capexRate, capexFlat);
       const capRate = marketValue > 0 ? (netRent * 12) / marketValue : 0;
       const rankIdx = payoffOrder.indexOf(p.name);
       const noi =
-        (effectiveRent - totalMonthlyExpenses(grossRent, operating, resolveMonthlyUtilities(p))) *
+        (effectiveRent - totalMonthlyExpenses(grossRent, operating, utilities)) *
         12;
       const refiMonth = result.refinanceSchedule[p.name];
       const monthlyPayment =
@@ -1486,7 +1502,7 @@ export function computePropertyInsightsAtMonth(
         !ownerOccupied && cashInvested > 0 ? annualCf / cashInvested : 0;
       const breakEvenOccupancy =
         grossRent > 0
-          ? (totalMonthlyExpenses(grossRent, operating, resolveMonthlyUtilities(p)) +
+          ? (totalMonthlyExpenses(grossRent, operating, utilities) +
               (balance > 0 ? p.monthlyPayment : 0) +
               monthlyCapexReserve) /
             grossRent

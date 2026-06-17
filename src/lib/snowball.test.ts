@@ -17,6 +17,8 @@ import {
   computePropertyInsightsAtMonth,
   computePortfolioYearMetrics,
   computeRentalCashflowAtMonth,
+  DEFAULT_EXPENSE_INFLATION,
+  DEFAULT_RENT_GROWTH,
   isOwnerOccupiedAtMonth,
   monthForPortfolioYear,
   DESOTO_DEBORAH_MONTHLY_RENT,
@@ -26,6 +28,9 @@ import {
   normalizePortfolio,
   runSimulation,
   paymentFromPrincipal,
+  propertyGrownOperatingAtMonth,
+  propertyGrownRentAtMonth,
+  propertyGrownUtilitiesAtMonth,
   resolveMonthlyExpenses,
   resolveMonthlyUtilities,
   resolvePropertySchedule,
@@ -540,6 +545,75 @@ describe('normalizePortfolio', () => {
     expect(p.extraMonthlyBudget).toBe(5000);
     expect(p.simulationAnchorYear).toBe(2026);
     expect(p.properties[0].annualInterestRate).toBe(0.05);
+    expect(p.annualRentGrowthRate).toBe(0.02);
+    expect(p.annualExpenseInflationRate).toBe(0.015);
+  });
+
+  it('defaults rent growth to 2% and expense inflation to 1.5%', () => {
+    expect(DEFAULT_RENT_GROWTH).toBe(0.02);
+    expect(DEFAULT_EXPENSE_INFLATION).toBe(0.015);
+  });
+
+  it('compounds rent and expenses monthly in simulation', () => {
+    const props: Property[] = [
+      {
+        name: 'Growth Test',
+        balance: 100000,
+        marketValue: 100000,
+        annualInterestRate: 0,
+        annualAppreciationRate: 0,
+        monthlyPayment: 100,
+        monthlyRent: 1000,
+        monthlyExpenses: 400,
+        monthlyUtilities: 100,
+      },
+    ];
+    const portfolio = normalizePortfolio({
+      extra_monthly_budget: 0,
+      annual_rent_growth_rate: 0.02,
+      annual_expense_inflation_rate: 0.015,
+      properties: [
+        {
+          name: 'Growth Test',
+          balance: 100000,
+          market_value: 100000,
+          annual_interest_rate: 0,
+          monthly_payment: 100,
+          monthly_rent: 1000,
+          monthly_expenses: 400,
+          monthly_utilities: 100,
+        },
+      ],
+    });
+    const r = simulateSnowball(props, {
+      payoffOrder: ['Growth Test'],
+      extraMonthlyBudget: 0,
+      snowballCashflow: false,
+      annualRentGrowthRate: portfolio.annualRentGrowthRate,
+      annualExpenseInflationRate: portfolio.annualExpenseInflationRate,
+      strategyName: 'test',
+      maxMonths: 13,
+      allowIncomplete: true,
+    });
+    const month12 = r.history[11];
+    expect(month12.monthlyRent).toBeCloseTo(1000 * Math.pow(1.02, 11 / 12), 0);
+    expect(month12.monthlyOperatingExpenses).toBeCloseTo(
+      400 * Math.pow(1.015, 11 / 12),
+      0,
+    );
+    expect(month12.monthlyUtilities).toBeCloseTo(100 * Math.pow(1.015, 11 / 12), 0);
+    expect(propertyGrownRentAtMonth(props[0], portfolio, 12)).toBeCloseTo(
+      1000 * Math.pow(1.02, 11 / 12),
+      0,
+    );
+    expect(propertyGrownOperatingAtMonth(props[0], portfolio, 12)).toBeCloseTo(
+      400 * Math.pow(1.015, 11 / 12),
+      0,
+    );
+    expect(propertyGrownUtilitiesAtMonth(props[0], portfolio, 12)).toBeCloseTo(
+      100 * Math.pow(1.015, 11 / 12),
+      0,
+    );
   });
 
   it('maps close_year to closeMonth from anchor', () => {

@@ -6,8 +6,8 @@ import {
   isPropertyActiveAtMonth,
   propertyGrownRentAtMonth,
   propertyGrownOperatingAtMonth,
+  propertyGrownUtilitiesAtMonth,
   resolveCashInvested,
-  resolveMonthlyUtilities,
 } from './snowball';
 
 /** One row on a personal financial statement schedule of real estate. */
@@ -306,7 +306,7 @@ export function buildScheduleOfRealEstate(
       const insight = insightByName.get(p.name);
       const grossRentMonthly = propertyGrownRentAtMonth(p, portfolio, asOfMonth);
       const operatingMonthly = propertyGrownOperatingAtMonth(p, portfolio, asOfMonth);
-      const utilitiesMonthly = resolveMonthlyUtilities(p);
+      const utilitiesMonthly = propertyGrownUtilitiesAtMonth(p, portfolio, asOfMonth);
       const grossAnnualRent = grossRentMonthly * 12;
       const annualOperatingExpenses = (operatingMonthly + utilitiesMonthly) * 12;
       const marketValue = insight?.marketValue ?? p.marketValue;

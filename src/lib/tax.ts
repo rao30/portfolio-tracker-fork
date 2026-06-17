@@ -483,8 +483,8 @@ export function normalizeAcquisitionTemplate(
     ? buildAcquisitionTemplateFromPortfolio(portfolio)
     : buildAcquisitionTemplateFromPortfolio({
         extraMonthlyBudget: 0,
-        annualRentGrowthRate: 0.025,
-        annualExpenseInflationRate: 0.02,
+        annualRentGrowthRate: 0.02,
+        annualExpenseInflationRate: 0.015,
         reinvestSurplus: false,
         monthlyReserveTarget: 0,
         defaultVacancyRate: 0.05,
