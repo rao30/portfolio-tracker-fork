@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { BalanceChart } from './components/BalanceChart';
 import { CashflowChart } from './components/CashflowChart';
 import { Controls } from './components/Controls';
+import { StrategyLab } from './components/StrategyLab';
 import { GoalTracker } from './components/GoalTracker';
 import { Header } from './components/Header';
 import { IncomeVsExpenseChart } from './components/IncomeVsExpenseChart';
@@ -31,7 +32,9 @@ import {
 import type { ScenarioConfig } from './lib/types';
 import { useIsMobile } from './lib/useMediaQuery';
 import { usePortfolio } from './lib/usePortfolio';
+import { useStrategyLab } from './lib/useStrategyLab';
 import { useAuth } from './context/AuthContext';
+import type { StrategyLabPin } from './lib/strategyLab';
 
 function DashboardApp() {
   const {
@@ -68,6 +71,24 @@ function DashboardApp() {
   const [portfolioYear, setPortfolioYear] = useState(1);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [marketValuesRefreshing, setMarketValuesRefreshing] = useState(false);
+
+  const handleApplyLabPin = useCallback(
+    (pin: StrategyLabPin) => {
+      setScenario(pin.scenario);
+      setActiveStrategy(pin.strategy);
+      setBudget(pin.extraBudget);
+    },
+    [setBudget],
+  );
+
+  const strategyLab = useStrategyLab({
+    userId: user?.id,
+    cloudEnabled,
+    currentScenario: scenario,
+    currentStrategy: activeStrategy,
+    currentBudget: portfolio?.extraMonthlyBudget ?? 0,
+    onApplyPin: handleApplyLabPin,
+  });
 
   const handleSave = () => {
     void (async () => {
@@ -228,6 +249,22 @@ function DashboardApp() {
             />
             <div className="app-surface space-y-4 p-4">
               <Controls {...controlProps} mode="primary" embedded />
+              {portfolio && (
+                <StrategyLab
+                  portfolio={portfolio}
+                  state={strategyLab.state}
+                  loading={strategyLab.loading}
+                  syncing={strategyLab.syncing}
+                  toast={strategyLab.toast}
+                  currentScenario={scenario}
+                  currentStrategy={activeStrategy}
+                  currentBudget={portfolio.extraMonthlyBudget}
+                  onPin={strategyLab.pinCurrent}
+                  onApply={strategyLab.applySlot}
+                  onUnpin={strategyLab.unpinSlot}
+                  embedded
+                />
+              )}
               <div className="border-t border-white/10 pt-4">
                 <ScenarioControls
                   portfolio={portfolio}
@@ -383,6 +420,20 @@ function DashboardApp() {
       />
 
       <Controls {...controlProps} />
+
+      <StrategyLab
+        portfolio={portfolio}
+        state={strategyLab.state}
+        loading={strategyLab.loading}
+        syncing={strategyLab.syncing}
+        toast={strategyLab.toast}
+        currentScenario={scenario}
+        currentStrategy={activeStrategy}
+        currentBudget={portfolio.extraMonthlyBudget}
+        onPin={strategyLab.pinCurrent}
+        onApply={strategyLab.applySlot}
+        onUnpin={strategyLab.unpinSlot}
+      />
 
       <PortfolioDashboard
         portfolio={portfolio}
