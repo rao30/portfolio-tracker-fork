@@ -16,6 +16,7 @@ import { PropertyTable } from './components/PropertyTable';
 import { ScheduleOfRealEstateModal } from './components/ScheduleOfRealEstateModal';
 import { ScenarioControls } from './components/ScenarioControls';
 import { StrategyLab } from './components/StrategyLab';
+import { TimelineStudio } from './components/TimelineStudio';
 import { StrategyComparison } from './components/StrategyComparison';
 import { TaxPlanner } from './components/TaxPlanner';
 import { WealthCompositionChart } from './components/WealthCompositionChart';
@@ -60,6 +61,8 @@ function DashboardApp() {
     resetFromFile,
     exportJson,
     refreshMarketValues,
+    applyTimelineEvents,
+    clearTimelineEvents,
   } = usePortfolio();
   const { user, signOut } = useAuth();
   const strategyLab = useStrategyLab();
@@ -239,6 +242,18 @@ function DashboardApp() {
                   embedded
                 />
               </div>
+              <div className="border-t border-white/10 pt-4">
+                <TimelineStudio
+                  portfolio={portfolio}
+                  strategyId={activeStrategy}
+                  monthsToPayoff={activeResult.monthsToPayoff}
+                  cloudEnabled={cloudEnabled}
+                  userId={user?.id}
+                  onApplyEvents={applyTimelineEvents}
+                  onClearEvents={clearTimelineEvents}
+                  embedded
+                />
+              </div>
             </div>
             <PortfolioDashboard
               portfolio={portfolio}
@@ -412,6 +427,16 @@ function DashboardApp() {
         portfolio={portfolio}
         scenarioId={scenario.id}
         onScenarioChange={setScenario}
+      />
+
+      <TimelineStudio
+        portfolio={portfolio}
+        strategyId={activeStrategy}
+        monthsToPayoff={activeResult.monthsToPayoff}
+        cloudEnabled={cloudEnabled}
+        userId={user?.id}
+        onApplyEvents={applyTimelineEvents}
+        onClearEvents={clearTimelineEvents}
       />
 
       <StrategyLab

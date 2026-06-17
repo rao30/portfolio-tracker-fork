@@ -27,6 +27,13 @@ import {
 } from './server/strategy-lab-store.js';
 import { bootstrapAdminUserIfConfigured } from './server/startup-bootstrap.js';
 import { getSupabaseClientConfig } from './server/client-config.js';
+import { refreshPortfolioMarketValues } from './server/market-values.js';
+import {
+  createTimelineScenario,
+  deleteTimelineScenario,
+  isTimelineScenariosEnabled,
+  listTimelineScenarios,
+} from './server/timeline-scenarios.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -233,6 +240,56 @@ app.put('/api/portfolio', requirePortfolioWebAccess, async (req, res) => {
     console.error('PUT /api/portfolio', err);
     res.status(500).json({
       error: err instanceof Error ? err.message : 'Failed to save portfolio',
+    });
+  }
+});
+
+function requireTimelineCloudUser(req, res, next) {
+  if (!isTimelineScenariosEnabled()) {
+    res.status(503).json({ error: 'Cloud storage is not configured' });
+    return;
+  }
+  if (!req.supabaseUser?.id) {
+    res.status(401).json({ error: 'Sign in required to sync timeline scenarios' });
+    return;
+  }
+  next();
+}
+
+app.get('/api/timeline-scenarios', requirePortfolioWebAccess, requireTimelineCloudUser, async (req, res) => {
+  try {
+    const scenarios = await listTimelineScenarios(req.supabaseUser.id);
+    res.json({ scenarios });
+  } catch (err) {
+    console.error('GET /api/timeline-scenarios', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to list timeline scenarios',
+    });
+  }
+});
+
+app.post('/api/timeline-scenarios', requirePortfolioWebAccess, requireTimelineCloudUser, async (req, res) => {
+  try {
+    const scenario = await createTimelineScenario(req.supabaseUser.id, req.body ?? {});
+    res.status(201).json({ scenario });
+  } catch (err) {
+    console.error('POST /api/timeline-scenarios', err);
+    const status = err.message?.includes('already exists') ? 409 : 400;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to create timeline scenario',
+    });
+  }
+});
+
+app.delete('/api/timeline-scenarios/:id', requirePortfolioWebAccess, requireTimelineCloudUser, async (req, res) => {
+  try {
+    await deleteTimelineScenario(req.supabaseUser.id, req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('DELETE /api/timeline-scenarios/:id', err);
+    const status = err.message === 'Scenario not found' ? 404 : 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to delete timeline scenario',
     });
   }
 });
