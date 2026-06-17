@@ -22,14 +22,17 @@ function syncLabel(
   syncStatus: SyncStatus,
   cloudEnabled: boolean,
   isDirty: boolean,
+  saving: boolean,
 ): string | null {
+  if (saving) return 'Syncing…';
+  if (isDirty && cloudEnabled) return 'Unsaved — auto-save soon';
   if (isDirty) return 'Unsaved changes';
   if (!cloudEnabled) return null;
   switch (syncStatus) {
     case 'saving':
-      return 'Saving…';
+      return 'Syncing…';
     case 'saved':
-      return 'Saved';
+      return 'Synced';
     case 'error':
       return 'Save failed';
     default:
@@ -54,7 +57,7 @@ export function Header({
   userEmail,
   compact = false,
 }: HeaderProps) {
-  const sync = syncLabel(syncStatus, cloudEnabled, isDirty);
+  const sync = syncLabel(syncStatus, cloudEnabled, isDirty, saving);
 
   const saveButton =
     onSave && isDirty ? (

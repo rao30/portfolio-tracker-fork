@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { ExpenseBreakdown, Portfolio, Property, PropertyDraft } from '../lib/types';
 import {
   editPercentValue,
@@ -15,12 +15,20 @@ import {
 } from '../lib/snowball';
 import { AddPropertyModal } from './AddPropertyModal';
 import { ExpenseBreakdownEditor } from './ExpenseBreakdownEditor';
+import { FinancingEditor } from './FinancingEditor';
+import {
+  financingBadgeLabel,
+  resolveFinancingType,
+  type PropertyFinancingPatch,
+} from '../lib/propertyFinancing';
 
 interface PropertyTableProps {
   portfolio: Portfolio;
   onUpdate: (index: number, field: keyof Property, value: string) => void;
   onUpdateAcquisitionDate?: (index: number, value: string) => void;
   onExpenseBreakdownChange?: (index: number, breakdown: ExpenseBreakdown) => void;
+  onFinancingChange?: (index: number, patch: PropertyFinancingPatch) => void;
+  onDeriveFinancingFromCap?: (index: number, balance: number, monthlyPayment: number) => void;
   onAdd: (property: PropertyDraft) => void;
   onRemove: (index: number) => void;
   mobileCards?: boolean;
@@ -87,6 +95,19 @@ const CURRENCY_FIELDS = new Set<EditableField>([
   'purchasePrice',
   'cashInvested',
 ]);
+
+function financingBadgeClass(p: Property, asOfMonth: number): string {
+  const type = resolveFinancingType(p);
+  if (type === 'conventional') return 'border-slate-600/50 bg-slate-800/50 text-slate-400';
+  const label = financingBadgeLabel(p, asOfMonth);
+  if (label.includes('mo')) return 'border-red-500/40 bg-red-500/15 text-red-300';
+  if (label.includes('yr') && parseInt(label, 10) <= 2) {
+    return 'border-amber-500/40 bg-amber-500/15 text-amber-300';
+  }
+  return 'border-violet-500/40 bg-violet-500/15 text-violet-300';
+}
+
+type ExpandPanel = 'financing' | 'expenses';
 
 function closeYearLabel(p: Property, anchorYear: number): string | null {
   if (p.closeYear != null) return String(p.closeYear);
@@ -284,6 +305,8 @@ export function PropertyTable({
   onUpdate,
   onUpdateAcquisitionDate,
   onExpenseBreakdownChange,
+  onFinancingChange,
+  onDeriveFinancingFromCap,
   onAdd,
   onRemove,
   mobileCards = false,
@@ -294,14 +317,49 @@ export function PropertyTable({
   onDiscard,
 }: PropertyTableProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [expandedRow, setExpandedRow] = useState<number | null>(null);
+  const [expandPanel, setExpandPanel] = useState<{ index: number; panel: ExpandPanel } | null>(
+    null,
+  );
   const [modalOpen, setModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [financingFilter, setFinancingFilter] = useState<'all' | 'seller' | 'conventional'>(
+    'all',
+  );
+  const searchRef = useRef<HTMLInputElement>(null);
   const { properties } = portfolio;
   const anchorYear = portfolio.simulationAnchorYear ?? 2026;
   const lastProperty = properties[properties.length - 1];
   const columns = showAdvanced
     ? [...BASIC_COLUMNS, ...ADVANCED_COLUMNS]
     : BASIC_COLUMNS;
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  const filteredIndices = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return properties
+      .map((p, i) => ({ p, i }))
+      .filter(({ p }) => {
+        if (financingFilter === 'seller' && resolveFinancingType(p) !== 'seller') return false;
+        if (financingFilter === 'conventional' && resolveFinancingType(p) !== 'conventional') {
+          return false;
+        }
+        if (!q) return true;
+        return p.name.toLowerCase().includes(q);
+      })
+      .map(({ i }) => i);
+  }, [properties, searchQuery, financingFilter]);
 
   const activeProperties = properties.filter((p) =>
     isPropertyActiveAtMonth(p, asOfMonth),
@@ -331,56 +389,98 @@ export function PropertyTable({
   const totalExpenses = totals.monthlyOperating + totals.monthlyUtilities;
 
   const header = (
-    <div className="mb-3 flex items-center justify-between gap-2">
-      <div>
-        <h3 className="text-sm font-semibold text-slate-200">Portfolio</h3>
-        <p className="text-xs text-slate-500">
-          Totals: {activeProperties.length} in service · {properties.length - activeProperties.length}{' '}
-          scheduled later
-        </p>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {isDirty && onSave ? (
-          <>
-            {onDiscard ? (
+    <div className="mb-3 flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-200">Portfolio</h3>
+          <p className="text-xs text-slate-500">
+            Totals: {activeProperties.length} in service ·{' '}
+            {properties.length - activeProperties.length} scheduled later
+            {saving ? ' · syncing…' : isDirty && cloudEnabledLabel()}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {isDirty && onSave ? (
+            <>
+              {onDiscard ? (
+                <button
+                  type="button"
+                  onClick={onDiscard}
+                  disabled={saving}
+                  className="rounded-lg border border-white/10 px-2 py-1 text-xs text-slate-300 hover:bg-white/5 disabled:opacity-50"
+                >
+                  Discard
+                </button>
+              ) : null}
               <button
                 type="button"
-                onClick={onDiscard}
+                onClick={onSave}
                 disabled={saving}
-                className="rounded-lg border border-white/10 px-2 py-1 text-xs text-slate-300 hover:bg-white/5 disabled:opacity-50"
+                className="rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-cyan-500 disabled:opacity-50"
               >
-                Discard
+                {saving ? 'Saving…' : 'Save now'}
               </button>
-            ) : null}
+            </>
+          ) : null}
+          {!mobileCards && (
             <button
               type="button"
-              onClick={onSave}
-              disabled={saving}
-              className="rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-cyan-500 disabled:opacity-50"
+              onClick={() => setShowAdvanced((v) => !v)}
+              className="rounded-lg border border-white/10 px-2 py-1 text-xs text-slate-300 hover:bg-white/5"
             >
-              {saving ? 'Saving…' : 'Save changes'}
+              {showAdvanced ? 'Hide advanced' : 'Advanced columns'}
             </button>
-          </>
-        ) : null}
-        {!mobileCards && (
+          )}
           <button
             type="button"
-            onClick={() => setShowAdvanced((v) => !v)}
-            className="rounded-lg border border-white/10 px-2 py-1 text-xs text-slate-300 hover:bg-white/5"
+            onClick={() => setModalOpen(true)}
+            className="rounded-lg border border-cyan-500/30 bg-cyan-600/20 px-3 py-1.5 text-xs font-medium text-cyan-200 hover:bg-cyan-600/30"
           >
-            {showAdvanced ? 'Hide advanced' : 'Advanced columns'}
+            + Add property
           </button>
-        )}
-        <button
-          type="button"
-          onClick={() => setModalOpen(true)}
-          className="rounded-lg border border-cyan-500/30 bg-cyan-600/20 px-3 py-1.5 text-xs font-medium text-cyan-200 hover:bg-cyan-600/30"
-        >
-          + Add property
-        </button>
+        </div>
       </div>
+      {!mobileCards && (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[12rem] flex-1">
+            <input
+              ref={searchRef}
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search properties… (press /)"
+              className="w-full rounded-lg border border-white/10 bg-slate-900/80 px-3 py-1.5 text-xs text-white placeholder:text-slate-500"
+            />
+          </div>
+          <div className="flex rounded-lg border border-white/10 p-0.5">
+            {(['all', 'seller', 'conventional'] as const).map((filter) => (
+              <button
+                key={filter}
+                type="button"
+                onClick={() => setFinancingFilter(filter)}
+                className={`rounded-md px-2.5 py-1 text-[11px] capitalize transition ${
+                  financingFilter === filter
+                    ? 'bg-white/10 text-white'
+                    : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                {filter === 'all' ? 'All' : filter}
+              </button>
+            ))}
+          </div>
+          {searchQuery || financingFilter !== 'all' ? (
+            <span className="text-[11px] text-slate-500">
+              {filteredIndices.length} of {properties.length}
+            </span>
+          ) : null}
+        </div>
+      )}
     </div>
   );
+
+  function cloudEnabledLabel(): string {
+    return ' · auto-save pending';
+  }
 
   if (mobileCards) {
     return (
@@ -454,11 +554,14 @@ export function PropertyTable({
           </tr>
         </thead>
         <tbody>
-          {properties.map((p, i) => {
+          {filteredIndices.map((i) => {
+            const p = properties[i];
             const active = isPropertyActiveAtMonth(p, asOfMonth);
             const closes = closeYearLabel(p, anchorYear);
             const monthlyInterest = p.balance * (p.annualInterestRate / 12);
             const piWarn = p.balance > 0 && p.monthlyPayment < monthlyInterest - 1e-6;
+            const isExpanded = expandPanel?.index === i;
+            const activePanel = isExpanded ? expandPanel.panel : null;
 
             return (
               <Fragment key={`${p.name}-${i}`}>
@@ -475,12 +578,19 @@ export function PropertyTable({
                     <td key={col.key} className="py-2 pr-2">
                       {col.key === 'name' ? (
                         <div>
-                          <EditableCell
-                            field={col.key}
-                            value={rawValue(p, col.key)}
-                            display={fieldDisplay(p, col.key)}
-                            onCommit={(v) => onUpdate(i, col.key, v)}
-                          />
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <EditableCell
+                              field={col.key}
+                              value={rawValue(p, col.key)}
+                              display={fieldDisplay(p, col.key)}
+                              onCommit={(v) => onUpdate(i, col.key, v)}
+                            />
+                            <span
+                              className={`rounded border px-1.5 py-0.5 text-[10px] font-medium ${financingBadgeClass(p, asOfMonth)}`}
+                            >
+                              {financingBadgeLabel(p, asOfMonth)}
+                            </span>
+                          </div>
                           {!active && closes && (
                             <p className="mt-0.5 text-[10px] text-slate-500">
                               Closes {closes}
@@ -516,14 +626,40 @@ export function PropertyTable({
                   </td>
                   <td className="py-2">
                     <div className="flex gap-1">
+                      {onFinancingChange && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExpandPanel(
+                              isExpanded && activePanel === 'financing'
+                                ? null
+                                : { index: i, panel: 'financing' },
+                            )
+                          }
+                          className={`text-xs hover:text-cyan-300 ${
+                            activePanel === 'financing' ? 'text-cyan-300' : 'text-slate-400'
+                          }`}
+                          title="Financing studio"
+                        >
+                          {activePanel === 'financing' ? '▾' : '◈'}
+                        </button>
+                      )}
                       {showAdvanced && onExpenseBreakdownChange && (
                         <button
                           type="button"
-                          onClick={() => setExpandedRow(expandedRow === i ? null : i)}
-                          className="text-xs text-slate-400 hover:text-cyan-300"
+                          onClick={() =>
+                            setExpandPanel(
+                              isExpanded && activePanel === 'expenses'
+                                ? null
+                                : { index: i, panel: 'expenses' },
+                            )
+                          }
+                          className={`text-xs hover:text-cyan-300 ${
+                            activePanel === 'expenses' ? 'text-cyan-300' : 'text-slate-400'
+                          }`}
                           title="Expense breakdown"
                         >
-                          {expandedRow === i ? '▾' : '▸'}
+                          {activePanel === 'expenses' ? '▾' : '▸'}
                         </button>
                       )}
                       <button
@@ -538,7 +674,23 @@ export function PropertyTable({
                     </div>
                   </td>
                 </tr>
-                {expandedRow === i && showAdvanced && onExpenseBreakdownChange && (
+                {isExpanded && activePanel === 'financing' && onFinancingChange ? (
+                  <tr key={`${p.name}-${i}-financing`}>
+                    <td colSpan={columns.length + 3} className="pb-3 pl-8 pr-2">
+                      <FinancingEditor
+                        property={p}
+                        portfolio={portfolio}
+                        asOfMonth={asOfMonth}
+                        onChange={(patch) => onFinancingChange(i, patch)}
+                        onDeriveFromCap={(balance, monthlyPayment) => {
+                          onFinancingChange(i, { balance, monthlyPayment });
+                          onDeriveFinancingFromCap?.(i, balance, monthlyPayment);
+                        }}
+                      />
+                    </td>
+                  </tr>
+                ) : null}
+                {isExpanded && activePanel === 'expenses' && onExpenseBreakdownChange ? (
                   <tr key={`${p.name}-${i}-breakdown`}>
                     <td colSpan={columns.length + 3} className="pb-3 pl-8 pr-2">
                       <ExpenseBreakdownEditor
@@ -547,7 +699,7 @@ export function PropertyTable({
                       />
                     </td>
                   </tr>
-                )}
+                ) : null}
               </Fragment>
             );
           })}

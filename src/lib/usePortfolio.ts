@@ -11,6 +11,10 @@ import type {
 } from './types';
 import { denormalizePortfolio, normalizePortfolio, resolveMonthlyExpenses } from './snowball';
 import { applyPropertyEventOverlays, type PropertyEventOverlay } from './timeline';
+import {
+  applyFinancingPatch,
+  type PropertyFinancingPatch,
+} from './propertyFinancing';
 import { calendarToSimMonth } from './format';
 import { bonusDepreciationForYear } from './tax';
 import { getClientConfig } from './clientConfig';
@@ -60,6 +64,7 @@ export interface UsePortfolioResult {
   updateAcquisitionDate: (index: number, value: string) => void;
   updateExpenseBreakdown: (index: number, breakdown: ExpenseBreakdown) => void;
   updatePropertyBoolean: (index: number, field: keyof Property, value: boolean) => void;
+  updatePropertyFinancing: (index: number, patch: PropertyFinancingPatch) => void;
   addProperty: (draft: PropertyDraft) => void;
   removeProperty: (index: number) => void;
   resetFromFile: () => Promise<void>;
@@ -190,6 +195,7 @@ export function usePortfolio(): UsePortfolioResult {
   const [saving, setSaving] = useState(false);
   const portfolioRef = useRef<Portfolio | null>(null);
   const savedSnapshotRef = useRef<Portfolio | null>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   portfolioRef.current = portfolio;
 
@@ -602,6 +608,30 @@ export function usePortfolio(): UsePortfolioResult {
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, [isDirty]);
 
+  useEffect(() => {
+    if (!isDirty || !cloudEnabled || saving) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      void save();
+    }, 1500);
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [isDirty, cloudEnabled, saving, portfolio, save]);
+
+  const updatePropertyFinancing = useCallback(
+    (index: number, patch: PropertyFinancingPatch) => {
+      if (!portfolio) return;
+      const props = [...portfolio.properties];
+      props[index] = applyFinancingPatch(props[index], patch);
+      persist(
+        { ...portfolio, properties: props },
+        source === 'file' ? 'local' : source,
+      );
+    },
+    [portfolio, persist, source],
+  );
+
   return {
     portfolio,
     loading,
@@ -622,6 +652,7 @@ export function usePortfolio(): UsePortfolioResult {
     updateAcquisitionDate,
     updateExpenseBreakdown,
     updatePropertyBoolean,
+    updatePropertyFinancing,
     addProperty,
     removeProperty,
     resetFromFile,

@@ -63,6 +63,7 @@ function DashboardApp() {
     updateProperty,
     updateAcquisitionDate,
     updateExpenseBreakdown,
+    updatePropertyFinancing,
     addProperty,
     removeProperty,
     resetFromFile,
@@ -383,6 +384,7 @@ function DashboardApp() {
               portfolio={portfolio}
               onUpdate={updateProperty}
               onUpdateAcquisitionDate={updateAcquisitionDate}
+              onFinancingChange={updatePropertyFinancing}
               onAdd={addProperty}
               onRemove={removeProperty}
               mobileCards
@@ -574,6 +576,7 @@ function DashboardApp() {
         onUpdate={updateProperty}
         onUpdateAcquisitionDate={updateAcquisitionDate}
         onExpenseBreakdownChange={updateExpenseBreakdown}
+        onFinancingChange={updatePropertyFinancing}
         onAdd={addProperty}
         onRemove={removeProperty}
         asOfMonth={insightMonth}
