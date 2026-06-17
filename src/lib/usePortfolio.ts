@@ -10,7 +10,10 @@ import type {
   TaxProfile,
 } from './types';
 import { denormalizePortfolio, normalizePortfolio, resolveMonthlyExpenses } from './snowball';
+import { calendarToSimMonth } from './format';
 import { bonusDepreciationForYear } from './tax';
+import { getAccessToken } from './supabaseClient';
+import { useAuth } from '../context/AuthContext';
 
 const STORAGE_KEY = 'rental-snowball-portfolio';
 const SAVE_DEBOUNCE_MS = 800;
@@ -45,12 +48,14 @@ export interface UsePortfolioResult {
   ) => void;
   updateGoals: (goals: GoalConfig[]) => void;
   updateProperty: (index: number, field: keyof Property, value: string) => void;
+  updateAcquisitionDate: (index: number, value: string) => void;
   updateExpenseBreakdown: (index: number, breakdown: ExpenseBreakdown) => void;
   updatePropertyBoolean: (index: number, field: keyof Property, value: boolean) => void;
   addProperty: (draft: PropertyDraft) => void;
   removeProperty: (index: number) => void;
   resetFromFile: () => Promise<void>;
   exportJson: () => void;
+  refreshMarketValues: () => Promise<{ ok: boolean; message: string }>;
 }
 
 function saveLocal(portfolio: Portfolio): void {
@@ -116,12 +121,23 @@ function apiHeaders(jsonBody = false): HeadersInit {
   return headers;
 }
 
+async function authorizedHeaders(jsonBody = false): Promise<HeadersInit> {
+  const headers: Record<string, string> = {};
+  if (jsonBody) headers['Content-Type'] = 'application/json';
+  const token = await getAccessToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+    return headers;
+  }
+  return apiHeaders(jsonBody);
+}
+
 async function loadFromApi(): Promise<{
   response: ApiPortfolioResponse | null;
   error?: string;
 }> {
   try {
-    const res = await fetch('/api/portfolio', { headers: apiHeaders() });
+    const res = await fetch('/api/portfolio', { headers: await authorizedHeaders() });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       const hint =
@@ -134,15 +150,15 @@ async function loadFromApi(): Promise<{
   }
 }
 
-function writeHeaders(): HeadersInit {
-  return apiHeaders(true);
+function writeHeaders(): Promise<HeadersInit> {
+  return authorizedHeaders(true);
 }
 
 async function saveToApi(file: PortfolioFile): Promise<boolean> {
   try {
     const res = await fetch('/api/portfolio', {
       method: 'PUT',
-      headers: writeHeaders(),
+      headers: await writeHeaders(),
       body: JSON.stringify({ portfolio: file }),
     });
     return res.ok;
@@ -153,6 +169,7 @@ async function saveToApi(file: PortfolioFile): Promise<boolean> {
 
 /** Load portfolio from API, localStorage, or repo JSON; persist edits to cloud + local cache. */
 export function usePortfolio(): UsePortfolioResult {
+  const { session, loading: authLoading, configured: authConfigured } = useAuth();
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -192,6 +209,13 @@ export function usePortfolio(): UsePortfolioResult {
   );
 
   useEffect(() => {
+    if (authConfigured && authLoading) return;
+    if (authConfigured && !session) {
+      setLoading(false);
+      setPortfolio(null);
+      return;
+    }
+
     let cancelled = false;
     (async () => {
       try {
@@ -248,7 +272,7 @@ export function usePortfolio(): UsePortfolioResult {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authConfigured, authLoading, session?.access_token]);
 
   const setBudget = useCallback(
     (budget: number) => {
@@ -375,6 +399,36 @@ export function usePortfolio(): UsePortfolioResult {
     [portfolio, persist, source],
   );
 
+  const updateAcquisitionDate = useCallback(
+    (index: number, value: string) => {
+      if (!portfolio) return;
+      const match = value.trim().match(/^(\d{4})-(\d{1,2})$/);
+      if (!match) return;
+      const year = Number(match[1]);
+      const month = Number(match[2]);
+      if (month < 1 || month > 12) return;
+      const props = [...portfolio.properties];
+      const current = {
+        ...props[index],
+        closeYear: year,
+        closeMonthCalendar: month,
+        acquisitionDate: value.trim(),
+        closeMonth: calendarToSimMonth(
+          year,
+          month,
+          portfolio.simulationAnchorYear ?? 2026,
+          portfolio.simulationAnchorMonth ?? 1,
+        ),
+      };
+      props[index] = current;
+      persist(
+        { ...portfolio, properties: props },
+        source === 'file' ? 'local' : source,
+      );
+    },
+    [portfolio, persist, source],
+  );
+
   const resetFromFile = useCallback(async () => {
     if (
       source !== 'file' &&
@@ -395,7 +449,7 @@ export function usePortfolio(): UsePortfolioResult {
       if (cloudEnabled) {
         const res = await fetch('/api/portfolio/reset', {
           method: 'POST',
-          headers: writeHeaders(),
+          headers: await writeHeaders(),
         });
         if (!res.ok) {
           throw new Error(`Reset failed (${res.status})`);
@@ -434,6 +488,48 @@ export function usePortfolio(): UsePortfolioResult {
     URL.revokeObjectURL(url);
   }, [portfolio]);
 
+  const refreshMarketValues = useCallback(async () => {
+    if (!portfolio) return { ok: false, message: 'No portfolio loaded' };
+    setSyncStatus('saving');
+    try {
+      const res = await fetch('/api/portfolio/market-values', {
+        method: 'POST',
+        headers: await writeHeaders(),
+        body: JSON.stringify({}),
+      });
+      const body = (await res.json()) as {
+        error?: string;
+        portfolio?: unknown;
+        results?: unknown[];
+        errors?: unknown[];
+      };
+      if (!res.ok) {
+        throw new Error(body.error ?? `Market value refresh failed (${res.status})`);
+      }
+      if (body.portfolio) {
+        const normalized = normalizePortfolio(body.portfolio);
+        setPortfolio(normalized);
+        persist(normalized, source === 'file' ? 'local' : source);
+      }
+      const count = body.results?.length ?? 0;
+      const errCount = body.errors?.length ?? 0;
+      setSyncStatus(errCount > 0 ? 'error' : 'saved');
+      return {
+        ok: errCount === 0,
+        message:
+          errCount > 0
+            ? `Updated ${count} properties; ${errCount} failed (check RENTCAST_API_KEY on server)`
+            : `Updated market values for ${count} properties`,
+      };
+    } catch (e) {
+      setSyncStatus('error');
+      return {
+        ok: false,
+        message: e instanceof Error ? e.message : 'Market value refresh failed',
+      };
+    }
+  }, [portfolio, persist, source]);
+
   useEffect(() => {
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -453,11 +549,13 @@ export function usePortfolio(): UsePortfolioResult {
     updateAcquisitionTemplate,
     updateGoals,
     updateProperty,
+    updateAcquisitionDate,
     updateExpenseBreakdown,
     updatePropertyBoolean,
     addProperty,
     removeProperty,
     resetFromFile,
     exportJson,
+    refreshMarketValues,
   };
 }

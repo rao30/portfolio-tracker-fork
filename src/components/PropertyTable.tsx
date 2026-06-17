@@ -12,6 +12,7 @@ import { ExpenseBreakdownEditor } from './ExpenseBreakdownEditor';
 interface PropertyTableProps {
   portfolio: Portfolio;
   onUpdate: (index: number, field: keyof Property, value: string) => void;
+  onUpdateAcquisitionDate?: (index: number, value: string) => void;
   onExpenseBreakdownChange?: (index: number, breakdown: ExpenseBreakdown) => void;
   onAdd: (property: PropertyDraft) => void;
   onRemove: (index: number) => void;
@@ -230,6 +231,7 @@ function PropertyCard({
 export function PropertyTable({
   portfolio,
   onUpdate,
+  onUpdateAcquisitionDate,
   onExpenseBreakdownChange,
   onAdd,
   onRemove,
@@ -370,6 +372,7 @@ export function PropertyTable({
                 {col.label}
               </th>
             ))}
+            <th className="pb-2 pr-2 font-medium">Acquired</th>
             <th className="pb-2 w-10" />
           </tr>
         </thead>
@@ -417,6 +420,20 @@ export function PropertyTable({
                       )}
                     </td>
                   ))}
+                  <td className="py-2 pr-2">
+                    {onUpdateAcquisitionDate ? (
+                      <EditableCell
+                        value={p.acquisitionDate ?? ''}
+                        display={p.acquisitionDate ?? '—'}
+                        onCommit={(v) => onUpdateAcquisitionDate(i, v)}
+                        mono
+                      />
+                    ) : (
+                      <span className="font-mono text-slate-300">
+                        {p.acquisitionDate ?? '—'}
+                      </span>
+                    )}
+                  </td>
                   <td className="py-2">
                     <div className="flex gap-1">
                       {showAdvanced && onExpenseBreakdownChange && (
@@ -443,7 +460,7 @@ export function PropertyTable({
                 </tr>
                 {expandedRow === i && showAdvanced && onExpenseBreakdownChange && (
                   <tr key={`${p.name}-${i}-breakdown`}>
-                    <td colSpan={columns.length + 2} className="pb-3 pl-8 pr-2">
+                    <td colSpan={columns.length + 3} className="pb-3 pl-8 pr-2">
                       <ExpenseBreakdownEditor
                         property={p}
                         onChange={(b) => onExpenseBreakdownChange(i, b)}
@@ -479,6 +496,7 @@ export function PropertyTable({
             <td className="pt-2 font-mono tabular-nums">
               {formatCurrency(totals.monthlyUtilities)}
             </td>
+            <td className="pt-2">—</td>
             {showAdvanced &&
               ADVANCED_COLUMNS.map((col) => (
                 <td key={col.key} className="pt-2">

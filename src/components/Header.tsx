@@ -7,6 +7,9 @@ interface HeaderProps {
   onReset: () => void;
   onExport: () => void;
   onScheduleOfRealEstate?: () => void;
+  onRefreshMarketValues?: () => void;
+  onSignOut?: () => void;
+  userEmail?: string | null;
   compact?: boolean;
 }
 
@@ -53,6 +56,10 @@ export function Header({
   onReset,
   onExport,
   onScheduleOfRealEstate,
+  onRefreshMarketValues,
+  marketValuesRefreshing = false,
+  onSignOut,
+  userEmail,
   compact = false,
 }: HeaderProps) {
   const sync = syncLabel(syncStatus, cloudEnabled);
@@ -146,6 +153,17 @@ export function Header({
             Schedule of Real Estate
           </button>
         ) : null}
+        {onRefreshMarketValues ? (
+          <button
+            type="button"
+            onClick={onRefreshMarketValues}
+            disabled={marketValuesRefreshing}
+            title="Pull latest AVM estimates (RentCast; needs RENTCAST_API_KEY on server)"
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-slate-200 transition hover:bg-white/10 disabled:opacity-50"
+          >
+            {marketValuesRefreshing ? 'Updating values…' : 'Update values'}
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={onExport}
@@ -153,6 +171,18 @@ export function Header({
         >
           Export JSON
         </button>
+        {userEmail ? (
+          <span className="hidden text-xs text-slate-500 sm:inline">{userEmail}</span>
+        ) : null}
+        {onSignOut ? (
+          <button
+            type="button"
+            onClick={onSignOut}
+            className="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-slate-300 hover:bg-white/5"
+          >
+            Sign out
+          </button>
+        ) : null}
       </div>
     </header>
   );

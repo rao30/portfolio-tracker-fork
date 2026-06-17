@@ -12,12 +12,14 @@ import {
 } from './server/auth.js';
 import { buildWwwAuthenticateHeader } from './server/oauth.js';
 import { createOAuthRouter } from './server/oauth-routes.js';
+import { isSupabaseAuthEnabled } from './server/supabase-auth.js';
 import {
   isCloudStorageEnabled,
   loadPortfolio,
   resetPortfolioToSeed,
   savePortfolio,
 } from './server/portfolio-store.js';
+import { bootstrapAdminUserIfConfigured } from './server/startup-bootstrap.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,14 +44,15 @@ app.get('/api/health', (_req, res) => {
     cloudStorage: isCloudStorageEnabled(),
     apiKeyRequired: Boolean(getPortfolioApiKey()),
     oauthEnabled: Boolean(getPortfolioApiKey()),
+    supabaseAuthEnabled: isSupabaseAuthEnabled(),
   });
 });
 
 app.use(createOAuthRouter(getRequestOrigin));
 
-app.get('/api/portfolio', requirePortfolioWebAccess, async (_req, res) => {
+app.get('/api/portfolio', requirePortfolioWebAccess, async (req, res) => {
   try {
-    const result = await loadPortfolio();
+    const result = await loadPortfolio(req.portfolioRowId);
     res.json({
       portfolio: result.data,
       source: result.source,
@@ -57,6 +60,7 @@ app.get('/api/portfolio', requirePortfolioWebAccess, async (_req, res) => {
       cloudStorage: isCloudStorageEnabled(),
       seedVersion: result.data?.seed_version,
       upgradedFromVersion: result.upgradedFromVersion,
+      userId: req.supabaseUser?.id,
     });
   } catch (err) {
     console.error('GET /api/portfolio', err);
@@ -66,9 +70,9 @@ app.get('/api/portfolio', requirePortfolioWebAccess, async (_req, res) => {
   }
 });
 
-app.post('/api/portfolio/reset', requirePortfolioWebAccess, async (_req, res) => {
+app.post('/api/portfolio/reset', requirePortfolioWebAccess, async (req, res) => {
   try {
-    const result = await resetPortfolioToSeed();
+    const result = await resetPortfolioToSeed(req.portfolioRowId);
     res.json({
       portfolio: result.data,
       source: result.source,
@@ -80,6 +84,37 @@ app.post('/api/portfolio/reset', requirePortfolioWebAccess, async (_req, res) =>
     console.error('POST /api/portfolio/reset', err);
     res.status(500).json({
       error: err instanceof Error ? err.message : 'Failed to reset portfolio',
+    });
+  }
+});
+
+app.post('/api/portfolio/market-values', requirePortfolioWebAccess, async (req, res) => {
+  const dryRun = req.body?.dryRun === true;
+
+  try {
+    const loaded = await loadPortfolio(req.portfolioRowId);
+    const portfolio = structuredClone(loaded.data);
+    const refresh = await refreshPortfolioMarketValues(portfolio, { dryRun });
+
+    if (!dryRun && refresh.results.length > 0) {
+      if (isCloudStorageEnabled()) {
+        await savePortfolio(portfolio, req.portfolioRowId);
+      }
+    }
+
+    res.json({
+      ok: refresh.errors.length === 0,
+      dryRun,
+      updatedAt: refresh.updatedAt,
+      results: refresh.results,
+      errors: refresh.errors,
+      portfolio: dryRun ? undefined : portfolio,
+      cloudSaved: !dryRun && isCloudStorageEnabled() && refresh.results.length > 0,
+    });
+  } catch (err) {
+    console.error('POST /api/portfolio/market-values', err);
+    res.status(err.message?.includes('RENTCAST') ? 503 : 500).json({
+      error: err instanceof Error ? err.message : 'Failed to refresh market values',
     });
   }
 });
@@ -97,7 +132,7 @@ app.put('/api/portfolio', requirePortfolioWebAccess, async (req, res) => {
   }
 
   try {
-    const result = await savePortfolio(portfolio);
+    const result = await savePortfolio(portfolio, req.portfolioRowId);
     res.json({ ok: true, updatedAt: result.updatedAt });
   } catch (err) {
     console.error('PUT /api/portfolio', err);
@@ -204,4 +239,7 @@ app.listen(port, host, () => {
   console.log(
     `Cloud portfolio storage: ${isCloudStorageEnabled() ? 'enabled' : 'disabled (using repo seed only)'}`,
   );
+  void bootstrapAdminUserIfConfigured().catch((err) => {
+    console.error('[bootstrap] Failed:', err instanceof Error ? err.message : err);
+  });
 });

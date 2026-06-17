@@ -176,3 +176,22 @@ export function buildTimelineTicks(maxMonth: number): number[] {
 
   return [...ticks].sort((a, b) => a - b);
 }
+
+/** Parse YYYY-MM acquisition date. */
+export function parseAcquisitionDate(value: string): { year: number; month: number } | null {
+  const match = value.trim().match(/^(\d{4})-(\d{1,2})$/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (month < 1 || month > 12) return null;
+  return { year, month };
+}
+
+export function formatAcquisitionDate(
+  closeYear?: number,
+  closeMonthCalendar?: number,
+): string | undefined {
+  if (closeYear == null) return undefined;
+  const month = closeMonthCalendar ?? 1;
+  return `${closeYear}-${String(month).padStart(2, '0')}`;
+}

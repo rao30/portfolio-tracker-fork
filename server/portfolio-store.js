@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import ws from 'ws';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORTFOLIO_ROW_ID = 'default';
+export const LEGACY_PORTFOLIO_ROW_ID = 'default';
 
 let supabase = null;
 
@@ -38,7 +38,12 @@ async function readSeedFile() {
   return JSON.parse(raw);
 }
 
-export async function loadPortfolio() {
+function resolveRowId(rowId) {
+  return rowId ?? LEGACY_PORTFOLIO_ROW_ID;
+}
+
+export async function loadPortfolio(rowId = LEGACY_PORTFOLIO_ROW_ID) {
+  const id = resolveRowId(rowId);
   const client = getSupabase();
   if (!client) {
     return { data: await readSeedFile(), source: 'file', updatedAt: null };
@@ -47,7 +52,7 @@ export async function loadPortfolio() {
   const { data: row, error } = await client
     .from('portfolio_snapshots')
     .select('data, updated_at')
-    .eq('id', PORTFOLIO_ROW_ID)
+    .eq('id', id)
     .maybeSingle();
 
   if (error) {
@@ -68,18 +73,25 @@ export async function loadPortfolio() {
       };
     }
 
-    const { error: upgradeError } = await client.from('portfolio_snapshots').upsert({
-      id: PORTFOLIO_ROW_ID,
+    const upsertPayload = {
+      id,
       data: seed,
       updated_at: new Date().toISOString(),
-    });
+    };
+    if (id !== LEGACY_PORTFOLIO_ROW_ID) {
+      upsertPayload.user_id = id;
+    }
+
+    const { error: upgradeError } = await client
+      .from('portfolio_snapshots')
+      .upsert(upsertPayload);
 
     if (upgradeError) {
       throw new Error(`Supabase seed upgrade failed: ${upgradeError.message}`);
     }
 
     console.info(
-      `Portfolio seed upgraded: cloud v${cloudVersion} → repo v${seedVersion}`,
+      `Portfolio seed upgraded (${id}): cloud v${cloudVersion} → repo v${seedVersion}`,
     );
 
     return {
@@ -90,11 +102,18 @@ export async function loadPortfolio() {
     };
   }
 
-  const { error: insertError } = await client.from('portfolio_snapshots').upsert({
-    id: PORTFOLIO_ROW_ID,
+  const upsertPayload = {
+    id,
     data: seed,
     updated_at: new Date().toISOString(),
-  });
+  };
+  if (id !== LEGACY_PORTFOLIO_ROW_ID) {
+    upsertPayload.user_id = id;
+  }
+
+  const { error: insertError } = await client
+    .from('portfolio_snapshots')
+    .upsert(upsertPayload);
 
   if (insertError) {
     throw new Error(`Supabase seed failed: ${insertError.message}`);
@@ -103,19 +122,25 @@ export async function loadPortfolio() {
   return { data: seed, source: 'cloud', updatedAt: new Date().toISOString() };
 }
 
-export async function savePortfolio(portfolioData) {
+export async function savePortfolio(portfolioData, rowId = LEGACY_PORTFOLIO_ROW_ID) {
+  const id = resolveRowId(rowId);
   const client = getSupabase();
   if (!client) {
     throw new Error('Cloud storage is not configured');
   }
 
+  const upsertPayload = {
+    id,
+    data: portfolioData,
+    updated_at: new Date().toISOString(),
+  };
+  if (id !== LEGACY_PORTFOLIO_ROW_ID) {
+    upsertPayload.user_id = id;
+  }
+
   const { data: row, error } = await client
     .from('portfolio_snapshots')
-    .upsert({
-      id: PORTFOLIO_ROW_ID,
-      data: portfolioData,
-      updated_at: new Date().toISOString(),
-    })
+    .upsert(upsertPayload)
     .select('updated_at')
     .single();
 
@@ -126,23 +151,60 @@ export async function savePortfolio(portfolioData) {
   return { updatedAt: row?.updated_at ?? new Date().toISOString() };
 }
 
-/** Overwrite cloud snapshot with the repo seed file (same as deploy defaults). */
-export async function resetPortfolioToSeed() {
+/** Overwrite cloud snapshot with the repo seed file. */
+export async function resetPortfolioToSeed(rowId = LEGACY_PORTFOLIO_ROW_ID) {
+  const id = resolveRowId(rowId);
   const seed = await readSeedFile();
   const client = getSupabase();
   if (!client) {
     return { data: seed, source: 'file', updatedAt: null };
   }
 
-  const { error } = await client.from('portfolio_snapshots').upsert({
-    id: PORTFOLIO_ROW_ID,
+  const upsertPayload = {
+    id,
     data: seed,
     updated_at: new Date().toISOString(),
-  });
+  };
+  if (id !== LEGACY_PORTFOLIO_ROW_ID) {
+    upsertPayload.user_id = id;
+  }
+
+  const { error } = await client.from('portfolio_snapshots').upsert(upsertPayload);
 
   if (error) {
     throw new Error(`Supabase reset failed: ${error.message}`);
   }
 
   return { data: seed, source: 'cloud', updatedAt: new Date().toISOString() };
+}
+
+/** Copy legacy default row to a user id (bootstrap). */
+export async function copyPortfolioRow(fromId, toId) {
+  const client = getSupabase();
+  if (!client) {
+    throw new Error('Cloud storage is not configured');
+  }
+
+  const { data: source, error: readError } = await client
+    .from('portfolio_snapshots')
+    .select('data')
+    .eq('id', fromId)
+    .maybeSingle();
+
+  if (readError) {
+    throw new Error(`Supabase read failed: ${readError.message}`);
+  }
+
+  const data = source?.data ?? (await readSeedFile());
+
+  const { error: upsertError } = await client.from('portfolio_snapshots').upsert({
+    id: toId,
+    user_id: toId,
+    data,
+    updated_at: new Date().toISOString(),
+  });
+
+  if (upsertError) {
+    throw new Error(`Supabase copy failed: ${upsertError.message}`);
+  }
 }

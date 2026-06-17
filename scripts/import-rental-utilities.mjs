@@ -12,9 +12,9 @@ const MONTH_COLS = ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'];
 const SHEET_TO_PROPERTY = {
   '731 Lisa': 'Lisa Ln (Cedar Hill)',
   '314 Brookwood': 'Brookwood (Duncanville)',
-  '1928 Wendy St': 'Wendy (Irving)',
-  '1238 Ridge Rock Ln': 'Ridge Rock (Duncanville)',
-  '2717 E Park Blvd': 'Park Blvd (Plano, projected post-move-out)',
+  '1928 Wendy St': '1928 Wendy St (Irving)',
+  '1238 Ridge Rock Ln': '1238 Ridge Rock Dr (Duncanville)',
+  '2717 E Park Blvd': '2717 E Park Blvd (Plano)',
 };
 
 function categorize(label) {

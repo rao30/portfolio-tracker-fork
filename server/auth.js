@@ -1,4 +1,5 @@
 import { getAccessToken } from './oauth-store.js';
+import { getSupabaseUserFromRequest, isSupabaseAuthEnabled } from './supabase-auth.js';
 
 function isValidOAuthAccessToken(token) {
   if (!getPortfolioApiKey()) return false;
@@ -133,37 +134,51 @@ export function describePortfolioAuthAttempt(req) {
 }
 
 /**
- * Express middleware — 401 when key is configured and missing/wrong.
- * @param {{ wwwAuthenticate?: (req: import('express').Request) => string }} [options]
+ * Portfolio UI routes: Supabase session, API key, OAuth token, or legacy same-origin.
  */
-/**
- * Portfolio UI routes: API key, OAuth token, or same-origin browser session.
- * MCP and external clients still require a key via requirePortfolioApiKey.
- */
-export function requirePortfolioWebAccess(req, res, next, options = {}) {
-  if (isPortfolioWebAccessAuthorized(req)) {
-    next();
-    return;
-  }
+export async function requirePortfolioWebAccess(req, res, next, options = {}) {
+  try {
+    if (isPortfolioApiAuthorized(req)) {
+      req.portfolioRowId = 'default';
+      next();
+      return;
+    }
 
-  const diagnostics = describePortfolioAuthAttempt(req);
-  const logMcp =
-    req.path === '/mcp' || process.env.LOG_AUTH_DEBUG === 'true';
-  if (logMcp) {
-    console.warn(
-      `[auth] ${req.method} ${req.path} unauthorized (web)`,
-      JSON.stringify(diagnostics),
-    );
-  }
+    const user = await getSupabaseUserFromRequest(req);
+    if (user) {
+      req.portfolioRowId = user.id;
+      req.supabaseUser = user;
+      next();
+      return;
+    }
 
-  if (options.wwwAuthenticate) {
-    res.set('WWW-Authenticate', options.wwwAuthenticate(req));
-  }
+    if (!isSupabaseAuthEnabled() && isSameOriginBrowserRequest(req)) {
+      req.portfolioRowId = 'default';
+      next();
+      return;
+    }
 
-  res.status(401).json({
-    error: 'Unauthorized',
-    hint: 'Open the portfolio tracker in your browser or use Authorization: Bearer <PORTFOLIO_API_KEY>',
-  });
+    const diagnostics = describePortfolioAuthAttempt(req);
+    if (req.path === '/mcp' || process.env.LOG_AUTH_DEBUG === 'true') {
+      console.warn(
+        `[auth] ${req.method} ${req.path} unauthorized (web)`,
+        JSON.stringify(diagnostics),
+      );
+    }
+
+    if (options.wwwAuthenticate) {
+      res.set('WWW-Authenticate', options.wwwAuthenticate(req));
+    }
+
+    res.status(401).json({
+      error: 'Unauthorized',
+      hint: isSupabaseAuthEnabled()
+        ? 'Sign in with your account or use Authorization: Bearer <PORTFOLIO_API_KEY>'
+        : 'Open the portfolio tracker in your browser or use Authorization: Bearer <PORTFOLIO_API_KEY>',
+    });
+  } catch (err) {
+    next(err);
+  }
 }
 
 export function requirePortfolioApiKey(req, res, next, options = {}) {

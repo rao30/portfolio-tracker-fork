@@ -1,5 +1,5 @@
 {
-  "seed_version": 13,
+  "seed_version": 18,
   "simulation_anchor_year": 2026,
   "simulation_anchor_month": 1,
   "default_refi_annual_rate": 0.0675,
@@ -24,8 +24,13 @@
     {
       "name": "Lisa Ln (Cedar Hill)",
       "financing_type": "conventional",
+      "close_year": 2020,
+      "close_month_calendar": 6,
+      "address": "731 Lisa Ln, Cedar Hill, TX 75104",
       "balance": 200841.83,
-      "market_value": 320000,
+      "market_value": 355050,
+      "market_value_source": "zillow_zestimate",
+      "market_value_updated_at": "2026-06-15",
       "annual_interest_rate": 0.0275,
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 939.67,
@@ -37,14 +42,20 @@
         "water_sewer": 174,
         "internet": 109
       },
-      "purchase_price": 320000,
-      "use_cost_seg": true
+      "purchase_price": 220000,
+      "use_cost_seg": true,
+      "acquisition_date": "2020-06"
     },
     {
       "name": "Brookwood (Duncanville)",
       "financing_type": "conventional",
+      "close_year": 2022,
+      "close_month_calendar": 7,
+      "address": "314 Brookwood Dr, Duncanville, TX 75116",
       "balance": 367904.27,
-      "market_value": 400000,
+      "market_value": 374805,
+      "market_value_source": "redfin_estimate",
+      "market_value_updated_at": "2026-06-15",
       "annual_interest_rate": 0.0425,
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 1936.67,
@@ -56,14 +67,20 @@
         "water_sewer": 227,
         "internet": 148
       },
-      "purchase_price": 550000,
-      "use_cost_seg": true
+      "purchase_price": 380000,
+      "use_cost_seg": true,
+      "acquisition_date": "2022-07"
     },
     {
-      "name": "Ridge Rock (Duncanville)",
+      "name": "1238 Ridge Rock Dr (Duncanville)",
       "financing_type": "conventional",
+      "close_year": 2024,
+      "close_month_calendar": 10,
+      "address": "1238 Ridge Rock Ln, Duncanville, TX 75116",
       "balance": 402799.55,
-      "market_value": 450000,
+      "market_value": 456000,
+      "market_value_source": "public_avm",
+      "market_value_updated_at": "2026-06-15",
       "annual_interest_rate": 0.0655,
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 2595.45,
@@ -74,14 +91,20 @@
         "electricity": 476,
         "water_sewer": 183
       },
-      "purchase_price": 620000,
-      "use_cost_seg": true
+      "purchase_price": 430000,
+      "use_cost_seg": true,
+      "acquisition_date": "2024-10"
     },
     {
-      "name": "Wendy (Irving)",
+      "name": "1928 Wendy St (Irving)",
       "financing_type": "conventional",
+      "close_year": 2022,
+      "close_month_calendar": 12,
+      "address": "1928 Wendy St, Irving, TX 75060",
       "balance": 409329.95,
-      "market_value": 460000,
+      "market_value": 462210,
+      "market_value_source": "redfin_estimate",
+      "market_value_updated_at": "2026-06-15",
       "annual_interest_rate": 0.06375,
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 2663.3,
@@ -93,14 +116,20 @@
         "electricity": 476,
         "water_sewer": 132
       },
-      "purchase_price": 630000,
-      "use_cost_seg": true
+      "purchase_price": 450000,
+      "use_cost_seg": true,
+      "acquisition_date": "2022-12"
     },
     {
-      "name": "Park Blvd (Plano, projected post-move-out)",
+      "name": "2717 E Park Blvd (Plano)",
       "financing_type": "conventional",
+      "close_year": 2025,
+      "close_month_calendar": 10,
+      "address": "2717 E Park Blvd, Plano, TX 75074",
       "balance": 468576.65,
-      "market_value": 500000,
+      "market_value": 488400,
+      "market_value_source": "zillow_zestimate",
+      "market_value_updated_at": "2026-06-15",
       "annual_interest_rate": 0.06625,
       "annual_appreciation_rate": 0.03,
       "monthly_payment": 3011.06,
@@ -110,14 +139,16 @@
         "electricity": 296,
         "water_sewer": 175
       },
-      "purchase_price": 720000,
-      "use_cost_seg": true
+      "purchase_price": 495000,
+      "use_cost_seg": true,
+      "acquisition_date": "2025-10"
     },
     {
       "name": "116/118 Shadybrook Dr (conventional)",
       "financing_type": "conventional",
       "close_year": 2026,
       "close_month_calendar": 6,
+      "address": "116 Shadybrook Dr, DeSoto, TX 75115",
       "balance": 288000,
       "market_value": 450000,
       "annual_interest_rate": 0.07,
@@ -130,13 +161,15 @@
       "purchase_price": 360000,
       "original_loan_amount": 288000,
       "remaining_term_months": 360,
-      "cash_invested": 72000
+      "cash_invested": 72000,
+      "acquisition_date": "2026-06"
     },
     {
       "name": "144/146 Shadybrook Dr (seller 6%, 5yr balloon)",
       "financing_type": "seller",
       "close_year": 2026,
       "close_month_calendar": 6,
+      "address": "144 Shadybrook Dr, DeSoto, TX 75115",
       "balloon_months": 60,
       "seller_amortization_months": 240,
       "refi_annual_rate": 0.0675,
@@ -154,7 +187,8 @@
       "original_loan_amount": 344050,
       "remaining_term_months": 240,
       "seller_payoff_cap": 344050,
-      "cash_invested": 0
+      "cash_invested": 0,
+      "acquisition_date": "2026-06"
     },
     {
       "name": "141/143 Shadybrook Dr (conventional)",
@@ -170,7 +204,8 @@
       "property_tax_rate": 0.02,
       "annual_insurance": 3100,
       "purchase_price": 450000,
-      "cash_invested": 90000
+      "cash_invested": 90000,
+      "acquisition_date": "2027-12"
     },
     {
       "name": "125/127 Larchbrook Dr (seller 6%, 5yr balloon)",
@@ -192,7 +227,8 @@
       "purchase_price": 472000,
       "seller_payoff_cap": 452000,
       "seller_credit": 20000,
-      "cash_invested": 70000
+      "cash_invested": 70000,
+      "acquisition_date": "2027-12"
     },
     {
       "name": "120/122 Idlecreek Dr (conventional)",
@@ -208,7 +244,8 @@
       "property_tax_rate": 0.02,
       "annual_insurance": 3100,
       "purchase_price": 450000,
-      "cash_invested": 78000
+      "cash_invested": 78000,
+      "acquisition_date": "2028-12"
     },
     {
       "name": "800/802 Summit Dr (seller 6%, 5yr balloon)",
@@ -230,7 +267,8 @@
       "purchase_price": 472000,
       "seller_payoff_cap": 452000,
       "seller_credit": 20000,
-      "cash_invested": 70000
+      "cash_invested": 70000,
+      "acquisition_date": "2028-12"
     },
     {
       "name": "804/806 Summit Dr (conventional)",
@@ -246,7 +284,8 @@
       "property_tax_rate": 0.02,
       "annual_insurance": 3100,
       "purchase_price": 450000,
-      "cash_invested": 78000
+      "cash_invested": 78000,
+      "acquisition_date": "2029-12"
     },
     {
       "name": "1419/1421 Deborah Dr (seller 6%, 5yr balloon)",
@@ -268,7 +307,8 @@
       "purchase_price": 380000,
       "seller_payoff_cap": 360000,
       "seller_credit": 20000,
-      "cash_invested": 56000
+      "cash_invested": 56000,
+      "acquisition_date": "2029-12"
     },
     {
       "name": "Additional rental 2026 (~450k, house hack)",
@@ -282,7 +322,8 @@
       "monthly_rent": 4283,
       "monthly_expenses": 850,
       "purchase_price": 450000,
-      "cash_invested": 84000
+      "cash_invested": 84000,
+      "acquisition_date": "2026-12"
     },
     {
       "name": "Additional rental 2027 (~450k, house hack)",
@@ -296,7 +337,8 @@
       "monthly_rent": 4283,
       "monthly_expenses": 850,
       "purchase_price": 450000,
-      "cash_invested": 84000
+      "cash_invested": 84000,
+      "acquisition_date": "2027-12"
     },
     {
       "name": "Additional rental 2028 (~450k, house hack)",
@@ -310,7 +352,8 @@
       "monthly_rent": 4283,
       "monthly_expenses": 850,
       "purchase_price": 450000,
-      "cash_invested": 84000
+      "cash_invested": 84000,
+      "acquisition_date": "2028-12"
     },
     {
       "name": "Additional rental 2029 (~450k, house hack)",
@@ -324,7 +367,8 @@
       "monthly_rent": 4283,
       "monthly_expenses": 850,
       "purchase_price": 450000,
-      "cash_invested": 84000
+      "cash_invested": 84000,
+      "acquisition_date": "2029-12"
     },
     {
       "name": "Primary 2026 → rental (house hack after move-out)",
@@ -339,7 +383,14 @@
       "monthly_expenses": 850,
       "purchase_price": 500000,
       "cash_invested": 13000,
-      "events": [{ "month": 13, "type": "rentChange", "rent": 5060 }]
+      "events": [
+        {
+          "month": 13,
+          "type": "rentChange",
+          "rent": 5060
+        }
+      ],
+      "acquisition_date": "2026-12"
     },
     {
       "name": "Primary 2027 → rental (house hack after move-out)",
@@ -354,7 +405,14 @@
       "monthly_expenses": 850,
       "purchase_price": 500000,
       "cash_invested": 13000,
-      "events": [{ "month": 25, "type": "rentChange", "rent": 5060 }]
+      "events": [
+        {
+          "month": 25,
+          "type": "rentChange",
+          "rent": 5060
+        }
+      ],
+      "acquisition_date": "2027-12"
     },
     {
       "name": "Primary 2028 → rental (house hack after move-out)",
@@ -369,7 +427,14 @@
       "monthly_expenses": 850,
       "purchase_price": 500000,
       "cash_invested": 13000,
-      "events": [{ "month": 37, "type": "rentChange", "rent": 5060 }]
+      "events": [
+        {
+          "month": 37,
+          "type": "rentChange",
+          "rent": 5060
+        }
+      ],
+      "acquisition_date": "2028-12"
     },
     {
       "name": "Primary 2029 → rental (house hack after move-out)",
@@ -384,7 +449,14 @@
       "monthly_expenses": 850,
       "purchase_price": 500000,
       "cash_invested": 13000,
-      "events": [{ "month": 49, "type": "rentChange", "rent": 5060 }]
+      "events": [
+        {
+          "month": 49,
+          "type": "rentChange",
+          "rent": 5060
+        }
+      ],
+      "acquisition_date": "2029-12"
     }
   ]
 }

@@ -797,7 +797,7 @@ describe('utilities expense', () => {
     expect(sumUtilityBreakdown(lisa.utilityBreakdown)).toBe(680);
     const brookwood = portfolio.properties.find((p) => p.name.includes('Brookwood'))!;
     expect(resolveMonthlyUtilities(brookwood)).toBe(928);
-    const wendy = portfolio.properties.find((p) => p.name.includes('Wendy'))!;
+    const wendy = portfolio.properties.find((p) => /wendy/i.test(p.name))!;
     expect(resolveMonthlyUtilities(wendy)).toBe(763);
     expect(
       portfolio.properties.every((p) => p.utilitiesRentRate == null),
@@ -1154,7 +1154,7 @@ describe('seed portfolio integration', () => {
       monthlyExpenses: 1860,
     },
     {
-      name: 'Ridge Rock (Duncanville)',
+      name: '1238 Ridge Rock Dr (Duncanville)',
       balance: 402799.55,
       marketValue: 620000,
       annualInterestRate: 0.0655,
@@ -1164,7 +1164,7 @@ describe('seed portfolio integration', () => {
       monthlyExpenses: 1722,
     },
     {
-      name: 'Wendy (Irving)',
+      name: '1928 Wendy St (Irving)',
       balance: 409329.95,
       marketValue: 630000,
       annualInterestRate: 0.06375,

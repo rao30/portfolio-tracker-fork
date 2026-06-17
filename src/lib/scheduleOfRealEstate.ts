@@ -1,8 +1,8 @@
 import type { Portfolio, Property, ScenarioConfig, SimulationResult } from './types';
 import { formatMonths, simMonthToCalendar } from './format';
-import { DEFAULT_PROJECTED_CLOSE_MONTH } from './snowball';
 import {
   computePropertyInsightsAtMonth,
+  DEFAULT_PROJECTED_CLOSE_MONTH,
   isPropertyActiveAtMonth,
   propertyGrownRentAtMonth,
   propertyGrownOperatingAtMonth,
@@ -124,14 +124,125 @@ function inferPropertyType(name: string): string {
   return 'SFR';
 }
 
-function formatDateAcquired(p: Property): string {
-  if (p.closeYear != null) {
-    const month = p.closeMonthCalendar ?? DEFAULT_PROJECTED_CLOSE_MONTH;
-    const date = new Date(p.closeYear, month - 1, 1);
-    return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+function calendarMonthsBefore(
+  year: number,
+  month: number,
+  monthsBack: number,
+): { year: number; month: number } {
+  const date = new Date(year, month - 1 - monthsBack, 1);
+  return { year: date.getFullYear(), month: date.getMonth() + 1 };
+}
+
+function loanRemainingMonths(
+  balance: number,
+  annualRate: number,
+  payment: number,
+): number | null {
+  const monthlyRate = annualRate / 12;
+  if (balance <= 0 || payment <= 0 || payment <= balance * monthlyRate + 1e-9) {
+    return null;
   }
-  if (p.placedInServiceYear != null) return String(p.placedInServiceYear);
-  return 'Prior to report';
+  return -Math.log(1 - (balance * monthlyRate) / payment) / Math.log(1 + monthlyRate);
+}
+
+function paymentImpliedPrincipal(
+  payment: number,
+  annualRate: number,
+  termMonths: number,
+): number {
+  const monthlyRate = annualRate / 12;
+  if (monthlyRate === 0) return payment * termMonths;
+  return payment * (1 - Math.pow(1 + monthlyRate, -termMonths)) / monthlyRate;
+}
+
+const STANDARD_AMORTIZATION_MONTHS = 360;
+
+function estimateOriginalLoanPrincipal(p: Property): number | null {
+  if (p.originalLoanAmount != null && p.originalLoanAmount > 0) {
+    return p.originalLoanAmount;
+  }
+  if (p.monthlyPayment > 0 && p.annualInterestRate >= 0) {
+    return paymentImpliedPrincipal(
+      p.monthlyPayment,
+      p.annualInterestRate,
+      STANDARD_AMORTIZATION_MONTHS,
+    );
+  }
+  return null;
+}
+
+/** Months since loan origination from remaining amortization vs implied original term. */
+export function estimateMonthsSinceLoanOrigination(p: Property): number | null {
+  const remaining = loanRemainingMonths(
+    p.balance,
+    p.annualInterestRate,
+    p.monthlyPayment,
+  );
+  if (remaining == null) {
+    return null;
+  }
+
+  const originalPrincipal = estimateOriginalLoanPrincipal(p);
+  if (originalPrincipal == null) {
+    return null;
+  }
+
+  const termAtOrig =
+    loanRemainingMonths(
+      originalPrincipal,
+      p.annualInterestRate,
+      p.monthlyPayment,
+    ) ?? STANDARD_AMORTIZATION_MONTHS;
+
+  const elapsed = termAtOrig - remaining;
+  if (elapsed <= 0 || elapsed > 480) {
+    return null;
+  }
+  return Math.round(elapsed);
+}
+
+/** Resolve acquisition calendar date from explicit close fields or loan amortization. */
+export function resolveAcquisitionCalendar(
+  p: Property,
+  portfolio: Portfolio,
+  asOfMonth: number,
+): { year: number; month: number } {
+  const anchorYear = portfolio.simulationAnchorYear ?? 2026;
+  const anchorMonth = portfolio.simulationAnchorMonth ?? 1;
+
+  if (p.closeYear != null) {
+    return {
+      year: p.closeYear,
+      month: p.closeMonthCalendar ?? DEFAULT_PROJECTED_CLOSE_MONTH,
+    };
+  }
+
+  const closeMonth = p.closeMonth ?? 1;
+  if (closeMonth > 1) {
+    return simMonthToCalendar(closeMonth, anchorYear, anchorMonth);
+  }
+
+  if (p.placedInServiceYear != null) {
+    return { year: p.placedInServiceYear, month: 1 };
+  }
+
+  const monthsOnLoan = estimateMonthsSinceLoanOrigination(p);
+  if (monthsOnLoan != null) {
+    const asOfCal = simMonthToCalendar(asOfMonth, anchorYear, anchorMonth);
+    return calendarMonthsBefore(asOfCal.year, asOfCal.month, monthsOnLoan);
+  }
+
+  return simMonthToCalendar(closeMonth, anchorYear, anchorMonth);
+}
+
+function formatDateAcquired(
+  p: Property,
+  portfolio: Portfolio,
+  asOfMonth: number,
+): string {
+  const { year, month } = resolveAcquisitionCalendar(p, portfolio, asOfMonth);
+  const date = new Date(year, month - 1, 1);
+  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
 function formatFinancingType(p: Property): string {
@@ -214,7 +325,7 @@ export function buildScheduleOfRealEstate(
         propertyDescription: p.name,
         propertyType: inferPropertyType(p.name),
         ownershipPercent: 1,
-        dateAcquired: formatDateAcquired(p),
+        dateAcquired: formatDateAcquired(p, portfolio, asOfMonth),
         purchasePrice: p.purchasePrice ?? p.marketValue,
         marketValue,
         loanBalance,

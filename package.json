@@ -19,7 +19,9 @@
     "mcp:stdio": "npm run build:mcp --silent && node mcp-server/dist/index.js",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "fetch-market-values": "node scripts/fetch-market-values.mjs --write public/data/portfolio.json",
+    "bootstrap-user": "node scripts/bootstrap-user.mjs"
   },
   "engines": {
     "node": ">=20"
@@ -28,6 +30,7 @@
     "@modelcontextprotocol/sdk": "^1.12.1",
     "@supabase/supabase-js": "^2.106.2",
     "express": "^4.19.2",
+    "react-router-dom": "^7.18.0",
     "ws": "^8.18.0",
     "xlsx": "^0.18.5",
     "zod": "^3.24.2"

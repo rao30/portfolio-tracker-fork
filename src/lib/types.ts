@@ -118,6 +118,13 @@ export interface Property {
   sellerPayoffCap?: number;
   /** Seller credit at closing (reduces cash invested). */
   sellerCredit?: number;
+  /** Calendar acquisition date YYYY-MM (mirrors close year/month). */
+  acquisitionDate?: string;
+  /** Full address for AVM lookups (Street, City, State Zip). */
+  address?: string;
+  /** e.g. rentcast_avm, zillow_zestimate */
+  marketValueSource?: string;
+  marketValueUpdatedAt?: string;
 }
 
 /** Fields required when adding a new property via the UI. */
@@ -216,6 +223,10 @@ export interface PropertyFile {
   seller_payoff_cap?: number;
   /** Seller credit at closing. */
   seller_credit?: number;
+  acquisition_date?: string;
+  address?: string;
+  market_value_source?: string;
+  market_value_updated_at?: string;
 }
 
 export interface UtilityBreakdownFile {

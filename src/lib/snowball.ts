@@ -1,4 +1,4 @@
-import { calendarToSimMonth, simMonthToCalendar } from './format';
+import { calendarToSimMonth, simMonthToCalendar, parseAcquisitionDate, formatAcquisitionDate } from './format';
 import { computeMonthlyPayment } from './tax';
 import type {
   ExpenseBreakdown,
@@ -1952,6 +1952,16 @@ function applyOptionalPropertyFields(prop: Property, p: Record<string, unknown>)
   if (Array.isArray(p.events)) {
     prop.events = p.events as PropertyEvent[];
   }
+
+  if (typeof p.address === 'string' && p.address.trim()) {
+    prop.address = p.address.trim();
+  }
+  if (typeof p.market_value_source === 'string') {
+    prop.marketValueSource = p.market_value_source;
+  }
+  if (typeof p.market_value_updated_at === 'string') {
+    prop.marketValueUpdatedAt = p.market_value_updated_at;
+  }
 }
 
 export function normalizePortfolio(raw: unknown): Portfolio {
@@ -2071,6 +2081,14 @@ export function normalizePortfolio(raw: unknown): Portfolio {
       prop.annualExpenseInflationRate = p.annual_expense_inflation_rate;
     }
 
+    if (typeof p.acquisition_date === 'string') {
+      const parsed = parseAcquisitionDate(p.acquisition_date);
+      if (parsed) {
+        p.close_year = parsed.year;
+        p.close_month_calendar = parsed.month;
+      }
+    }
+
     const schedule = resolvePropertySchedule(
       p,
       simulationAnchorYear,
@@ -2102,6 +2120,8 @@ export function normalizePortfolio(raw: unknown): Portfolio {
     if (schedule.balloonRefiTermMonths !== undefined) {
       prop.balloonRefiTermMonths = schedule.balloonRefiTermMonths;
     }
+
+    prop.acquisitionDate = formatAcquisitionDate(prop.closeYear, prop.closeMonthCalendar);
 
     if (typeof p.utilities_rent_rate === 'number') {
       prop.utilitiesRentRate = p.utilities_rent_rate;
@@ -2228,6 +2248,11 @@ export function denormalizePortfolio(
       if (p.sellerCredit !== undefined) {
         file.seller_credit = p.sellerCredit;
       }
+      if (p.address) file.address = p.address;
+      if (p.marketValueSource) file.market_value_source = p.marketValueSource;
+      if (p.marketValueUpdatedAt) {
+        file.market_value_updated_at = p.marketValueUpdatedAt;
+      }
       if (p.utilitiesRentRate !== undefined) {
         file.utilities_rent_rate = p.utilitiesRentRate;
       }
@@ -2243,6 +2268,7 @@ export function denormalizePortfolio(
       if (p.originalLoanAmount !== undefined) file.original_loan_amount = p.originalLoanAmount;
       if (p.remainingTermMonths !== undefined) file.remaining_term_months = p.remainingTermMonths;
       if (p.purchasePrice !== undefined) file.purchase_price = p.purchasePrice;
+      if (p.acquisitionDate) file.acquisition_date = p.acquisitionDate;
       if (p.propertyTaxRate !== undefined) file.property_tax_rate = p.propertyTaxRate;
       if (p.annualInsurance !== undefined) file.annual_insurance = p.annualInsurance;
       if (p.landPercent !== undefined) file.land_percent = p.landPercent;
@@ -2273,7 +2299,7 @@ export function denormalizePortfolio(
 }
 
 export const SEED_PROPERTY_NAMES = {
-  parkBlvd: 'Park Blvd (Plano, projected post-move-out)',
+  parkBlvd: '2717 E Park Blvd (Plano)',
   shadybrookSeller:
     '144/146 Shadybrook Dr (seller 6%, 5yr balloon)',
   lisaLn: 'Lisa Ln (Cedar Hill)',

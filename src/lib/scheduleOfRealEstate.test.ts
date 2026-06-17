@@ -3,7 +3,10 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import * as XLSX from 'xlsx';
 import { currentSimulationMonth } from './format';
-import { buildScheduleOfRealEstate } from './scheduleOfRealEstate';
+import {
+  buildScheduleOfRealEstate,
+  estimateMonthsSinceLoanOrigination,
+} from './scheduleOfRealEstate';
 import { buildScheduleWorkbook } from './scheduleOfRealEstateExcel';
 import {
   DEFAULT_PROJECTED_CLOSE_MONTH,
@@ -75,10 +78,56 @@ describe('buildScheduleOfRealEstate', () => {
     expect(shady144?.cashInvested).toBe(0);
   });
 
+  it('uses explicit acquisition dates for held properties', () => {
+    const schedule = buildScheduleOfRealEstate(portfolio, result, 6);
+    const find = (needle: string) =>
+      schedule.rows.find((r) => r.propertyDescription.includes(needle));
+
+    expect(find('Lisa Ln')?.dateAcquired).toBe('Jun 2020');
+    expect(find('Brookwood')?.dateAcquired).toBe('Jul 2022');
+    expect(find('Wendy')?.dateAcquired).toBe('Dec 2022');
+    expect(find('Ridge Rock')?.dateAcquired).toBe('Oct 2024');
+    expect(find('Park Blvd')?.dateAcquired).toBe('Oct 2025');
+
+    const lisa = portfolio.properties.find((p) => p.name.includes('Lisa Ln'))!;
+    expect(lisa.acquisitionDate).toBe('2020-06');
+    expect(find('Lisa Ln')?.purchasePrice).toBe(220_000);
+    expect(find('Brookwood')?.purchasePrice).toBe(380_000);
+    expect(find('Wendy')?.purchasePrice).toBe(450_000);
+    expect(find('Ridge Rock')?.purchasePrice).toBe(430_000);
+    expect(find('Park Blvd')?.purchasePrice).toBe(495_000);
+  });
+
+  it('back-calculates acquisition date when close year is not set', () => {
+    const shady116 = portfolio.properties.find((p) => p.name.startsWith('116/118'))!;
+    const months = estimateMonthsSinceLoanOrigination(shady116);
+    expect(months).toBeNull();
+
+    const schedule = buildScheduleOfRealEstate(portfolio, result, 6);
+    expect(schedule.rows.find((r) => r.propertyDescription.startsWith('116/118'))?.dateAcquired).toBe(
+      'Jun 2026',
+    );
+  });
+
   it('excludes future acquisitions before close month', () => {
     const scheduleY1 = buildScheduleOfRealEstate(portfolio, result, 1);
     const scheduleY3 = buildScheduleOfRealEstate(portfolio, result, 25);
     expect(scheduleY3.propertyCount).toBeGreaterThan(scheduleY1.propertyCount);
+  });
+
+  it('uses AVM-backed market values for Ridge Rock and Wendy', () => {
+    const ridge = portfolio.properties.find((p) => /ridge rock/i.test(p.name))!;
+    const wendy = portfolio.properties.find((p) => /wendy/i.test(p.name))!;
+    expect(ridge.marketValue).toBe(456_000);
+    expect(wendy.marketValue).toBe(462_210);
+    expect(ridge.address).toContain('Ridge Rock');
+    expect(wendy.address).toContain('Wendy');
+
+    const schedule = buildScheduleOfRealEstate(portfolio, result, 6);
+    const ridgeRow = schedule.rows.find((r) => /ridge rock/i.test(r.propertyDescription));
+    const wendyRow = schedule.rows.find((r) => /wendy/i.test(r.propertyDescription));
+    expect(ridgeRow?.marketValue).toBeGreaterThanOrEqual(456_000);
+    expect(wendyRow?.marketValue).toBeGreaterThanOrEqual(462_000);
   });
 });
 
