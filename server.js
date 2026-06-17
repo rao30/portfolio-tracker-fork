@@ -39,6 +39,11 @@ import {
   isTimelineScenariosEnabled,
   listTimelineScenarios,
 } from './server/timeline-scenarios.js';
+import {
+  getDecisionPulsePreferences,
+  isDecisionPulseEnabled,
+  upsertDecisionPulsePreferences,
+} from './server/decision-pulse-store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -269,6 +274,38 @@ app.delete('/api/payoff-playbook', requirePortfolioWebAccess, async (req, res) =
     console.error('DELETE /api/payoff-playbook', err);
     res.status(500).json({
       error: err instanceof Error ? err.message : 'Failed to delete Payoff Playbook',
+    });
+  }
+});
+
+app.get('/api/decision-pulse', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await getDecisionPulsePreferences(req.supabaseUser.id);
+    res.json({ preferences, enabled: isDecisionPulseEnabled() });
+  } catch (err) {
+    console.error('GET /api/decision-pulse', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load Decision Pulse preferences',
+    });
+  }
+});
+
+app.put('/api/decision-pulse', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await upsertDecisionPulsePreferences(
+      req.supabaseUser.id,
+      req.body ?? {},
+    );
+    res.json({ preferences });
+  } catch (err) {
+    console.error('PUT /api/decision-pulse', err);
+    const status = err.status ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to save Decision Pulse preferences',
     });
   }
 });

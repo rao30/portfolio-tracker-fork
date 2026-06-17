@@ -19,6 +19,7 @@ import { StrategyLab } from './components/StrategyLab';
 import { PayoffPlaybook } from './components/PayoffPlaybook';
 import { TimelineStudio } from './components/TimelineStudio';
 import { StrategyComparison } from './components/StrategyComparison';
+import { DecisionPulse } from './components/DecisionPulse';
 import { TaxPlanner } from './components/TaxPlanner';
 import { WealthCompositionChart } from './components/WealthCompositionChart';
 import { ChartVariantContext } from './components/chart-theme';
@@ -37,6 +38,7 @@ import { useIsMobile } from './lib/useMediaQuery';
 import { usePortfolio } from './lib/usePortfolio';
 import { useStrategyLab } from './lib/useStrategyLab';
 import { usePayoffPlaybook } from './lib/usePayoffPlaybook';
+import { useDecisionPulse } from './lib/useDecisionPulse';
 import { useAuth } from './context/AuthContext';
 
 function DashboardApp() {
@@ -70,6 +72,7 @@ function DashboardApp() {
   const { user, signOut } = useAuth();
   const strategyLab = useStrategyLab();
   const payoffPlaybookHook = usePayoffPlaybook();
+  const decisionPulseHook = useDecisionPulse();
 
   const isMobile = useIsMobile();
   const [mobileTab, setMobileTab] = useState<MobileTab>('overview');
@@ -242,6 +245,18 @@ function DashboardApp() {
     },
   };
 
+  const decisionPulseProps = {
+    portfolio,
+    activeStrategy,
+    activeResult,
+    comparisons,
+    customOrder: playbookOrder,
+    budgetMax,
+    pulseHook: decisionPulseHook,
+    onBudgetChange: setBudget,
+    onStrategyChange: setActiveStrategy,
+  };
+
   if (isMobile) {
     return (
       <div className="mx-auto min-h-screen max-w-7xl space-y-3 p-3 pb-24">
@@ -264,6 +279,7 @@ function DashboardApp() {
               userEmail={user?.email}
               compact
             />
+            <DecisionPulse {...decisionPulseProps} embedded />
             <div className="app-surface space-y-4 p-4">
               <Controls {...controlProps} mode="primary" embedded />
               <div className="border-t border-white/10 pt-4">
@@ -446,6 +462,8 @@ function DashboardApp() {
         result={activeResult}
         scenario={scenario}
       />
+
+      <DecisionPulse {...decisionPulseProps} />
 
       <Controls {...controlProps} />
 
