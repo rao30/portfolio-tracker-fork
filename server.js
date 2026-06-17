@@ -44,6 +44,11 @@ import {
   isDecisionPulseEnabled,
   upsertDecisionPulsePreferences,
 } from './server/decision-pulse-store.js';
+import {
+  getPayoffLandscapePreferences,
+  isPayoffLandscapeEnabled,
+  upsertPayoffLandscapePreferences,
+} from './server/payoff-landscape-store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -306,6 +311,38 @@ app.put('/api/decision-pulse', requirePortfolioWebAccess, async (req, res) => {
     const status = err.status ?? 500;
     res.status(status).json({
       error: err instanceof Error ? err.message : 'Failed to save Decision Pulse preferences',
+    });
+  }
+});
+
+app.get('/api/payoff-landscape', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await getPayoffLandscapePreferences(req.supabaseUser.id);
+    res.json({ preferences, enabled: isPayoffLandscapeEnabled() });
+  } catch (err) {
+    console.error('GET /api/payoff-landscape', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load Payoff Landscape preferences',
+    });
+  }
+});
+
+app.put('/api/payoff-landscape', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await upsertPayoffLandscapePreferences(
+      req.supabaseUser.id,
+      req.body ?? {},
+    );
+    res.json({ preferences });
+  } catch (err) {
+    console.error('PUT /api/payoff-landscape', err);
+    const status = err.status ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to save Payoff Landscape preferences',
     });
   }
 });
