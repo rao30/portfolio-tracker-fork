@@ -1,6 +1,11 @@
 import type { Portfolio, Property, PropertyEvent, PropertyEventType } from './types';
 import { runSimulation, snapshotAtMonth, type StrategyId } from './snowball';
-import { simMonthToCalendar } from './format';
+import { formatMonths, simMonthToCalendar } from './format';
+import type {
+  TimelineCommandAnalysis,
+  TimelinePreviewDelta,
+  TimelineVerdictTone,
+} from './timelineTypes';
 
 export const MAX_TIMELINE_MONTH = 600;
 
@@ -181,6 +186,109 @@ export function applyPropertyEventOverlays(
       if (!byName.has(p.name)) return p;
       return { ...p, events: byName.get(p.name) ?? [] };
     }),
+  };
+}
+
+function eventsEqual(a: PropertyEvent, b: PropertyEvent): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+export function overlaysEqual(
+  a: PropertyEventOverlay[],
+  b: PropertyEventOverlay[],
+): boolean {
+  if (a.length !== b.length) return false;
+  const sortOverlay = (overlays: PropertyEventOverlay[]) =>
+    [...overlays]
+      .sort((x, y) => x.propertyName.localeCompare(y.propertyName))
+      .map((overlay) => ({
+        propertyName: overlay.propertyName,
+        events: [...overlay.events].sort((x, y) => x.month - y.month || x.type.localeCompare(y.type)),
+      }));
+
+  const sortedA = sortOverlay(a);
+  const sortedB = sortOverlay(b);
+  if (sortedA.length !== sortedB.length) return false;
+
+  return sortedA.every((overlay, index) => {
+    const other = sortedB[index];
+    if (overlay.propertyName !== other.propertyName) return false;
+    if (overlay.events.length !== other.events.length) return false;
+    return overlay.events.every((event, eventIndex) =>
+      eventsEqual(event, other.events[eventIndex]),
+    );
+  });
+}
+
+export function portfolioFromEventOverlays(
+  portfolio: Portfolio,
+  overlays: PropertyEventOverlay[],
+): Portfolio {
+  return applyPropertyEventOverlays(portfolioWithoutEvents(portfolio), overlays);
+}
+
+export function computeTimelinePreviewDelta(
+  portfolio: Portfolio,
+  previewOverlays: PropertyEventOverlay[],
+  strategyId: StrategyId,
+): TimelinePreviewDelta {
+  const committedResult = runSimulation(portfolio, strategyId);
+  const previewPortfolio = portfolioFromEventOverlays(portfolio, previewOverlays);
+  const previewResult = runSimulation(previewPortfolio, strategyId);
+  const committedSnap = snapshotAtMonth(committedResult, 120);
+  const previewSnap = snapshotAtMonth(previewResult, 120);
+  const committedCount = countPortfolioEvents(portfolio);
+  const previewCount = previewOverlays.reduce((sum, overlay) => sum + overlay.events.length, 0);
+
+  return {
+    monthsDelta: previewResult.monthsToPayoff - committedResult.monthsToPayoff,
+    equityDelta: (previewSnap?.totalEquity ?? 0) - (committedSnap?.totalEquity ?? 0),
+    cashflowDelta:
+      (previewSnap?.monthlyCashflow ?? 0) - (committedSnap?.monthlyCashflow ?? 0),
+    eventCountDelta: previewCount - committedCount,
+  };
+}
+
+export function computeTimelineCommandAnalysis(
+  portfolio: Portfolio,
+  previewOverlays: PropertyEventOverlay[],
+  strategyId: StrategyId,
+): TimelineCommandAnalysis {
+  const previewPortfolio = portfolioFromEventOverlays(portfolio, previewOverlays);
+  const previewResult = runSimulation(previewPortfolio, strategyId);
+  const previewCount = previewOverlays.reduce((sum, overlay) => sum + overlay.events.length, 0);
+  const committedCount = countPortfolioEvents(portfolio);
+  const delta = computeTimelinePreviewDelta(portfolio, previewOverlays, strategyId);
+
+  let verdict: string;
+  let verdictTone: TimelineVerdictTone = 'neutral';
+
+  if (previewCount === 0) {
+    verdict = 'No lifecycle events planned — add rent bumps, refis, or exits on the timeline.';
+  } else if (delta.monthsDelta <= -6 && delta.equityDelta > 0) {
+    verdict = `Strong plan — debt-free ${Math.abs(delta.monthsDelta)} months sooner with higher 10-year equity.`;
+    verdictTone = 'positive';
+  } else if (delta.monthsDelta <= -1) {
+    verdict = `Accelerates payoff by ${Math.abs(delta.monthsDelta)} month${Math.abs(delta.monthsDelta) === 1 ? '' : 's'} vs your committed plan.`;
+    verdictTone = 'positive';
+  } else if (delta.monthsDelta >= 6) {
+    verdict = `Adds ${delta.monthsDelta} months to debt-free — review refi costs or capex timing.`;
+    verdictTone = 'caution';
+  } else if (delta.cashflowDelta >= 500) {
+    verdict = `Boosts 10-year cashflow by $${Math.round(delta.cashflowDelta).toLocaleString()}/mo vs committed.`;
+    verdictTone = 'positive';
+  } else if (delta.eventCountDelta > 0) {
+    verdict = `${previewCount} event${previewCount === 1 ? '' : 's'} staged — apply when ready or keep exploring.`;
+  } else {
+    verdict = 'Preview matches your committed timeline — tweak events or load a saved plan.';
+  }
+
+  return {
+    verdict,
+    verdictTone,
+    debtFreeLabel: formatMonths(previewResult.monthsToPayoff),
+    previewEventCount: previewCount,
+    committedEventCount: committedCount,
   };
 }
 
