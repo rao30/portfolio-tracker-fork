@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import ws from 'ws';
 import { extractPortfolioToken, getPortfolioApiKey } from './auth.js';
 
 let authClient = null;
@@ -29,6 +30,7 @@ function getAuthClient() {
   if (!authClient) {
     authClient = createClient(url, key, {
       auth: { persistSession: false, autoRefreshToken: false },
+      realtime: { transport: ws },
     });
   }
   return authClient;

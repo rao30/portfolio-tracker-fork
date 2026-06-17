@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import ws from 'ws';
 import { copyPortfolioRow, LEGACY_PORTFOLIO_ROW_ID } from './portfolio-store.js';
 
 /**
@@ -19,6 +20,7 @@ export async function bootstrapAdminUserIfConfigured() {
 
   const supabase = createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
+    realtime: { transport: ws },
   });
 
   const { data: list, error: listError } = await supabase.auth.admin.listUsers();
