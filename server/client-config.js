@@ -1,19 +1,19 @@
+function envOrNull(name) {
+  const value = process.env[name]?.trim();
+  return value || null;
+}
+
 export function getSupabaseClientConfig() {
-  const supabaseUrl =
-    process.env.SUPABASE_URL?.trim() || process.env.VITE_SUPABASE_URL?.trim() || null;
+  const supabaseUrl = envOrNull('SUPABASE_URL') || envOrNull('VITE_SUPABASE_URL');
   const supabaseAnonKey =
-    process.env.SUPABASE_ANON_KEY?.trim() ??
-    process.env.SUPABASE_PUBLISHABLE_KEY?.trim() ??
-    process.env.VITE_SUPABASE_ANON_KEY?.trim() ??
-    null;
+    envOrNull('SUPABASE_ANON_KEY') ??
+    envOrNull('SUPABASE_PUBLISHABLE_KEY') ??
+    envOrNull('VITE_SUPABASE_ANON_KEY');
 
   return {
     supabaseUrl,
     supabaseAnonKey,
-    portfolioApiKey:
-      process.env.VITE_PORTFOLIO_API_KEY?.trim() ||
-      process.env.PORTFOLIO_API_KEY?.trim() ||
-      null,
-    portfolioWriteKey: process.env.VITE_PORTFOLIO_WRITE_KEY?.trim() || null,
+    portfolioApiKey: envOrNull('VITE_PORTFOLIO_API_KEY') || envOrNull('PORTFOLIO_API_KEY'),
+    portfolioWriteKey: envOrNull('VITE_PORTFOLIO_WRITE_KEY'),
   };
 }
