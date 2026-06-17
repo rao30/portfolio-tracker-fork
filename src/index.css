@@ -110,6 +110,21 @@
   animation: nav-panel-in-right 0.2s ease-out;
 }
 
+.deck-picker-enter {
+  animation: nav-panel-in-up 0.25s ease-out;
+}
+
+@keyframes nav-panel-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes shake-field {
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-4px); }

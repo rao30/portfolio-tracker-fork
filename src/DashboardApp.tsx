@@ -14,7 +14,6 @@ import { PayoffTimeline } from './components/PayoffTimeline';
 import { PortfolioDashboard } from './components/PortfolioDashboard';
 import { PropertyInsights } from './components/PropertyInsights';
 import { PropertyDeck } from './components/PropertyDeck';
-import { PropertyTable } from './components/PropertyTable';
 import { ScheduleOfRealEstateModal } from './components/ScheduleOfRealEstateModal';
 import { ScenarioControls } from './components/ScenarioControls';
 import { StrategyLab } from './components/StrategyLab';
@@ -498,20 +497,25 @@ function DashboardApp() {
 
           {mobileTab === 'portfolio' && (
             <>
-              <SectionHeader title="Portfolio" description="Properties and per-asset insights." />
-              <PropertyTable
+              <SectionHeader
+                title="Property Deck"
+                description="Focus-mode editor with live health checks — swipe or tap to switch properties."
+              />
+              <PropertyDeck
                 portfolio={portfolio}
+                deckHook={propertyDeckHook}
                 onUpdate={updateProperty}
                 onUpdateAcquisitionDate={updateAcquisitionDate}
+                onExpenseBreakdownChange={updateExpenseBreakdown}
                 onFinancingChange={updatePropertyFinancing}
                 onAdd={addProperty}
                 onRemove={removeProperty}
-                mobileCards
                 asOfMonth={insightMonth}
                 isDirty={isDirty}
                 saving={saving}
                 onSave={handleSave}
                 onDiscard={discardChanges}
+                variant="mobile"
               />
               <PropertyInsights
                 insights={propertyInsights}

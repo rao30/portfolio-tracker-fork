@@ -8,5 +8,6 @@ export interface PropertyDeckPreferences {
   inspectorTab: PropertyDeckInspectorTab;
   financingFilter: PropertyDeckFinancingFilter;
   searchQuery: string;
+  mobileHintDismissed: boolean;
   updatedAt: string;
 }

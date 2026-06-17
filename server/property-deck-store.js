@@ -28,6 +28,7 @@ function rowToPreferences(row) {
     inspectorTab: row.inspector_tab,
     financingFilter: row.financing_filter,
     searchQuery: row.search_query ?? '',
+    mobileHintDismissed: Boolean(row.mobile_hint_dismissed),
     updatedAt: row.updated_at,
   };
 }
@@ -63,6 +64,10 @@ function validatePayload(body) {
     }
   }
 
+  if (body.mobileHintDismissed !== undefined && typeof body.mobileHintDismissed !== 'boolean') {
+    errors.push('mobileHintDismissed must be a boolean');
+  }
+
   return errors;
 }
 
@@ -86,6 +91,7 @@ export async function getPropertyDeckPreferences(userId) {
       inspectorTab: 'core',
       financingFilter: 'all',
       searchQuery: '',
+      mobileHintDismissed: false,
       updatedAt: null,
     };
   }
@@ -116,6 +122,7 @@ export async function upsertPropertyDeckPreferences(userId, body) {
   if (body.inspectorTab !== undefined) row.inspector_tab = body.inspectorTab;
   if (body.financingFilter !== undefined) row.financing_filter = body.financingFilter;
   if (body.searchQuery !== undefined) row.search_query = body.searchQuery;
+  if (body.mobileHintDismissed !== undefined) row.mobile_hint_dismissed = body.mobileHintDismissed;
 
   const { data, error } = await client
     .from('property_deck_preferences')

@@ -17,6 +17,7 @@ const DEFAULT_PREFERENCES: PropertyDeckPreferences = {
   inspectorTab: 'core',
   financingFilter: 'all',
   searchQuery: '',
+  mobileHintDismissed: false,
   updatedAt: new Date(0).toISOString(),
 };
 
@@ -59,6 +60,7 @@ export interface UsePropertyDeckResult {
   setInspectorTab: (tab: PropertyDeckInspectorTab) => Promise<void>;
   setFinancingFilter: (filter: PropertyDeckFinancingFilter) => Promise<void>;
   setSearchQuery: (query: string) => Promise<void>;
+  dismissMobileHint: () => Promise<void>;
 }
 
 export function usePropertyDeck(): UsePropertyDeckResult {
@@ -121,6 +123,7 @@ export function usePropertyDeck(): UsePropertyDeckResult {
               inspectorTab: next.inspectorTab,
               financingFilter: next.financingFilter,
               searchQuery: next.searchQuery,
+              mobileHintDismissed: next.mobileHintDismissed,
             }),
           });
           if (res.ok) {
@@ -180,6 +183,10 @@ export function usePropertyDeck(): UsePropertyDeckResult {
     [persist],
   );
 
+  const dismissMobileHint = useCallback(async () => {
+    await persist({ mobileHintDismissed: true });
+  }, [persist]);
+
   return {
     preferences,
     loading,
@@ -190,5 +197,6 @@ export function usePropertyDeck(): UsePropertyDeckResult {
     setInspectorTab,
     setFinancingFilter,
     setSearchQuery,
+    dismissMobileHint,
   };
 }
