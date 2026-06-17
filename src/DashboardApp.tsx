@@ -13,6 +13,7 @@ import { NetWorthChart } from './components/NetWorthChart';
 import { PayoffTimeline } from './components/PayoffTimeline';
 import { PortfolioDashboard } from './components/PortfolioDashboard';
 import { PropertyInsights } from './components/PropertyInsights';
+import { PropertyDeck } from './components/PropertyDeck';
 import { PropertyTable } from './components/PropertyTable';
 import { ScheduleOfRealEstateModal } from './components/ScheduleOfRealEstateModal';
 import { ScenarioControls } from './components/ScenarioControls';
@@ -50,7 +51,9 @@ import { usePayoffPlaybook } from './lib/usePayoffPlaybook';
 import { useDecisionPulse } from './lib/useDecisionPulse';
 import { useBalloonSafety } from './lib/useBalloonSafety';
 import { usePayoffLandscape } from './lib/usePayoffLandscape';
+import { usePropertyDeck } from './lib/usePropertyDeck';
 import { useAuth } from './context/AuthContext';
+import { useToast } from './context/ToastContext';
 
 function DashboardApp() {
   const {
@@ -87,6 +90,8 @@ function DashboardApp() {
   const decisionPulseHook = useDecisionPulse();
   const balloonSafetyHook = useBalloonSafety();
   const payoffLandscapeHook = usePayoffLandscape();
+  const propertyDeckHook = usePropertyDeck();
+  const { pushToast } = useToast();
 
   const isMobile = useIsMobile();
   const [mobileTab, setMobileTab] = useState<MobileTab>('overview');
@@ -119,8 +124,10 @@ function DashboardApp() {
   const handleSave = () => {
     void (async () => {
       const ok = await save();
-      if (!ok && cloudEnabled) {
-        window.alert('Could not save your portfolio. Try again or export a backup.');
+      if (ok) {
+        pushToast('Portfolio saved', 'success');
+      } else if (cloudEnabled) {
+        pushToast('Could not save your portfolio. Try again or export a backup.', 'error');
       }
     })();
   };
@@ -130,8 +137,10 @@ function DashboardApp() {
       setMarketValuesRefreshing(true);
       const result = await refreshMarketValues();
       setMarketValuesRefreshing(false);
-      if (!result.ok) {
-        window.alert(result.message);
+      if (result.ok) {
+        pushToast('Market values updated', 'success');
+      } else {
+        pushToast(result.message, 'error');
       }
     })();
   };
@@ -642,8 +651,9 @@ function DashboardApp() {
 
             {activeSection === 'properties' && (
               <>
-                <PropertyTable
+                <PropertyDeck
                   portfolio={portfolio}
+                  deckHook={propertyDeckHook}
                   onUpdate={updateProperty}
                   onUpdateAcquisitionDate={updateAcquisitionDate}
                   onExpenseBreakdownChange={updateExpenseBreakdown}

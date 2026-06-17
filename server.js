@@ -54,6 +54,11 @@ import {
   isBalloonSafetyEnabled,
   upsertBalloonSafetyPreferences,
 } from './server/balloon-safety-store.js';
+import {
+  getPropertyDeckPreferences,
+  isPropertyDeckEnabled,
+  upsertPropertyDeckPreferences,
+} from './server/property-deck-store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -380,6 +385,38 @@ app.put('/api/balloon-safety', requirePortfolioWebAccess, async (req, res) => {
     const status = err.status ?? 500;
     res.status(status).json({
       error: err instanceof Error ? err.message : 'Failed to save Balloon Safety preferences',
+    });
+  }
+});
+
+app.get('/api/property-deck', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await getPropertyDeckPreferences(req.supabaseUser.id);
+    res.json({ preferences, enabled: isPropertyDeckEnabled() });
+  } catch (err) {
+    console.error('GET /api/property-deck', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load Property Deck preferences',
+    });
+  }
+});
+
+app.put('/api/property-deck', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await upsertPropertyDeckPreferences(
+      req.supabaseUser.id,
+      req.body ?? {},
+    );
+    res.json({ preferences });
+  } catch (err) {
+    console.error('PUT /api/property-deck', err);
+    const status = err.status ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to save Property Deck preferences',
     });
   }
 });
