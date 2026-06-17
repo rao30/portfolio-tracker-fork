@@ -1,13 +1,14 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { BalanceChart } from './components/BalanceChart';
 import { CashflowChart } from './components/CashflowChart';
+import { ChartNavigator } from './components/ChartNavigator';
 import { Controls } from './components/Controls';
+import { DashboardNav, SectionHeader } from './components/DashboardNav';
 import { GoalTracker } from './components/GoalTracker';
 import { Header } from './components/Header';
 import { IncomeVsExpenseChart } from './components/IncomeVsExpenseChart';
 import { InterestChart } from './components/InterestChart';
 import { MonteCarloChart } from './components/MonteCarloChart';
-import { MobileNav, type MobileTab } from './components/MobileNav';
 import { NetWorthChart } from './components/NetWorthChart';
 import { PayoffTimeline } from './components/PayoffTimeline';
 import { PortfolioDashboard } from './components/PortfolioDashboard';
@@ -36,6 +37,12 @@ import {
   type StrategyId,
 } from './lib/snowball';
 import type { ScenarioConfig } from './lib/types';
+import {
+  chartsForViewport,
+  DESKTOP_SECTIONS,
+  type DashboardSection,
+  type MobileTab,
+} from './lib/dashboard-sections';
 import { useIsMobile } from './lib/useMediaQuery';
 import { usePortfolio } from './lib/usePortfolio';
 import { useStrategyLab } from './lib/useStrategyLab';
@@ -83,12 +90,23 @@ function DashboardApp() {
 
   const isMobile = useIsMobile();
   const [mobileTab, setMobileTab] = useState<MobileTab>('overview');
+  const [activeSection, setActiveSection] = useState<DashboardSection>('command');
   const [activeStrategy, setActiveStrategy] = useState<StrategyId>('highestRate');
   const [playbookOrder, setPlaybookOrder] = useState<string[] | null>(null);
   const [scenario, setScenario] = useState<ScenarioConfig>(SCENARIO_PRESETS[0]);
   const [portfolioYear, setPortfolioYear] = useState(1);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [marketValuesRefreshing, setMarketValuesRefreshing] = useState(false);
+
+  const handleSectionChange = useCallback((section: DashboardSection) => {
+    setActiveSection(section);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  const handleMobileTabChange = useCallback((tab: MobileTab) => {
+    setMobileTab(tab);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
 
   useEffect(() => {
     if (payoffPlaybookHook.loading) return;
@@ -195,6 +213,23 @@ function DashboardApp() {
       };
     }, [portfolio, activeStrategy, scenario, portfolioYear, playbookOrder]);
 
+  const headerProps = {
+    source,
+    syncStatus,
+    cloudEnabled,
+    isDirty,
+    saving,
+    onSave: handleSave,
+    onDiscard: discardChanges,
+    onReset: () => void resetFromFile(),
+    onExport: exportJson,
+    onScheduleOfRealEstate: () => setScheduleOpen(true),
+    onRefreshMarketValues: handleRefreshMarketValues,
+    marketValuesRefreshing,
+    onSignOut: () => void signOut(),
+    userEmail: user?.email,
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center text-slate-400">
@@ -293,42 +328,278 @@ function DashboardApp() {
     currentPlaybookOrder: playbookOrder ?? undefined,
   };
 
+  const strategyLabProps = {
+    portfolio,
+    activeBudget: portfolio.extraMonthlyBudget,
+    activeStrategy,
+    activeScenario: scenario,
+    activeScenarioId: scenario.id,
+    lab: strategyLab,
+    onApply: ({ budget, strategy, scenario: nextScenario }: {
+      budget: number;
+      strategy: StrategyId;
+      scenario: ScenarioConfig;
+    }) => {
+      setBudget(budget);
+      setActiveStrategy(strategy);
+      setScenario(nextScenario);
+    },
+  };
+
+  const yearLabel =
+    portfolioYear === 1
+      ? `${portfolio.simulationAnchorYear ?? 2026} (now)`
+      : String((portfolio.simulationAnchorYear ?? 2026) + portfolioYear - 1);
+
+  const chartPanels = chartsForViewport(isMobile).map((config) => {
+    const wrap = (node: React.ReactNode) => (
+      <ChartVariantContext.Provider value={isMobile ? 'flat' : 'card'}>
+        {node}
+      </ChartVariantContext.Provider>
+    );
+
+    switch (config.id) {
+      case 'net-worth':
+        return {
+          ...config,
+          content: wrap(
+            <NetWorthChart
+              result={activeResult}
+              baseline={scenario.id !== 'base' ? baseCaseResult : null}
+            />,
+          ),
+        };
+      case 'wealth-composition':
+        return { ...config, content: wrap(<WealthCompositionChart result={activeResult} />) };
+      case 'income-expense':
+        return { ...config, content: wrap(<IncomeVsExpenseChart result={activeResult} />) };
+      case 'monte-carlo':
+        return {
+          ...config,
+          content: wrap(
+            <MonteCarloChart portfolio={portfolio} strategyId={activeStrategy} />,
+          ),
+        };
+      case 'strategy-comparison':
+        return {
+          ...config,
+          content: wrap(
+            <StrategyComparison
+              results={comparisons}
+              activeStrategy={activeStrategy}
+              onSelect={setActiveStrategy}
+            />,
+          ),
+        };
+      case 'payoff-timeline':
+        return { ...config, content: wrap(<PayoffTimeline result={activeResult} />) };
+      case 'balance':
+        return {
+          ...config,
+          content: wrap(
+            <BalanceChart result={activeResult} properties={portfolio.properties} />,
+          ),
+        };
+      case 'interest':
+        return {
+          ...config,
+          content: wrap(
+            <InterestChart active={activeResult} baseline={baselineResult} />,
+          ),
+        };
+      case 'cashflow':
+        return { ...config, content: wrap(<CashflowChart result={activeResult} />) };
+      default:
+        return { ...config, content: null };
+    }
+  });
+
+  const chartsSection = (
+    <ChartNavigator charts={chartPanels} />
+  );
+
+  const scheduleModal = (
+    <ScheduleOfRealEstateModal
+      open={scheduleOpen}
+      onClose={() => setScheduleOpen(false)}
+      portfolio={portfolio}
+      result={activeResult}
+      scenario={scenario}
+    />
+  );
+
+  const activeSectionMeta = DESKTOP_SECTIONS.find((s) => s.id === activeSection);
+
   if (isMobile) {
     return (
-      <div className="mx-auto min-h-screen max-w-7xl space-y-3 p-3 pb-24">
-        {mobileTab === 'overview' && (
-          <div className="space-y-3">
-            <Header
-              source={source}
-              syncStatus={syncStatus}
-              cloudEnabled={cloudEnabled}
-              isDirty={isDirty}
-              saving={saving}
-              onSave={handleSave}
-              onDiscard={discardChanges}
-              onReset={() => void resetFromFile()}
-              onExport={exportJson}
-              onScheduleOfRealEstate={() => setScheduleOpen(true)}
-              onRefreshMarketValues={handleRefreshMarketValues}
-              marketValuesRefreshing={marketValuesRefreshing}
-              onSignOut={() => void signOut()}
-              userEmail={user?.email}
-              compact
-            />
-            <DecisionPulse {...decisionPulseProps} embedded />
-            <BalloonSafety {...balloonSafetyProps} embedded />
-            <PayoffLandscape {...payoffLandscapeProps} embedded />
-            <div className="app-surface space-y-4 p-4">
-              <Controls {...controlProps} mode="primary" embedded />
-              <div className="border-t border-white/10 pt-4">
+      <div className="mx-auto min-h-screen max-w-7xl p-3 pb-24">
+        <div key={mobileTab} className="nav-section-enter space-y-3">
+          {mobileTab === 'overview' && (
+            <>
+              <Header {...headerProps} compact />
+              <DecisionPulse {...decisionPulseProps} embedded />
+              <BalloonSafety {...balloonSafetyProps} embedded />
+              <PayoffLandscape {...payoffLandscapeProps} embedded />
+              <div className="app-surface space-y-4 p-4">
+                <Controls {...controlProps} mode="primary" embedded />
+                <div className="border-t border-white/10 pt-4">
+                  <ScenarioControls
+                    portfolio={portfolio}
+                    scenarioId={scenario.id}
+                    onScenarioChange={setScenario}
+                    embedded
+                  />
+                </div>
+                <div className="border-t border-white/10 pt-4">
+                  <TimelineStudio
+                    portfolio={portfolio}
+                    strategyId={activeStrategy}
+                    monthsToPayoff={activeResult.monthsToPayoff}
+                    cloudEnabled={cloudEnabled}
+                    userId={user?.id}
+                    onApplyEvents={applyTimelineEvents}
+                    onClearEvents={clearTimelineEvents}
+                    embedded
+                  />
+                </div>
+              </div>
+              <PortfolioDashboard
+                portfolio={portfolio}
+                result={activeResult}
+                year={portfolioYear}
+                onYearChange={setPortfolioYear}
+                compact
+              />
+              <PayoffPlaybook {...playbookProps} embedded />
+              <StrategyLab {...strategyLabProps} embedded />
+              <GoalTracker {...goalProps} section="insights" />
+            </>
+          )}
+
+          {mobileTab === 'charts' && (
+            <>
+              <SectionHeader
+                title="Charts"
+                description="Swipe through projections — use arrows or tap a chart name."
+              />
+              <div className="app-surface overflow-hidden p-3">
+                {chartsSection}
+              </div>
+            </>
+          )}
+
+          {mobileTab === 'portfolio' && (
+            <>
+              <SectionHeader title="Portfolio" description="Properties and per-asset insights." />
+              <PropertyTable
+                portfolio={portfolio}
+                onUpdate={updateProperty}
+                onUpdateAcquisitionDate={updateAcquisitionDate}
+                onFinancingChange={updatePropertyFinancing}
+                onAdd={addProperty}
+                onRemove={removeProperty}
+                mobileCards
+                asOfMonth={insightMonth}
+                isDirty={isDirty}
+                saving={saving}
+                onSave={handleSave}
+                onDiscard={discardChanges}
+              />
+              <PropertyInsights
+                insights={propertyInsights}
+                result={activeResult}
+                stacked
+                yearLabel={yearLabel}
+                ownedCount={propertyInsights.length}
+              />
+            </>
+          )}
+
+          {mobileTab === 'settings' && (
+            <>
+              <SectionHeader title="Settings" description="Goals, tax, and portfolio controls." />
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void resetFromFile()}
+                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200"
+                >
+                  Reset data
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScheduleOpen(true)}
+                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200"
+                >
+                  Schedule of Real Estate
+                </button>
+                <button
+                  type="button"
+                  onClick={exportJson}
+                  className="rounded-lg bg-cyan-600 px-3 py-2 text-sm font-medium text-white"
+                >
+                  Export
+                </button>
+              </div>
+              <TaxPlanner portfolio={portfolio} onTaxProfileChange={updateTaxProfile} />
+              <Controls {...controlProps} mode="advanced" />
+              <GoalTracker {...goalProps} section="goals" />
+              <GoalTracker {...goalProps} section="milestones" />
+            </>
+          )}
+        </div>
+
+        <DashboardNav
+          variant="bottom"
+          activeMobileTab={mobileTab}
+          onMobileTabChange={handleMobileTabChange}
+        />
+        {scheduleModal}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto min-h-screen max-w-[90rem] p-3 sm:p-6">
+      <div className="mb-4">
+        <Header {...headerProps} />
+      </div>
+
+      <div className="flex gap-8">
+        <aside className="hidden w-56 shrink-0 lg:block">
+          <DashboardNav
+            variant="sidebar"
+            activeSection={activeSection}
+            onSectionChange={handleSectionChange}
+          />
+        </aside>
+
+        <main className="min-w-0 flex-1">
+          <div key={activeSection} className="nav-section-enter space-y-4">
+            {activeSectionMeta && (
+              <SectionHeader
+                title={activeSectionMeta.label}
+                description={activeSectionMeta.description}
+              />
+            )}
+
+            {activeSection === 'command' && (
+              <>
+                <DecisionPulse {...decisionPulseProps} />
+                <BalloonSafety {...balloonSafetyProps} />
+                <PayoffLandscape {...payoffLandscapeProps} />
+              </>
+            )}
+
+            {activeSection === 'strategy' && (
+              <>
+                <Controls {...controlProps} />
+                <PayoffPlaybook {...playbookProps} />
                 <ScenarioControls
                   portfolio={portfolio}
                   scenarioId={scenario.id}
                   onScenarioChange={setScenario}
-                  embedded
                 />
-              </div>
-              <div className="border-t border-white/10 pt-4">
                 <TimelineStudio
                   portfolio={portfolio}
                   strategyId={activeStrategy}
@@ -337,278 +608,61 @@ function DashboardApp() {
                   userId={user?.id}
                   onApplyEvents={applyTimelineEvents}
                   onClearEvents={clearTimelineEvents}
-                  embedded
                 />
-              </div>
-            </div>
-            <PortfolioDashboard
-              portfolio={portfolio}
-              result={activeResult}
-              year={portfolioYear}
-              onYearChange={setPortfolioYear}
-              compact
-            />
-            <PayoffPlaybook {...playbookProps} embedded />
-            <StrategyLab
-              portfolio={portfolio}
-              activeBudget={portfolio.extraMonthlyBudget}
-              activeStrategy={activeStrategy}
-              activeScenario={scenario}
-              activeScenarioId={scenario.id}
-              lab={strategyLab}
-              onApply={({ budget, strategy, scenario: nextScenario }) => {
-                setBudget(budget);
-                setActiveStrategy(strategy);
-                setScenario(nextScenario);
-              }}
-              embedded
-            />
-            <div className="app-surface overflow-hidden">
-              <ChartVariantContext.Provider value="flat">
-                <NetWorthChart
+                <StrategyLab {...strategyLabProps} />
+              </>
+            )}
+
+            {activeSection === 'portfolio' && (
+              <>
+                <PortfolioDashboard
+                  portfolio={portfolio}
                   result={activeResult}
-                  baseline={scenario.id !== 'base' ? baseCaseResult : null}
+                  year={portfolioYear}
+                  onYearChange={setPortfolioYear}
                 />
-                <StrategyComparison
-                  results={comparisons}
-                  activeStrategy={activeStrategy}
-                  onSelect={setActiveStrategy}
-                />
-              </ChartVariantContext.Provider>
-            </div>
-            <GoalTracker {...goalProps} section="insights" />
-          </div>
-        )}
-
-        {mobileTab === 'charts' && (
-          <div className="space-y-3">
-            <h2 className="text-sm font-semibold text-slate-300">Charts</h2>
-            <div className="app-surface overflow-hidden">
-              <ChartVariantContext.Provider value="flat">
-                <WealthCompositionChart result={activeResult} />
-                <IncomeVsExpenseChart result={activeResult} />
-                <PayoffTimeline result={activeResult} />
-                <BalanceChart
+                <PropertyInsights
+                  insights={propertyInsights}
                   result={activeResult}
-                  properties={portfolio.properties}
+                  yearLabel={yearLabel}
+                  ownedCount={propertyInsights.length}
                 />
-                <InterestChart active={activeResult} baseline={baselineResult} />
-                <CashflowChart result={activeResult} />
-              </ChartVariantContext.Provider>
-            </div>
+                <GoalTracker {...goalProps} section="insights" />
+              </>
+            )}
+
+            {activeSection === 'charts' && chartsSection}
+
+            {activeSection === 'tax' && (
+              <>
+                <TaxPlanner portfolio={portfolio} onTaxProfileChange={updateTaxProfile} />
+                <GoalTracker {...goalProps} />
+              </>
+            )}
+
+            {activeSection === 'properties' && (
+              <>
+                <PropertyTable
+                  portfolio={portfolio}
+                  onUpdate={updateProperty}
+                  onUpdateAcquisitionDate={updateAcquisitionDate}
+                  onExpenseBreakdownChange={updateExpenseBreakdown}
+                  onFinancingChange={updatePropertyFinancing}
+                  onAdd={addProperty}
+                  onRemove={removeProperty}
+                  asOfMonth={insightMonth}
+                  isDirty={isDirty}
+                  saving={saving}
+                  onSave={handleSave}
+                  onDiscard={discardChanges}
+                />
+              </>
+            )}
           </div>
-        )}
-
-        {mobileTab === 'portfolio' && (
-          <div className="space-y-3">
-            <h2 className="text-sm font-semibold text-slate-300">Portfolio</h2>
-            <PropertyTable
-              portfolio={portfolio}
-              onUpdate={updateProperty}
-              onUpdateAcquisitionDate={updateAcquisitionDate}
-              onFinancingChange={updatePropertyFinancing}
-              onAdd={addProperty}
-              onRemove={removeProperty}
-              mobileCards
-              asOfMonth={insightMonth}
-              isDirty={isDirty}
-              saving={saving}
-              onSave={handleSave}
-              onDiscard={discardChanges}
-            />
-            <PropertyInsights
-              insights={propertyInsights}
-              result={activeResult}
-              stacked
-              yearLabel={
-                portfolioYear === 1
-                  ? `${portfolio.simulationAnchorYear ?? 2026} (now)`
-                  : String((portfolio.simulationAnchorYear ?? 2026) + portfolioYear - 1)
-              }
-              ownedCount={propertyInsights.length}
-            />
-          </div>
-        )}
-
-        {mobileTab === 'settings' && (
-          <div className="space-y-3">
-            <h2 className="text-sm font-semibold text-slate-300">Settings</h2>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => void resetFromFile()}
-                className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200"
-              >
-                Reset data
-              </button>
-              <button
-                type="button"
-                onClick={() => setScheduleOpen(true)}
-                className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200"
-              >
-                Schedule of Real Estate
-              </button>
-              <button
-                type="button"
-                onClick={exportJson}
-                className="rounded-lg bg-cyan-600 px-3 py-2 text-sm font-medium text-white"
-              >
-                Export
-              </button>
-            </div>
-            <Controls {...controlProps} mode="advanced" />
-            <GoalTracker {...goalProps} section="goals" />
-            <GoalTracker {...goalProps} section="milestones" />
-          </div>
-        )}
-
-        <MobileNav active={mobileTab} onChange={setMobileTab} />
-
-        <ScheduleOfRealEstateModal
-          open={scheduleOpen}
-          onClose={() => setScheduleOpen(false)}
-          portfolio={portfolio}
-          result={activeResult}
-          scenario={scenario}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="mx-auto min-h-screen max-w-7xl space-y-4 p-3 sm:p-6">
-      <Header
-        source={source}
-        syncStatus={syncStatus}
-        cloudEnabled={cloudEnabled}
-        isDirty={isDirty}
-        saving={saving}
-        onSave={handleSave}
-        onDiscard={discardChanges}
-        onReset={() => void resetFromFile()}
-        onExport={exportJson}
-        onScheduleOfRealEstate={() => setScheduleOpen(true)}
-        onRefreshMarketValues={handleRefreshMarketValues}
-        marketValuesRefreshing={marketValuesRefreshing}
-        onSignOut={() => void signOut()}
-        userEmail={user?.email}
-      />
-
-      <ScheduleOfRealEstateModal
-        open={scheduleOpen}
-        onClose={() => setScheduleOpen(false)}
-        portfolio={portfolio}
-        result={activeResult}
-        scenario={scenario}
-      />
-
-      <DecisionPulse {...decisionPulseProps} />
-
-      <BalloonSafety {...balloonSafetyProps} />
-
-      <PayoffLandscape {...payoffLandscapeProps} />
-
-      <Controls {...controlProps} />
-
-      <PayoffPlaybook {...playbookProps} />
-
-      <PortfolioDashboard
-        portfolio={portfolio}
-        result={activeResult}
-        year={portfolioYear}
-        onYearChange={setPortfolioYear}
-      />
-
-      <ScenarioControls
-        portfolio={portfolio}
-        scenarioId={scenario.id}
-        onScenarioChange={setScenario}
-      />
-
-      <TimelineStudio
-        portfolio={portfolio}
-        strategyId={activeStrategy}
-        monthsToPayoff={activeResult.monthsToPayoff}
-        cloudEnabled={cloudEnabled}
-        userId={user?.id}
-        onApplyEvents={applyTimelineEvents}
-        onClearEvents={clearTimelineEvents}
-      />
-
-      <StrategyLab
-        portfolio={portfolio}
-        activeBudget={portfolio.extraMonthlyBudget}
-        activeStrategy={activeStrategy}
-        activeScenario={scenario}
-        activeScenarioId={scenario.id}
-        lab={strategyLab}
-        onApply={({ budget, strategy, scenario: nextScenario }) => {
-          setBudget(budget);
-          setActiveStrategy(strategy);
-          setScenario(nextScenario);
-        }}
-      />
-
-      <TaxPlanner
-        portfolio={portfolio}
-        onTaxProfileChange={updateTaxProfile}
-      />
-
-      <NetWorthChart
-        result={activeResult}
-        baseline={scenario.id !== 'base' ? baseCaseResult : null}
-      />
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <WealthCompositionChart result={activeResult} />
-        <IncomeVsExpenseChart result={activeResult} />
+        </main>
       </div>
 
-      <MonteCarloChart portfolio={portfolio} strategyId={activeStrategy} />
-
-      <GoalTracker {...goalProps} />
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <StrategyComparison
-          results={comparisons}
-          activeStrategy={activeStrategy}
-          onSelect={setActiveStrategy}
-        />
-        <PayoffTimeline result={activeResult} />
-      </div>
-
-      <BalanceChart result={activeResult} properties={portfolio.properties} />
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <InterestChart active={activeResult} baseline={baselineResult} />
-        <CashflowChart result={activeResult} />
-      </div>
-
-      <PropertyInsights
-        insights={propertyInsights}
-        result={activeResult}
-        yearLabel={
-          portfolioYear === 1
-            ? `${portfolio.simulationAnchorYear ?? 2026} (now)`
-            : String((portfolio.simulationAnchorYear ?? 2026) + portfolioYear - 1)
-        }
-        ownedCount={propertyInsights.length}
-      />
-
-      <PropertyTable
-        portfolio={portfolio}
-        onUpdate={updateProperty}
-        onUpdateAcquisitionDate={updateAcquisitionDate}
-        onExpenseBreakdownChange={updateExpenseBreakdown}
-        onFinancingChange={updatePropertyFinancing}
-        onAdd={addProperty}
-        onRemove={removeProperty}
-        asOfMonth={insightMonth}
-        isDirty={isDirty}
-        saving={saving}
-        onSave={handleSave}
-        onDiscard={discardChanges}
-      />
+      {scheduleModal}
     </div>
   );
 }

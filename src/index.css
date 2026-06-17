@@ -25,4 +25,64 @@
   .tabular-nums {
     font-variant-numeric: tabular-nums;
   }
+
+  .nav-indicator {
+    animation: nav-indicator-in 0.25s ease-out;
+  }
+
+  .nav-panel-enter-right {
+    animation: nav-panel-in-right 0.22s ease-out;
+  }
+
+  .nav-panel-enter-left {
+    animation: nav-panel-in-left 0.22s ease-out;
+  }
+
+  .nav-section-enter {
+    animation: nav-section-in 0.2s ease-out;
+  }
+}
+
+@keyframes nav-indicator-in {
+  from {
+    opacity: 0;
+    transform: scaleY(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+@keyframes nav-panel-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes nav-panel-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes nav-section-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
