@@ -310,15 +310,15 @@ export function buildScheduleOfRealEstate(
       const grossAnnualRent = grossRentMonthly * 12;
       const annualOperatingExpenses = (operatingMonthly + utilitiesMonthly) * 12;
       const marketValue = insight?.marketValue ?? p.marketValue;
-      const loanBalance = insight?.balance ?? p.balance;
-      const equity = insight?.equity ?? marketValue - loanBalance;
-      const ltv = insight?.ltv ?? (marketValue > 0 ? loanBalance / marketValue : 0);
+      const loanBalance = p.balance;
+      const equity = marketValue - loanBalance;
+      const ltv = marketValue > 0 ? loanBalance / marketValue : 0;
       const noi = insight ? insight.monthlyNetRent * 12 : 0;
-      const monthlyPayment =
-        loanBalance > 0 && insight
-          ? insight.monthlyNetRent - insight.monthlyCapexReserve - insight.cashflowMonthly
-          : 0;
+      const monthlyPayment = loanBalance > 0 ? p.monthlyPayment : 0;
+      const monthlyCapexReserve = insight?.monthlyCapexReserve ?? 0;
       const annualDebtService = monthlyPayment * 12;
+      const cashFlowAfterDebt =
+        noi - annualDebtService - monthlyCapexReserve * 12;
       const ownerOccupied = insight?.excludedFromRentalCashflow ?? false;
 
       return {
@@ -337,7 +337,7 @@ export function buildScheduleOfRealEstate(
         annualOperatingExpenses,
         netOperatingIncome: noi,
         annualDebtService,
-        cashFlowAfterDebt: insight?.cashflowAnnual ?? 0,
+        cashFlowAfterDebt,
         equity,
         ltv,
         cashInvested: resolveCashInvested(p),

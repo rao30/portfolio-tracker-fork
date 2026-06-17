@@ -115,6 +115,20 @@ describe('buildScheduleOfRealEstate', () => {
     expect(scheduleY3.propertyCount).toBeGreaterThan(scheduleY1.propertyCount);
   });
 
+  it('uses portfolio loan balances instead of simulated snowball balances', () => {
+    const asOfMonth = currentSimulationMonth(
+      portfolio.simulationAnchorYear ?? 2026,
+      portfolio.simulationAnchorMonth ?? 1,
+      new Date(2026, 5, 15),
+    );
+    const schedule = buildScheduleOfRealEstate(portfolio, result, asOfMonth);
+    const lisa = portfolio.properties.find((p) => p.name.includes('Lisa Ln'))!;
+    const lisaRow = schedule.rows.find((r) => r.propertyDescription.includes('Lisa Ln'));
+    expect(lisaRow?.loanBalance).toBe(lisa.balance);
+    expect(lisaRow?.equity).toBeCloseTo(lisaRow!.marketValue - lisa.balance, 0);
+    expect(lisaRow?.monthlyPi).toBeCloseTo(lisa.monthlyPayment, 0);
+  });
+
   it('uses AVM-backed market values for Ridge Rock and Wendy', () => {
     const ridge = portfolio.properties.find((p) => /ridge rock/i.test(p.name))!;
     const wendy = portfolio.properties.find((p) => /wendy/i.test(p.name))!;
