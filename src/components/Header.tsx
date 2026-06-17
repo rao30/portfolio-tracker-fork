@@ -8,31 +8,10 @@ interface HeaderProps {
   onExport: () => void;
   onScheduleOfRealEstate?: () => void;
   onRefreshMarketValues?: () => void;
+  marketValuesRefreshing?: boolean;
   onSignOut?: () => void;
   userEmail?: string | null;
   compact?: boolean;
-}
-
-function sourceLabel(source: DataSource): string {
-  switch (source) {
-    case 'cloud':
-      return 'Cloud';
-    case 'local':
-      return 'Local';
-    default:
-      return 'Defaults';
-  }
-}
-
-function sourceBadgeClass(source: DataSource): string {
-  switch (source) {
-    case 'cloud':
-      return 'bg-emerald-500/20 text-emerald-300';
-    case 'local':
-      return 'bg-amber-500/20 text-amber-300';
-    default:
-      return 'bg-cyan-500/20 text-cyan-300';
-  }
 }
 
 function syncLabel(syncStatus: SyncStatus, cloudEnabled: boolean): string | null {
@@ -76,11 +55,6 @@ export function Header({
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-          <span
-            className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${sourceBadgeClass(source)}`}
-          >
-            {sourceLabel(source)}
-          </span>
           {sync ? (
             <span
               className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
@@ -110,15 +84,6 @@ export function Header({
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <span
-          className={`rounded-full px-3 py-1 text-xs font-medium ${sourceBadgeClass(source)}`}
-        >
-          {source === 'cloud'
-            ? 'Synced to Supabase'
-            : source === 'local'
-              ? 'Local edits (browser cache)'
-              : 'Loaded from repo defaults'}
-        </span>
         {sync ? (
           <span
             className={`rounded-full px-3 py-1 text-xs font-medium ${
@@ -137,7 +102,7 @@ export function Header({
           onClick={onReset}
           title={
             source === 'cloud' || source === 'local'
-              ? 'Reload portfolio.json from the server (fixes missing properties)'
+              ? 'Restore the original portfolio template'
               : undefined
           }
           className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-slate-200 transition hover:bg-white/10"
@@ -158,7 +123,7 @@ export function Header({
             type="button"
             onClick={onRefreshMarketValues}
             disabled={marketValuesRefreshing}
-            title="Pull latest AVM estimates (RentCast; needs RENTCAST_API_KEY on server)"
+            title="Refresh property values from current market estimates"
             className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-slate-200 transition hover:bg-white/10 disabled:opacity-50"
           >
             {marketValuesRefreshing ? 'Updating values…' : 'Update values'}
@@ -169,7 +134,7 @@ export function Header({
           onClick={onExport}
           className="rounded-lg bg-cyan-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-cyan-500"
         >
-          Export JSON
+          Export
         </button>
         {userEmail ? (
           <span className="hidden text-xs text-slate-500 sm:inline">{userEmail}</span>

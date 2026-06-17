@@ -31,14 +31,13 @@ export function LandingPage() {
           </h1>
           <p className="mt-4 text-base text-slate-400 sm:text-lg">
             Compare avalanche, snowball, and cashflow strategies across your properties. Track
-            equity, DSCR, tax impacts, and a Schedule of Real Estate — synced securely to your
-            account.
+            equity, DSCR, tax impacts, and a Schedule of Real Estate — saved to your account.
           </p>
           <ul className="mt-6 space-y-2 text-sm text-slate-300">
             <li>• Multi-property snowball simulation with monthly granularity</li>
             <li>• Seller financing, refi balloons, and house-hack scenarios</li>
             <li>• Tax planner with cost seg and bonus depreciation</li>
-            <li>• Cloud portfolio per user — your data stays private</li>
+            <li>• Private portfolio — your data stays yours</li>
           </ul>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link

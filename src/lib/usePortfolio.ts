@@ -245,7 +245,7 @@ export function usePortfolio(): UsePortfolioResult {
         if (cloudStorage) {
           throw new Error(
             apiError ??
-              'Cloud storage is enabled but the portfolio could not be loaded. Refresh or try Reset to defaults.',
+              'Your portfolio could not be loaded. Refresh the page or reset to the default template.',
           );
         }
 
@@ -518,7 +518,7 @@ export function usePortfolio(): UsePortfolioResult {
         ok: errCount === 0,
         message:
           errCount > 0
-            ? `Updated ${count} properties; ${errCount} failed (check RENTCAST_API_KEY on server)`
+            ? `Updated ${count} properties; ${errCount} could not be refreshed`
             : `Updated market values for ${count} properties`,
       };
     } catch (e) {

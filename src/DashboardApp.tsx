@@ -312,7 +312,7 @@ function DashboardApp() {
                 onClick={exportJson}
                 className="rounded-lg bg-cyan-600 px-3 py-2 text-sm font-medium text-white"
               >
-                Export JSON
+                Export
               </button>
             </div>
             <Controls {...controlProps} mode="advanced" />
