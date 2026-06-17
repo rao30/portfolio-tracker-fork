@@ -12,7 +12,7 @@ import {
 } from './server/auth.js';
 import { buildWwwAuthenticateHeader } from './server/oauth.js';
 import { createOAuthRouter } from './server/oauth-routes.js';
-import { isSupabaseAuthEnabled } from './server/supabase-auth.js';
+import { isSupabaseAuthEnabled, getSupabaseUserFromRequest } from './server/supabase-auth.js';
 import {
   isCloudStorageEnabled,
   loadPortfolio,
@@ -21,6 +21,14 @@ import {
 } from './server/portfolio-store.js';
 import { bootstrapAdminUserIfConfigured } from './server/startup-bootstrap.js';
 import { getSupabaseClientConfig } from './server/client-config.js';
+import { refreshPortfolioMarketValues } from './server/market-values.js';
+import {
+  createStrategyLabScenario,
+  deleteStrategyLabScenario,
+  listStrategyLabScenarios,
+  reorderStrategyLabScenarios,
+  updateStrategyLabScenario,
+} from './server/strategy-lab-store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -126,6 +134,93 @@ app.post('/api/portfolio/market-values', requirePortfolioWebAccess, async (req, 
     console.error('POST /api/portfolio/market-values', err);
     res.status(err.message?.includes('RENTCAST') ? 503 : 500).json({
       error: err instanceof Error ? err.message : 'Failed to refresh market values',
+    });
+  }
+});
+
+async function requireSupabaseUser(req, res, next) {
+  try {
+    const user = await getSupabaseUserFromRequest(req);
+    if (!user) {
+      res.status(401).json({
+        error: 'Sign in required',
+        hint: 'Strategy Lab scenarios are saved to your account after you sign in.',
+      });
+      return;
+    }
+    req.supabaseUser = user;
+    next();
+  } catch (err) {
+    next(err);
+  }
+}
+
+app.get('/api/strategy-lab/scenarios', requireSupabaseUser, async (req, res) => {
+  try {
+    const scenarios = await listStrategyLabScenarios(req.supabaseUser.id);
+    res.json({ scenarios });
+  } catch (err) {
+    console.error('GET /api/strategy-lab/scenarios', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load scenarios',
+    });
+  }
+});
+
+app.post('/api/strategy-lab/scenarios', requireSupabaseUser, async (req, res) => {
+  try {
+    const scenario = await createStrategyLabScenario(req.supabaseUser.id, req.body ?? {});
+    res.status(201).json({ scenario });
+  } catch (err) {
+    console.error('POST /api/strategy-lab/scenarios', err);
+    const status = err instanceof Error && err.message.includes('at most') ? 409 : 400;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to create scenario',
+    });
+  }
+});
+
+app.put('/api/strategy-lab/scenarios/:id', requireSupabaseUser, async (req, res) => {
+  try {
+    const scenario = await updateStrategyLabScenario(
+      req.supabaseUser.id,
+      req.params.id,
+      req.body ?? {},
+    );
+    res.json({ scenario });
+  } catch (err) {
+    console.error('PUT /api/strategy-lab/scenarios/:id', err);
+    const status = err instanceof Error && err.message === 'Scenario not found' ? 404 : 400;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to update scenario',
+    });
+  }
+});
+
+app.delete('/api/strategy-lab/scenarios/:id', requireSupabaseUser, async (req, res) => {
+  try {
+    await deleteStrategyLabScenario(req.supabaseUser.id, req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('DELETE /api/strategy-lab/scenarios/:id', err);
+    const status = err instanceof Error && err.message === 'Scenario not found' ? 404 : 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to delete scenario',
+    });
+  }
+});
+
+app.post('/api/strategy-lab/scenarios/reorder', requireSupabaseUser, async (req, res) => {
+  try {
+    const scenarios = await reorderStrategyLabScenarios(
+      req.supabaseUser.id,
+      req.body?.orderedIds ?? [],
+    );
+    res.json({ scenarios });
+  } catch (err) {
+    console.error('POST /api/strategy-lab/scenarios/reorder', err);
+    res.status(400).json({
+      error: err instanceof Error ? err.message : 'Failed to reorder scenarios',
     });
   }
 });

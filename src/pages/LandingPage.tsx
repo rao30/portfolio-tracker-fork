@@ -35,6 +35,7 @@ export function LandingPage() {
           </p>
           <ul className="mt-6 space-y-2 text-sm text-slate-300">
             <li>• Multi-property snowball simulation with monthly granularity</li>
+            <li>• Strategy Lab — pin and compare budget + payoff combos side by side</li>
             <li>• Seller financing, refi balloons, and house-hack scenarios</li>
             <li>• Tax planner with cost seg and bonus depreciation</li>
             <li>• Private portfolio — your data stays yours</li>
