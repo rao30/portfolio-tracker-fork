@@ -3,6 +3,7 @@ import type { Portfolio } from '../lib/types';
 import {
   computePayoffLandscape,
   defaultLandscapeRange,
+  portfolioSimulationSignature,
 } from '../lib/payoffLandscape';
 import type { LandscapeCell, LandscapeMetric } from '../lib/payoffLandscapeTypes';
 import { formatCurrency, formatMonths } from '../lib/format';
@@ -73,9 +74,11 @@ export function PayoffLandscape({
     });
   }, [preferences.budgetMin, preferences.budgetMax, preferences.budgetStep]);
 
+  const simulationSignature = portfolioSimulationSignature(portfolio);
+
   const suggestedRange = useMemo(
     () => defaultLandscapeRange(portfolio),
-    [portfolio],
+    [portfolio, simulationSignature],
   );
 
   const grid = useMemo(
@@ -90,6 +93,7 @@ export function PayoffLandscape({
       }),
     [
       portfolio,
+      simulationSignature,
       preferences.metric,
       preferences.budgetMin,
       preferences.budgetMax,
