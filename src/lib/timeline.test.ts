@@ -1,0 +1,82 @@
+import { describe, expect, it } from 'vitest';
+import type { Portfolio } from './types';
+import {
+  applyPropertyEventOverlays,
+  computeTimelineImpact,
+  validatePropertyEvent,
+} from './timeline';
+
+const basePortfolio: Portfolio = {
+  extraMonthlyBudget: 5000,
+  annualRentGrowthRate: 0.03,
+  annualExpenseInflationRate: 0.02,
+  reinvestSurplus: true,
+  monthlyReserveTarget: 0,
+  defaultVacancyRate: 0.05,
+  defaultCapexReserveRate: 0.1,
+  properties: [
+    {
+      name: 'Prop A',
+      balance: 200_000,
+      marketValue: 300_000,
+      annualInterestRate: 0.065,
+      annualAppreciationRate: 0.03,
+      monthlyPayment: 1200,
+      monthlyRent: 2000,
+      monthlyExpenses: 400,
+    },
+  ],
+  taxProfile: {
+    annualW2Income: 150_000,
+    spouseIsReps: false,
+    marginalTaxRate: 0.24,
+    taxYear: 2026,
+    bonusDepreciationRate: 0,
+    remainingBonusCarryover: 0,
+  },
+  goals: [],
+} as Portfolio;
+
+describe('validatePropertyEvent', () => {
+  it('rejects invalid month', () => {
+    const errors = validatePropertyEvent({ month: 0, type: 'rentChange', rent: 1800 });
+    expect(errors.some((e) => e.field === 'month')).toBe(true);
+  });
+
+  it('requires rent for rentChange', () => {
+    const errors = validatePropertyEvent({ month: 12, type: 'rentChange' });
+    expect(errors.some((e) => e.field === 'rent')).toBe(true);
+  });
+});
+
+describe('applyPropertyEventOverlays', () => {
+  it('updates only properties included in overlays', () => {
+    const next = applyPropertyEventOverlays(basePortfolio, [
+      {
+        propertyName: 'Prop A',
+        events: [{ month: 24, type: 'rentChange', rent: 2200 }],
+      },
+    ]);
+    expect(next.properties[0].events).toHaveLength(1);
+  });
+});
+
+describe('computeTimelineImpact', () => {
+  it('returns zero delta when no events', () => {
+    const impact = computeTimelineImpact(basePortfolio, 'highestRate');
+    expect(impact.eventCount).toBe(0);
+    expect(impact.monthsDelta).toBe(0);
+  });
+
+  it('detects rent increase impact', () => {
+    const withRent = applyPropertyEventOverlays(basePortfolio, [
+      {
+        propertyName: 'Prop A',
+        events: [{ month: 12, type: 'rentChange', rent: 3000 }],
+      },
+    ]);
+    const impact = computeTimelineImpact(withRent, 'highestRate');
+    expect(impact.eventCount).toBe(1);
+    expect(impact.cashflowDelta).not.toBe(0);
+  });
+});

@@ -10,6 +10,7 @@ import type {
   TaxProfile,
 } from './types';
 import { denormalizePortfolio, normalizePortfolio, resolveMonthlyExpenses } from './snowball';
+import { applyPropertyEventOverlays, type PropertyEventOverlay } from './timeline';
 import { calendarToSimMonth } from './format';
 import { bonusDepreciationForYear } from './tax';
 import { getClientConfig } from './clientConfig';
@@ -64,6 +65,8 @@ export interface UsePortfolioResult {
   resetFromFile: () => Promise<void>;
   exportJson: () => void;
   refreshMarketValues: () => Promise<{ ok: boolean; message: string }>;
+  applyTimelineEvents: (overlays: PropertyEventOverlay[]) => void;
+  clearTimelineEvents: () => void;
 }
 
 function saveLocal(portfolio: Portfolio): void {
@@ -439,6 +442,27 @@ export function usePortfolio(): UsePortfolioResult {
     [portfolio, persist, source],
   );
 
+  const applyTimelineEvents = useCallback(
+    (overlays: PropertyEventOverlay[]) => {
+      if (!portfolio) return;
+      const next = applyPropertyEventOverlays(portfolio, overlays);
+      persist(next, source === 'file' ? 'local' : source);
+    },
+    [portfolio, persist, source],
+  );
+
+  const clearTimelineEvents = useCallback(() => {
+    if (!portfolio) return;
+    const next = {
+      ...portfolio,
+      properties: portfolio.properties.map((p) => {
+        const { events: _events, ...rest } = p;
+        return rest;
+      }),
+    };
+    persist(next, source === 'file' ? 'local' : source);
+  }, [portfolio, persist, source]);
+
   const updateAcquisitionDate = useCallback(
     (index: number, value: string) => {
       if (!portfolio) return;
@@ -603,5 +627,7 @@ export function usePortfolio(): UsePortfolioResult {
     resetFromFile,
     exportJson,
     refreshMarketValues,
+    applyTimelineEvents,
+    clearTimelineEvents,
   };
 }
