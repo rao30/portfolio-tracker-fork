@@ -9,7 +9,7 @@ export const LEGACY_PORTFOLIO_ROW_ID = 'default';
 
 let supabase = null;
 
-function getSupabase() {
+export function getSupabase() {
   const url = process.env.SUPABASE_URL;
   const key =
     process.env.SUPABASE_SECRET_KEY ??

@@ -15,6 +15,7 @@ import { PropertyInsights } from './components/PropertyInsights';
 import { PropertyTable } from './components/PropertyTable';
 import { ScheduleOfRealEstateModal } from './components/ScheduleOfRealEstateModal';
 import { ScenarioControls } from './components/ScenarioControls';
+import { StrategyLab } from './components/StrategyLab';
 import { StrategyComparison } from './components/StrategyComparison';
 import { TaxPlanner } from './components/TaxPlanner';
 import { WealthCompositionChart } from './components/WealthCompositionChart';
@@ -31,6 +32,7 @@ import {
 import type { ScenarioConfig } from './lib/types';
 import { useIsMobile } from './lib/useMediaQuery';
 import { usePortfolio } from './lib/usePortfolio';
+import { useStrategyLab } from './lib/useStrategyLab';
 import { useAuth } from './context/AuthContext';
 
 function DashboardApp() {
@@ -60,6 +62,7 @@ function DashboardApp() {
     refreshMarketValues,
   } = usePortfolio();
   const { user, signOut } = useAuth();
+  const strategyLab = useStrategyLab(user?.id);
 
   const isMobile = useIsMobile();
   const [mobileTab, setMobileTab] = useState<MobileTab>('overview');
@@ -250,13 +253,21 @@ function DashboardApp() {
                   result={activeResult}
                   baseline={scenario.id !== 'base' ? baseCaseResult : null}
                 />
-                <StrategyComparison
-                  results={comparisons}
-                  activeStrategy={activeStrategy}
-                  onSelect={setActiveStrategy}
-                />
               </ChartVariantContext.Provider>
             </div>
+            <StrategyLab
+              portfolio={portfolio}
+              activeStrategy={activeStrategy}
+              budgetMax={budgetMax}
+              onStrategyChange={setActiveStrategy}
+              onBudgetChange={setBudget}
+              scenarios={strategyLab.scenarios}
+              canPersist={strategyLab.canPersist}
+              saving={strategyLab.saving}
+              onPinScenario={strategyLab.pinScenario}
+              onRemoveScenario={strategyLab.removeScenario}
+              compact
+            />
             <GoalTracker {...goalProps} section="insights" />
           </div>
         )}
@@ -413,6 +424,19 @@ function DashboardApp() {
       </div>
 
       <MonteCarloChart portfolio={portfolio} strategyId={activeStrategy} />
+
+      <StrategyLab
+        portfolio={portfolio}
+        activeStrategy={activeStrategy}
+        budgetMax={budgetMax}
+        onStrategyChange={setActiveStrategy}
+        onBudgetChange={setBudget}
+        scenarios={strategyLab.scenarios}
+        canPersist={strategyLab.canPersist}
+        saving={strategyLab.saving}
+        onPinScenario={strategyLab.pinScenario}
+        onRemoveScenario={strategyLab.removeScenario}
+      />
 
       <GoalTracker {...goalProps} />
 

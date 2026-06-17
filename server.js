@@ -12,7 +12,7 @@ import {
 } from './server/auth.js';
 import { buildWwwAuthenticateHeader } from './server/oauth.js';
 import { createOAuthRouter } from './server/oauth-routes.js';
-import { isSupabaseAuthEnabled } from './server/supabase-auth.js';
+import { getSupabaseUserFromRequest, isSupabaseAuthEnabled } from './server/supabase-auth.js';
 import {
   isCloudStorageEnabled,
   loadPortfolio,
@@ -149,6 +149,85 @@ app.put('/api/portfolio', requirePortfolioWebAccess, async (req, res) => {
     console.error('PUT /api/portfolio', err);
     res.status(500).json({
       error: err instanceof Error ? err.message : 'Failed to save portfolio',
+    });
+  }
+});
+
+import {
+  createStrategyLabScenario,
+  deleteStrategyLabScenario,
+  listStrategyLabScenarios,
+  updateStrategyLabScenario,
+} from './server/strategy-lab-store.js';
+
+async function requireAuthenticatedUser(req, res) {
+  const user = req.supabaseUser ?? (await getSupabaseUserFromRequest(req));
+  if (!user) {
+    res.status(401).json({
+      error: 'Sign in required',
+      hint: 'Strategy Lab scenarios are saved per account. Sign in to pin what-if plans.',
+    });
+    return null;
+  }
+  return user;
+}
+
+app.get('/api/strategy-lab', requirePortfolioWebAccess, async (req, res) => {
+  const user = await requireAuthenticatedUser(req, res);
+  if (!user) return;
+
+  try {
+    const scenarios = await listStrategyLabScenarios(user.id);
+    res.json({ scenarios });
+  } catch (err) {
+    console.error('GET /api/strategy-lab', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load scenarios',
+    });
+  }
+});
+
+app.post('/api/strategy-lab', requirePortfolioWebAccess, async (req, res) => {
+  const user = await requireAuthenticatedUser(req, res);
+  if (!user) return;
+
+  try {
+    const scenario = await createStrategyLabScenario(user.id, req.body ?? {});
+    res.status(201).json({ scenario });
+  } catch (err) {
+    console.error('POST /api/strategy-lab', err);
+    res.status(err.status ?? 500).json({
+      error: err instanceof Error ? err.message : 'Failed to create scenario',
+    });
+  }
+});
+
+app.put('/api/strategy-lab/:id', requirePortfolioWebAccess, async (req, res) => {
+  const user = await requireAuthenticatedUser(req, res);
+  if (!user) return;
+
+  try {
+    const scenario = await updateStrategyLabScenario(user.id, req.params.id, req.body ?? {});
+    res.json({ scenario });
+  } catch (err) {
+    console.error('PUT /api/strategy-lab/:id', err);
+    res.status(err.status ?? 500).json({
+      error: err instanceof Error ? err.message : 'Failed to update scenario',
+    });
+  }
+});
+
+app.delete('/api/strategy-lab/:id', requirePortfolioWebAccess, async (req, res) => {
+  const user = await requireAuthenticatedUser(req, res);
+  if (!user) return;
+
+  try {
+    await deleteStrategyLabScenario(user.id, req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('DELETE /api/strategy-lab/:id', err);
+    res.status(err.status ?? 500).json({
+      error: err instanceof Error ? err.message : 'Failed to delete scenario',
     });
   }
 });
