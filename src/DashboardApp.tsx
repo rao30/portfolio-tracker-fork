@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { BalanceChart } from './components/BalanceChart';
 import { CashflowChart } from './components/CashflowChart';
 import { Controls } from './components/Controls';
@@ -16,6 +16,7 @@ import { PropertyTable } from './components/PropertyTable';
 import { ScheduleOfRealEstateModal } from './components/ScheduleOfRealEstateModal';
 import { ScenarioControls } from './components/ScenarioControls';
 import { StrategyLab } from './components/StrategyLab';
+import { PayoffPlaybook } from './components/PayoffPlaybook';
 import { TimelineStudio } from './components/TimelineStudio';
 import { StrategyComparison } from './components/StrategyComparison';
 import { TaxPlanner } from './components/TaxPlanner';
@@ -26,6 +27,7 @@ import {
   computePropertyInsightsAtMonth,
   monthForPortfolioYear,
   runSimulation,
+  runSimulationWithPayoffOrder,
   SCENARIO_PRESETS,
   snapshotAtMonth,
   type StrategyId,
@@ -34,6 +36,7 @@ import type { ScenarioConfig } from './lib/types';
 import { useIsMobile } from './lib/useMediaQuery';
 import { usePortfolio } from './lib/usePortfolio';
 import { useStrategyLab } from './lib/useStrategyLab';
+import { usePayoffPlaybook } from './lib/usePayoffPlaybook';
 import { useAuth } from './context/AuthContext';
 
 function DashboardApp() {
@@ -66,14 +69,24 @@ function DashboardApp() {
   } = usePortfolio();
   const { user, signOut } = useAuth();
   const strategyLab = useStrategyLab();
+  const payoffPlaybookHook = usePayoffPlaybook();
 
   const isMobile = useIsMobile();
   const [mobileTab, setMobileTab] = useState<MobileTab>('overview');
   const [activeStrategy, setActiveStrategy] = useState<StrategyId>('highestRate');
+  const [playbookOrder, setPlaybookOrder] = useState<string[] | null>(null);
   const [scenario, setScenario] = useState<ScenarioConfig>(SCENARIO_PRESETS[0]);
   const [portfolioYear, setPortfolioYear] = useState(1);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [marketValuesRefreshing, setMarketValuesRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (payoffPlaybookHook.loading) return;
+    const saved = payoffPlaybookHook.playbook;
+    if (saved?.isActive && saved.propertyOrder.length > 0) {
+      setPlaybookOrder(saved.propertyOrder);
+    }
+  }, [payoffPlaybookHook.loading, payoffPlaybookHook.playbook]);
 
   const handleSave = () => {
     void (async () => {
@@ -137,7 +150,9 @@ function DashboardApp() {
       });
 
       const baseCaseResult = runSimulation(portfolio, activeStrategy, SCENARIO_PRESETS[0]);
-      const activeResult = runSimulation(portfolio, activeStrategy, scenario);
+      const activeResult = playbookOrder
+        ? runSimulationWithPayoffOrder(portfolio, playbookOrder, scenario)
+        : runSimulation(portfolio, activeStrategy, scenario);
       const baselineResult = runSimulation(portfolio, 'baseline', scenario);
 
       const insightMonth = monthForPortfolioYear(portfolioYear);
@@ -168,7 +183,7 @@ function DashboardApp() {
         scenarioDelta,
         insightMonth,
       };
-    }, [portfolio, activeStrategy, scenario, portfolioYear]);
+    }, [portfolio, activeStrategy, scenario, portfolioYear, playbookOrder]);
 
   if (loading) {
     return (
@@ -208,6 +223,23 @@ function DashboardApp() {
     strategyId: activeStrategy,
     scenarioDelta,
     onGoalsChange: updateGoals,
+  };
+
+  const playbookProps = {
+    portfolio,
+    activeStrategy,
+    scenario,
+    playbookHook: payoffPlaybookHook,
+    playbookActive: playbookOrder != null,
+    onApply: (order: string[]) => setPlaybookOrder(order),
+    onDeactivate: () => {
+      setPlaybookOrder(null);
+      void payoffPlaybookHook.savePlaybook({
+        propertyOrder: payoffPlaybookHook.playbook?.propertyOrder ?? [],
+        baseStrategy: payoffPlaybookHook.playbook?.baseStrategy ?? null,
+        isActive: false,
+      });
+    },
   };
 
   if (isMobile) {
@@ -262,6 +294,7 @@ function DashboardApp() {
               onYearChange={setPortfolioYear}
               compact
             />
+            <PayoffPlaybook {...playbookProps} embedded />
             <StrategyLab
               portfolio={portfolio}
               activeBudget={portfolio.extraMonthlyBudget}
@@ -415,6 +448,8 @@ function DashboardApp() {
       />
 
       <Controls {...controlProps} />
+
+      <PayoffPlaybook {...playbookProps} />
 
       <PortfolioDashboard
         portfolio={portfolio}

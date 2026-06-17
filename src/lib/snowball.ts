@@ -1201,6 +1201,53 @@ export function runSimulation(
   });
 }
 
+/** Keep a custom payoff order in sync with active, financed properties. */
+export function normalizePayoffOrder(
+  portfolio: Portfolio,
+  order: string[],
+  asOfMonth = 1,
+): string[] {
+  const active = portfolio.properties
+    .filter((p) => isPropertyActiveAtMonth(p, asOfMonth) && p.balance > 0)
+    .map((p) => p.name);
+  const activeSet = new Set(active);
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const name of order) {
+    if (activeSet.has(name) && !seen.has(name)) {
+      result.push(name);
+      seen.add(name);
+    }
+  }
+  for (const name of active) {
+    if (!seen.has(name)) result.push(name);
+  }
+  return result;
+}
+
+/** Run simulation with an explicit payoff queue (Payoff Playbook). */
+export function runSimulationWithPayoffOrder(
+  portfolio: Portfolio,
+  payoffOrder: string[],
+  scenario: ScenarioConfig | null = null,
+): SimulationResult {
+  const { properties, initialLumpSum } = applyScenario(portfolio, scenario);
+  const simOpts = portfolioSimOptions(portfolio, scenario);
+  const normalized = normalizePayoffOrder(
+    { ...portfolio, properties },
+    payoffOrder,
+  );
+
+  return simulateSnowball(properties, {
+    payoffOrder: normalized,
+    extraMonthlyBudget: portfolio.extraMonthlyBudget,
+    snowballCashflow: true,
+    strategyName: 'customPlaybook',
+    initialLumpSum,
+    ...simOpts,
+  });
+}
+
 /** Snapshot at a given month (clamped to history). */
 export function snapshotAtMonth(
   result: SimulationResult,

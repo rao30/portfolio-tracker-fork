@@ -25,6 +25,11 @@ import {
   listStrategyLabScenarios,
   updateStrategyLabScenario,
 } from './server/strategy-lab-store.js';
+import {
+  deletePayoffPlaybook,
+  getPayoffPlaybook,
+  upsertPayoffPlaybook,
+} from './server/payoff-playbook-store.js';
 import { bootstrapAdminUserIfConfigured } from './server/startup-bootstrap.js';
 import { getSupabaseClientConfig } from './server/client-config.js';
 import { refreshPortfolioMarketValues } from './server/market-values.js';
@@ -217,6 +222,53 @@ app.delete('/api/strategy-lab/:id', requirePortfolioWebAccess, async (req, res) 
     const status = err.statusCode ?? 500;
     res.status(status).json({
       error: err instanceof Error ? err.message : 'Failed to delete scenario',
+    });
+  }
+});
+
+app.get('/api/payoff-playbook', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const playbook = await getPayoffPlaybook(req.supabaseUser.id);
+    if (!playbook) {
+      res.status(404).json({ error: 'No playbook saved' });
+      return;
+    }
+    res.json({ playbook });
+  } catch (err) {
+    console.error('GET /api/payoff-playbook', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load Payoff Playbook',
+    });
+  }
+});
+
+app.put('/api/payoff-playbook', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const playbook = await upsertPayoffPlaybook(req.supabaseUser.id, req.body ?? {});
+    res.json({ playbook });
+  } catch (err) {
+    console.error('PUT /api/payoff-playbook', err);
+    const status = err.statusCode ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to save Payoff Playbook',
+    });
+  }
+});
+
+app.delete('/api/payoff-playbook', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    await deletePayoffPlaybook(req.supabaseUser.id);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('DELETE /api/payoff-playbook', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to delete Payoff Playbook',
     });
   }
 });
