@@ -4,11 +4,47 @@ import {
   computePayoffLandscape,
   defaultLandscapeRange,
   landscapeMatchesSimulation,
+  portfolioSimulationSignature,
 } from './payoffLandscape';
 import type { Portfolio } from './types';
 
 const miniPortfolio: Portfolio = {
   extraMonthlyBudget: 1000,
+  annualRentGrowthRate: 0.02,
+  annualExpenseInflationRate: 0.015,
+  reinvestSurplus: true,
+  monthlyReserveTarget: 0,
+  defaultVacancyRate: 0.05,
+  defaultCapexReserveRate: 0.05,
+  defaultCapexReserveFlat: 0,
+  taxProfile: {
+    annualW2Income: 100000,
+    spouseIsReps: false,
+    marginalTaxRate: 0.24,
+    taxYear: 2026,
+    bonusDepreciationRate: 1,
+    remainingBonusCarryover: 0,
+    filingStatus: 'single',
+    otherPassiveIncome: 0,
+    stateTaxRate: 0,
+  },
+  acquisitionTemplate: {
+    label: 'Default',
+    purchasePrice: 150000,
+    downPaymentPercent: 0.2,
+    annualInterestRate: 0.07,
+    loanTermMonths: 360,
+    monthlyRent: 1200,
+    monthlyExpenses: 200,
+    landPercent: 0.2,
+    costSegPercent: 0.25,
+    useCostSeg: false,
+  },
+  simulationAnchorYear: 2026,
+  simulationAnchorMonth: 1,
+  defaultRefiAnnualRate: 0.0675,
+  defaultRefiTermMonths: 360,
+  goals: [],
   properties: [
     {
       name: 'A',
@@ -93,6 +129,43 @@ describe('computePayoffLandscape', () => {
       (c) => c.strategyId === 'highestRate',
     )!;
     expect(highBudget.monthsToPayoff).toBeLessThanOrEqual(zeroBudget.monthsToPayoff);
+  });
+
+  it('reacts to rent growth and expense inflation assumptions', () => {
+    const lowGrowth = computePayoffLandscape(miniPortfolio, {
+      metric: 'monthsToPayoff',
+      budgetMin: 1000,
+      budgetMax: 1000,
+      budgetStep: 500,
+      activeStrategy: 'highestRate',
+      activeBudget: 1000,
+    });
+    const highGrowth = computePayoffLandscape(
+      {
+        ...miniPortfolio,
+        annualRentGrowthRate: 0.08,
+        annualExpenseInflationRate: 0.06,
+      },
+      {
+        metric: 'monthsToPayoff',
+        budgetMin: 1000,
+        budgetMax: 1000,
+        budgetStep: 500,
+        activeStrategy: 'highestRate',
+        activeBudget: 1000,
+      },
+    );
+
+    const lowCell = lowGrowth.cells[0].find((c) => c.strategyId === 'highestRate')!;
+    const highCell = highGrowth.cells[0].find((c) => c.strategyId === 'highestRate')!;
+    expect(portfolioSimulationSignature(miniPortfolio)).not.toBe(
+      portfolioSimulationSignature({
+        ...miniPortfolio,
+        annualRentGrowthRate: 0.08,
+        annualExpenseInflationRate: 0.06,
+      }),
+    );
+    expect(highCell.monthsToPayoff).not.toBe(lowCell.monthsToPayoff);
   });
 });
 

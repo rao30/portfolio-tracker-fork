@@ -222,6 +222,22 @@ export function usePortfolio(): UsePortfolioResult {
     [cloudEnabled],
   );
 
+  const patchPortfolio = useCallback(
+    (patch: (current: Portfolio) => Portfolio) => {
+      setPortfolio((current) => {
+        if (!current) return current;
+        const next = patch(current);
+        const nextSource = source === 'file' ? 'local' : source;
+        setSource(nextSource);
+        saveLocal(next);
+        setIsDirty(true);
+        setSyncStatus(cloudEnabled ? 'idle' : 'offline');
+        return next;
+      });
+    },
+    [cloudEnabled, source],
+  );
+
   const save = useCallback(async (): Promise<boolean> => {
     const current = portfolioRef.current;
     if (!current) return false;
@@ -325,18 +341,16 @@ export function usePortfolio(): UsePortfolioResult {
 
   const setBudget = useCallback(
     (budget: number) => {
-      if (!portfolio) return;
-      persist({ ...portfolio, extraMonthlyBudget: budget }, source === 'file' ? 'local' : source);
+      patchPortfolio((current) => ({ ...current, extraMonthlyBudget: budget }));
     },
-    [portfolio, persist, source],
+    [patchPortfolio],
   );
 
   const updatePortfolioSetting = useCallback(
     (field: PortfolioSettingKey, value: number | boolean) => {
-      if (!portfolio) return;
-      persist({ ...portfolio, [field]: value }, source === 'file' ? 'local' : source);
+      patchPortfolio((current) => ({ ...current, [field]: value }));
     },
-    [portfolio, persist, source],
+    [patchPortfolio],
   );
 
   const updateTaxProfile = useCallback(

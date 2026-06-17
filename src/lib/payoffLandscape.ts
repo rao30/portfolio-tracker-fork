@@ -6,6 +6,39 @@ import type {
   PayoffLandscapeGrid,
 } from './payoffLandscapeTypes';
 
+/** Stable key for memoization when portfolio simulation inputs change. */
+export function portfolioSimulationSignature(portfolio: Portfolio): string {
+  const settings = [
+    portfolio.extraMonthlyBudget,
+    portfolio.annualRentGrowthRate,
+    portfolio.annualExpenseInflationRate,
+    portfolio.reinvestSurplus,
+    portfolio.monthlyReserveTarget,
+    portfolio.defaultVacancyRate,
+    portfolio.defaultCapexReserveRate,
+    portfolio.defaultCapexReserveFlat,
+  ].join(',');
+  const props = portfolio.properties
+    .map((p) =>
+      [
+        p.name,
+        p.balance,
+        p.monthlyPayment,
+        p.monthlyRent,
+        p.monthlyExpenses,
+        p.monthlyUtilities ?? '',
+        p.annualInterestRate,
+        p.annualRentGrowthRate ?? '',
+        p.annualExpenseInflationRate ?? '',
+        p.vacancyRate ?? '',
+        p.capexReserveRate ?? '',
+        p.closeMonth ?? '',
+      ].join(':'),
+    )
+    .join('|');
+  return `${settings}|${props}`;
+}
+
 export const LANDSCAPE_STRATEGIES: StrategyId[] = [
   'highestRate',
   'highestPiPerDollar',

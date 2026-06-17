@@ -439,9 +439,10 @@ function DashboardApp() {
               <Header {...headerProps} compact />
               <DecisionPulse {...decisionPulseProps} embedded />
               <BalloonSafety {...balloonSafetyProps} embedded />
+              <Controls {...controlProps} mode="advanced" embedded idPrefix="overview" />
               <PayoffLandscape {...payoffLandscapeProps} embedded />
               <div className="app-surface space-y-4 p-4">
-                <Controls {...controlProps} mode="primary" embedded />
+                <Controls {...controlProps} mode="primary" embedded idPrefix="overview" />
                 <div className="border-t border-white/10 pt-4">
                   <ScenarioControls
                     portfolio={portfolio}
@@ -542,7 +543,7 @@ function DashboardApp() {
                 </button>
               </div>
               <TaxPlanner portfolio={portfolio} onTaxProfileChange={updateTaxProfile} />
-              <Controls {...controlProps} mode="advanced" />
+              <Controls {...controlProps} mode="advanced" idPrefix="settings" />
               <GoalTracker {...goalProps} section="goals" />
               <GoalTracker {...goalProps} section="milestones" />
             </>
@@ -587,13 +588,14 @@ function DashboardApp() {
               <>
                 <DecisionPulse {...decisionPulseProps} />
                 <BalloonSafety {...balloonSafetyProps} />
+                <Controls {...controlProps} mode="advanced" embedded idPrefix="command" />
                 <PayoffLandscape {...payoffLandscapeProps} />
               </>
             )}
 
             {activeSection === 'strategy' && (
               <>
-                <Controls {...controlProps} />
+                <Controls {...controlProps} idPrefix="strategy" />
                 <PayoffPlaybook {...playbookProps} />
                 <ScenarioControls
                   portfolio={portfolio}

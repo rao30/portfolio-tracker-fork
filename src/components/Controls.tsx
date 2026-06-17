@@ -19,6 +19,8 @@ interface ControlsProps {
     field: PortfolioSettingKey,
     value: number | boolean,
   ) => void;
+  /** Prefix for input ids when multiple Controls blocks appear on one page. */
+  idPrefix?: string;
   /** Primary = budget + strategy only; advanced = assumptions; full = desktop layout */
   mode?: 'full' | 'primary' | 'advanced';
   embedded?: boolean;
@@ -39,7 +41,9 @@ export function Controls({
   onPortfolioSettingChange,
   mode = 'full',
   embedded = false,
+  idPrefix = '',
 }: ControlsProps) {
+  const id = (name: string) => (idPrefix ? `${idPrefix}-${name}` : name);
   const showPrimary = mode === 'full' || mode === 'primary';
   const showAdvanced = mode === 'full' || mode === 'advanced';
 
@@ -55,7 +59,7 @@ export function Controls({
         <>
           <div>
             <label
-              htmlFor="budget-slider"
+              htmlFor={id('budget-slider')}
               className="mb-2 block text-sm font-medium text-slate-300"
             >
               Extra monthly budget{' '}
@@ -65,7 +69,7 @@ export function Controls({
             </label>
             <div className="flex items-center gap-3">
               <input
-                id="budget-slider"
+                id={id('budget-slider')}
                 type="range"
                 min={0}
                 max={budgetMax}
@@ -87,7 +91,7 @@ export function Controls({
             </div>
             <div className="mt-3 flex items-start gap-2 rounded-lg border border-white/10 bg-slate-900/40 px-3 py-2">
               <input
-                id="snowball-surplus"
+                id={id('snowball-surplus')}
                 type="checkbox"
                 checked={reinvestSurplus}
                 onChange={(e) =>
@@ -95,7 +99,7 @@ export function Controls({
                 }
                 className="mt-0.5 accent-cyan-500"
               />
-              <label htmlFor="snowball-surplus" className="text-xs text-slate-300">
+              <label htmlFor={id('snowball-surplus')} className="text-xs text-slate-300">
                 <span className="font-medium text-slate-200">
                   Snowball leftover cashflow
                 </span>
@@ -109,13 +113,13 @@ export function Controls({
           </div>
           <div>
             <label
-              htmlFor="strategy-select"
+              htmlFor={id('strategy-select')}
               className="mb-2 block text-sm font-medium text-slate-300"
             >
               Payoff strategy
             </label>
             <select
-              id="strategy-select"
+              id={id('strategy-select')}
               value={strategy}
               onChange={(e) => onStrategyChange(e.target.value as StrategyId)}
               className="w-full rounded-lg border border-white/10 bg-slate-900/80 px-3 py-2 text-sm text-slate-100"
@@ -145,13 +149,13 @@ export function Controls({
           )}
           <div>
             <label
-              htmlFor="rent-growth"
+              htmlFor={id('rent-growth')}
               className="mb-1 block text-xs font-medium text-slate-400"
             >
               Rent growth (annual): {formatPercent(annualRentGrowthRate)}
             </label>
             <input
-              id="rent-growth"
+              id={id('rent-growth')}
               type="range"
               min={0}
               max={0.08}
@@ -168,14 +172,14 @@ export function Controls({
           </div>
           <div>
             <label
-              htmlFor="expense-inflation"
+              htmlFor={id('expense-inflation')}
               className="mb-1 block text-xs font-medium text-slate-400"
             >
               Expense inflation (annual):{' '}
               {formatPercent(annualExpenseInflationRate)}
             </label>
             <input
-              id="expense-inflation"
+              id={id('expense-inflation')}
               type="range"
               min={0}
               max={0.08}
@@ -198,7 +202,7 @@ export function Controls({
               Monthly reserve target (kept in cash)
             </label>
             <NumericInput
-              id="reserve-target"
+              id={id('reserve-target')}
               value={monthlyReserveTarget}
               onChange={(v) =>
                 onPortfolioSettingChange(
@@ -212,13 +216,13 @@ export function Controls({
           </div>
           <div>
             <label
-              htmlFor="default-vacancy"
+              htmlFor={id('default-vacancy')}
               className="mb-1 block text-xs font-medium text-slate-400"
             >
               Default vacancy: {formatPercent(defaultVacancyRate)}
             </label>
             <input
-              id="default-vacancy"
+              id={id('default-vacancy')}
               type="range"
               min={0}
               max={0.25}
@@ -232,13 +236,13 @@ export function Controls({
           </div>
           <div>
             <label
-              htmlFor="default-capex"
+              htmlFor={id('default-capex')}
               className="mb-1 block text-xs font-medium text-slate-400"
             >
               Capex reserve (% of gross rent): {formatPercent(defaultCapexReserveRate)}
             </label>
             <input
-              id="default-capex"
+              id={id('default-capex')}
               type="range"
               min={0}
               max={0.2}
