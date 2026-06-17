@@ -11,6 +11,7 @@ const DEFAULT_PREFERENCES: DecisionPulsePreferences = {
   isCollapsed: false,
   lastExploredBudget: null,
   pinnedVerdictStrategy: null,
+  budgetStep: 100,
   updatedAt: new Date(0).toISOString(),
 };
 
@@ -51,6 +52,7 @@ export interface UseDecisionPulseResult {
   setCollapsed: (collapsed: boolean) => Promise<void>;
   setLastExploredBudget: (budget: number) => Promise<void>;
   setPinnedVerdictStrategy: (strategy: StrategyId | null) => Promise<void>;
+  setBudgetStep: (step: number) => Promise<void>;
 }
 
 export function useDecisionPulse(): UseDecisionPulseResult {
@@ -113,6 +115,7 @@ export function useDecisionPulse(): UseDecisionPulseResult {
               isCollapsed: next.isCollapsed,
               lastExploredBudget: next.lastExploredBudget,
               pinnedVerdictStrategy: next.pinnedVerdictStrategy,
+              budgetStep: next.budgetStep,
             }),
           });
           if (res.ok) {
@@ -158,6 +161,14 @@ export function useDecisionPulse(): UseDecisionPulseResult {
     [persist],
   );
 
+  const setBudgetStep = useCallback(
+    async (step: number) => {
+      const clamped = Math.min(5000, Math.max(50, Math.round(step)));
+      await persist({ budgetStep: clamped });
+    },
+    [persist],
+  );
+
   return {
     preferences,
     loading,
@@ -166,5 +177,6 @@ export function useDecisionPulse(): UseDecisionPulseResult {
     setCollapsed,
     setLastExploredBudget,
     setPinnedVerdictStrategy,
+    setBudgetStep,
   };
 }

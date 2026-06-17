@@ -2,6 +2,7 @@ import type { Portfolio, SimulationResult } from './types';
 import {
   STRATEGIES,
   STRATEGY_LABELS,
+  compareStrategies,
   runSimulation,
   runSimulationWithPayoffOrder,
   type StrategyId,
@@ -11,6 +12,7 @@ import type {
   BudgetSensitivityPoint,
   DecisionPulseAction,
   DecisionPulseAnalysis,
+  DecisionPulsePreviewDelta,
   StrategyDuel,
 } from './decisionPulseTypes';
 
@@ -232,5 +234,89 @@ export function buildDecisionPulse(
     sensitivity,
     debtFreeLabel,
     activeVsBest,
+  };
+}
+
+function portfolioSimulationOptions(portfolio: Portfolio) {
+  return {
+    annualRentGrowthRate: portfolio.annualRentGrowthRate,
+    annualExpenseInflationRate: portfolio.annualExpenseInflationRate,
+    reinvestSurplus: portfolio.reinvestSurplus,
+    monthlyReserveTarget: portfolio.monthlyReserveTarget,
+    defaultVacancyRate: portfolio.defaultVacancyRate,
+    defaultCapexReserveRate: portfolio.defaultCapexReserveRate,
+    defaultCapexReserveFlat: portfolio.defaultCapexReserveFlat,
+  };
+}
+
+export function computeDecisionPulsePreview(
+  portfolio: Portfolio,
+  previewBudget: number,
+  activeStrategy: StrategyId,
+  customOrder?: string[] | null,
+): DecisionPulseAnalysis {
+  const draft: Portfolio = {
+    ...portfolio,
+    extraMonthlyBudget: previewBudget,
+  };
+
+  const comparisons = compareStrategies(draft.properties, {
+    extraMonthlyBudget: previewBudget,
+    includeBaseline: true,
+    simulationOptions: portfolioSimulationOptions(draft),
+  });
+
+  const activeResult =
+    customOrder && customOrder.length > 0
+      ? runSimulationWithPayoffOrder(draft, customOrder, null)
+      : runSimulation(draft, activeStrategy, null);
+
+  return buildDecisionPulse(draft, activeStrategy, activeResult, comparisons, customOrder);
+}
+
+export function computePreviewDelta(
+  portfolio: Portfolio,
+  previewBudget: number,
+  activeStrategy: StrategyId,
+  customOrder?: string[] | null,
+): DecisionPulsePreviewDelta | null {
+  const committedBudget = portfolio.extraMonthlyBudget;
+  if (previewBudget === committedBudget) return null;
+
+  const committedResult =
+    customOrder && customOrder.length > 0
+      ? runSimulationWithPayoffOrder(portfolio, customOrder, null)
+      : runSimulation(portfolio, activeStrategy, null);
+
+  const previewResult =
+    customOrder && customOrder.length > 0
+      ? runSimulationWithPayoffOrder(
+          { ...portfolio, extraMonthlyBudget: previewBudget },
+          customOrder,
+          null,
+        )
+      : runSimulation(
+          { ...portfolio, extraMonthlyBudget: previewBudget },
+          activeStrategy,
+          null,
+        );
+
+  const anchorYear = portfolio.simulationAnchorYear ?? 2026;
+  const anchorMonth = portfolio.simulationAnchorMonth ?? 1;
+
+  return {
+    monthsDelta: previewResult.monthsToPayoff - committedResult.monthsToPayoff,
+    interestDelta:
+      previewResult.totalInterestPaid - committedResult.totalInterestPaid,
+    debtFreeLabelCommitted: formatSimulationMonthLabel(
+      committedResult.monthsToPayoff,
+      anchorYear,
+      anchorMonth,
+    ),
+    debtFreeLabelPreview: formatSimulationMonthLabel(
+      previewResult.monthsToPayoff,
+      anchorYear,
+      anchorMonth,
+    ),
   };
 }

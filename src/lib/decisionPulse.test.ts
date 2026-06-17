@@ -4,6 +4,8 @@ import {
   buildMonthlyAction,
   buildStrategyDuel,
   computeBudgetSensitivity,
+  computeDecisionPulsePreview,
+  computePreviewDelta,
 } from './decisionPulse';
 import { compareStrategies, normalizePortfolio, runSimulation } from './snowball';
 
@@ -106,6 +108,36 @@ describe('computeBudgetSensitivity', () => {
         sorted[i - 1].monthsToPayoff,
       );
     }
+  });
+});
+
+describe('computePreviewDelta', () => {
+  it('returns null when preview matches committed budget', () => {
+    const delta = computePreviewDelta(portfolio, portfolio.extraMonthlyBudget, 'highestRate');
+    expect(delta).toBeNull();
+  });
+
+  it('shows earlier payoff with higher preview budget', () => {
+    const delta = computePreviewDelta(
+      portfolio,
+      portfolio.extraMonthlyBudget + 1000,
+      'highestRate',
+    );
+    expect(delta).not.toBeNull();
+    expect(delta!.monthsDelta).toBeLessThanOrEqual(0);
+  });
+});
+
+describe('computeDecisionPulsePreview', () => {
+  it('runs isolated preview without mutating portfolio budget', () => {
+    const preview = computeDecisionPulsePreview(
+      portfolio,
+      portfolio.extraMonthlyBudget + 500,
+      'highestRate',
+    );
+    expect(portfolio.extraMonthlyBudget).toBe(2000);
+    expect(preview.verdict).toBeTruthy();
+    expect(preview.debtFreeLabel).toMatch(/20\d{2}/);
   });
 });
 

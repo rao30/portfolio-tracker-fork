@@ -32,6 +32,8 @@ function rowToPreferences(row) {
     lastExploredBudget:
       row.last_explored_budget != null ? Number(row.last_explored_budget) : null,
     pinnedVerdictStrategy: row.pinned_verdict_strategy ?? null,
+    budgetStep:
+      row.budget_step != null ? Number(row.budget_step) : 100,
     updatedAt: row.updated_at,
   };
 }
@@ -60,6 +62,13 @@ function validatePayload(body) {
     );
   }
 
+  if (body.budgetStep !== undefined) {
+    const step = Number(body.budgetStep);
+    if (!Number.isFinite(step) || step < 50 || step > 5000) {
+      errors.push('budgetStep must be between 50 and 5,000');
+    }
+  }
+
   return errors;
 }
 
@@ -81,6 +90,7 @@ export async function getDecisionPulsePreferences(userId) {
       isCollapsed: false,
       lastExploredBudget: null,
       pinnedVerdictStrategy: null,
+      budgetStep: 100,
       updatedAt: null,
     };
   }
@@ -112,6 +122,9 @@ export async function upsertDecisionPulsePreferences(userId, body) {
   }
   if (body.pinnedVerdictStrategy !== undefined) {
     row.pinned_verdict_strategy = body.pinnedVerdictStrategy;
+  }
+  if (body.budgetStep !== undefined) {
+    row.budget_step = Math.round(Number(body.budgetStep));
   }
 
   const { data, error } = await client

@@ -299,12 +299,10 @@ function DashboardApp() {
   const decisionPulseProps = {
     portfolio,
     activeStrategy,
-    activeResult,
-    comparisons,
     customOrder: playbookOrder,
     budgetMax,
     pulseHook: decisionPulseHook,
-    onBudgetChange: setBudget,
+    onApplyBudget: setBudget,
     onStrategyChange: setActiveStrategy,
   };
 

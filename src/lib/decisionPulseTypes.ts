@@ -44,5 +44,13 @@ export interface DecisionPulsePreferences {
   isCollapsed: boolean;
   lastExploredBudget: number | null;
   pinnedVerdictStrategy: StrategyId | null;
+  budgetStep: number;
   updatedAt: string;
+}
+
+export interface DecisionPulsePreviewDelta {
+  monthsDelta: number;
+  interestDelta: number;
+  debtFreeLabelCommitted: string;
+  debtFreeLabelPreview: string;
 }
