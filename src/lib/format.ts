@@ -48,6 +48,30 @@ export function formatPercent(rate: number): string {
   }).format(rate);
 }
 
+/** Percent rate as a plain number for editing (e.g. 0.065 → "6.5"). */
+export function editPercentValue(rate: number): string {
+  const pct = rate * 100;
+  return String(Number(pct.toFixed(4).replace(/\.?0+$/, '')));
+}
+
+/** Parse user percent input to a decimal rate (6.5, 6.5%, or 0.065 → 0.065). */
+export function parsePercentInput(raw: string): number | null {
+  const cleaned = raw.replace(/%/g, '').trim();
+  if (cleaned === '' || cleaned === '-') return null;
+  const n = parseFloat(cleaned.replace(/,/g, ''));
+  if (Number.isNaN(n)) return null;
+  if (Math.abs(n) > 1) return n / 100;
+  return n;
+}
+
+/** Parse currency input, stripping $ and grouping separators. */
+export function parseCurrencyInput(raw: string): number | null {
+  const cleaned = raw.replace(/[$,\s]/g, '');
+  if (cleaned === '' || cleaned === '-') return null;
+  const n = parseFloat(cleaned);
+  return Number.isNaN(n) ? null : n;
+}
+
 /** Format LTV as a percentage (0–100+). */
 export function formatLtv(ltv: number): string {
   return new Intl.NumberFormat('en-US', {

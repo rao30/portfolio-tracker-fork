@@ -1,6 +1,13 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import type { ExpenseBreakdown, Portfolio, Property, PropertyDraft } from '../lib/types';
-import { formatCurrency, formatPercent, propertyColor } from '../lib/format';
+import {
+  editPercentValue,
+  formatCurrency,
+  formatPercent,
+  parseCurrencyInput,
+  parsePercentInput,
+  propertyColor,
+} from '../lib/format';
 import {
   isPropertyActiveAtMonth,
   resolveMonthlyExpenses,
@@ -19,6 +26,10 @@ interface PropertyTableProps {
   mobileCards?: boolean;
   /** Simulation month for totals / active rows (matches portfolio year slider). */
   asOfMonth?: number;
+  isDirty?: boolean;
+  saving?: boolean;
+  onSave?: () => void;
+  onDiscard?: () => void;
 }
 
 type EditableField = keyof Property;
@@ -107,10 +118,38 @@ function rawValue(p: Property, field: EditableField): string {
   if (field === 'name') return p.name;
   const val = p[field];
   if (val === undefined) return '';
+  if (PERCENT_FIELDS.has(field)) return editPercentValue(val as number);
+  if (CURRENCY_FIELDS.has(field)) return String(Math.round(val as number));
   return String(val);
 }
 
+function commitFieldValue(field: EditableField, raw: string): string | null {
+  if (field === 'name') {
+    const trimmed = raw.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  if (field === 'acquisitionDate') {
+    const trimmed = raw.trim();
+    return /^\d{4}-\d{1,2}$/.test(trimmed) ? trimmed : null;
+  }
+  if (PERCENT_FIELDS.has(field)) {
+    const n = parsePercentInput(raw);
+    return n == null ? null : String(n);
+  }
+  if (CURRENCY_FIELDS.has(field)) {
+    const n = parseCurrencyInput(raw);
+    return n == null ? null : String(n);
+  }
+  if (field === 'remainingTermMonths') {
+    const n = parseInt(raw.replace(/[^\d]/g, ''), 10);
+    return Number.isNaN(n) || n < 0 ? null : String(n);
+  }
+  const n = parseFloat(raw);
+  return Number.isNaN(n) ? null : String(n);
+}
+
 interface EditableCellProps {
+  field: EditableField;
   value: string;
   display: string;
   onCommit: (value: string) => void;
@@ -118,12 +157,22 @@ interface EditableCellProps {
   warn?: boolean;
 }
 
-function EditableCell({ value, display, onCommit, mono, warn }: EditableCellProps) {
+function EditableCell({ field, value, display, onCommit, mono, warn }: EditableCellProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
 
+  useEffect(() => {
+    if (!editing) setDraft(value);
+  }, [value, editing]);
+
   const commit = () => {
-    onCommit(draft);
+    const parsed = commitFieldValue(field, draft);
+    if (parsed == null) {
+      setDraft(value);
+      setEditing(false);
+      return;
+    }
+    onCommit(parsed);
     setEditing(false);
   };
 
@@ -190,6 +239,7 @@ function PropertyCard({
               style={{ backgroundColor: propertyColor(property.name) }}
             />
             <EditableCell
+              field="name"
               value={rawValue(property, 'name')}
               display={property.name}
               onCommit={(v) => onUpdate(index, 'name', v)}
@@ -215,6 +265,7 @@ function PropertyCard({
             <dt className="text-slate-500">{field.label}</dt>
             <dd className="mt-0.5 font-mono tabular-nums text-slate-200">
               <EditableCell
+                field={field.key}
                 value={rawValue(property, field.key)}
                 display={fieldDisplay(property, field.key)}
                 onCommit={(v) => onUpdate(index, field.key, v)}
@@ -237,6 +288,10 @@ export function PropertyTable({
   onRemove,
   mobileCards = false,
   asOfMonth = 1,
+  isDirty = false,
+  saving = false,
+  onSave,
+  onDiscard,
 }: PropertyTableProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
@@ -284,7 +339,29 @@ export function PropertyTable({
           scheduled later
         </p>
       </div>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {isDirty && onSave ? (
+          <>
+            {onDiscard ? (
+              <button
+                type="button"
+                onClick={onDiscard}
+                disabled={saving}
+                className="rounded-lg border border-white/10 px-2 py-1 text-xs text-slate-300 hover:bg-white/5 disabled:opacity-50"
+              >
+                Discard
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={saving}
+              className="rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-cyan-500 disabled:opacity-50"
+            >
+              {saving ? 'Saving…' : 'Save changes'}
+            </button>
+          </>
+        ) : null}
         {!mobileCards && (
           <button
             type="button"
@@ -399,6 +476,7 @@ export function PropertyTable({
                       {col.key === 'name' ? (
                         <div>
                           <EditableCell
+                            field={col.key}
                             value={rawValue(p, col.key)}
                             display={fieldDisplay(p, col.key)}
                             onCommit={(v) => onUpdate(i, col.key, v)}
@@ -411,6 +489,7 @@ export function PropertyTable({
                         </div>
                       ) : (
                         <EditableCell
+                          field={col.key}
                           value={rawValue(p, col.key)}
                           display={fieldDisplay(p, col.key)}
                           onCommit={(v) => onUpdate(i, col.key, v)}
@@ -423,6 +502,7 @@ export function PropertyTable({
                   <td className="py-2 pr-2">
                     {onUpdateAcquisitionDate ? (
                       <EditableCell
+                        field="acquisitionDate"
                         value={p.acquisitionDate ?? ''}
                         display={p.acquisitionDate ?? '—'}
                         onCommit={(v) => onUpdateAcquisitionDate(i, v)}

@@ -17,7 +17,10 @@ import { getAccessToken } from './supabaseClient';
 import { useAuth } from '../context/AuthContext';
 
 const STORAGE_KEY = 'rental-snowball-portfolio';
-const SAVE_DEBOUNCE_MS = 800;
+
+function clonePortfolio(portfolio: Portfolio): Portfolio {
+  return JSON.parse(JSON.stringify(portfolio)) as Portfolio;
+}
 
 export type DataSource = 'file' | 'local' | 'cloud';
 
@@ -40,6 +43,10 @@ export interface UsePortfolioResult {
   source: DataSource;
   syncStatus: SyncStatus;
   cloudEnabled: boolean;
+  isDirty: boolean;
+  saving: boolean;
+  save: () => Promise<boolean>;
+  discardChanges: () => void;
   setBudget: (budget: number) => void;
   updatePortfolioSetting: (field: PortfolioSettingKey, value: number | boolean) => void;
   updateTaxProfile: (field: keyof TaxProfile, value: number | boolean | string) => void;
@@ -176,37 +183,77 @@ export function usePortfolio(): UsePortfolioResult {
   const [source, setSource] = useState<DataSource>('file');
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [cloudEnabled, setCloudEnabled] = useState(false);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
   const portfolioRef = useRef<Portfolio | null>(null);
+  const savedSnapshotRef = useRef<Portfolio | null>(null);
 
   portfolioRef.current = portfolio;
 
-  const scheduleCloudSave = useCallback((next: Portfolio) => {
-    saveLocal(next);
-    if (!cloudEnabled) {
-      setSyncStatus('offline');
-      return;
-    }
-
-    setSyncStatus('saving');
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      void (async () => {
-        const file = denormalizePortfolio(next);
-        const ok = await saveToApi(file);
-        setSyncStatus(ok ? 'saved' : 'error');
-      })();
-    }, SAVE_DEBOUNCE_MS);
-  }, [cloudEnabled]);
+  const markSaved = useCallback(
+    (next: Portfolio, nextSource: DataSource) => {
+      savedSnapshotRef.current = clonePortfolio(next);
+      setPortfolio(next);
+      setSource(nextSource);
+      saveLocal(next);
+      setIsDirty(false);
+      setSyncStatus(cloudEnabled ? 'saved' : 'offline');
+    },
+    [cloudEnabled],
+  );
 
   const persist = useCallback(
     (next: Portfolio, nextSource: DataSource) => {
       setPortfolio(next);
       setSource(nextSource);
-      scheduleCloudSave(next);
+      saveLocal(next);
+      setIsDirty(true);
+      setSyncStatus(cloudEnabled ? 'idle' : 'offline');
     },
-    [scheduleCloudSave],
+    [cloudEnabled],
   );
+
+  const save = useCallback(async (): Promise<boolean> => {
+    const current = portfolioRef.current;
+    if (!current) return false;
+
+    saveLocal(current);
+    if (!cloudEnabled) {
+      savedSnapshotRef.current = clonePortfolio(current);
+      setIsDirty(false);
+      setSyncStatus('offline');
+      return true;
+    }
+
+    setSaving(true);
+    setSyncStatus('saving');
+    try {
+      const ok = await saveToApi(denormalizePortfolio(current));
+      if (ok) {
+        savedSnapshotRef.current = clonePortfolio(current);
+        setIsDirty(false);
+        setSyncStatus('saved');
+      } else {
+        setSyncStatus('error');
+      }
+      return ok;
+    } catch {
+      setSyncStatus('error');
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }, [cloudEnabled]);
+
+  const discardChanges = useCallback(() => {
+    const saved = savedSnapshotRef.current;
+    if (!saved) return;
+    const restored = clonePortfolio(saved);
+    setPortfolio(restored);
+    saveLocal(restored);
+    setIsDirty(false);
+    setSyncStatus(cloudEnabled ? 'saved' : 'offline');
+  }, [cloudEnabled]);
 
   useEffect(() => {
     if (authConfigured && authLoading) return;
@@ -230,10 +277,7 @@ export function usePortfolio(): UsePortfolioResult {
 
         if (api?.portfolio) {
           const normalized = normalizePortfolio(api.portfolio);
-          setPortfolio(normalized);
-          setSource(api.source === 'cloud' ? 'cloud' : 'file');
-          saveLocal(normalized);
-          setSyncStatus(cloudStorage ? 'saved' : 'idle');
+          markSaved(normalized, api.source === 'cloud' ? 'cloud' : 'file');
           if (api.upgradedFromVersion != null) {
             console.info(
               `Portfolio seed upgraded in cloud: v${api.upgradedFromVersion} → v${api.seedVersion ?? normalized.seedVersion}`,
@@ -251,16 +295,12 @@ export function usePortfolio(): UsePortfolioResult {
 
         const stored = loadFromStorage();
         if (stored) {
-          setPortfolio(stored);
-          setSource('local');
-          setSyncStatus('offline');
+          markSaved(stored, 'local');
           return;
         }
 
         const file = await loadFromFile();
-        setPortfolio(file);
-        setSource('file');
-        setSyncStatus('offline');
+        markSaved(file, 'file');
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : 'Failed to load portfolio');
@@ -272,7 +312,7 @@ export function usePortfolio(): UsePortfolioResult {
     return () => {
       cancelled = true;
     };
-  }, [authConfigured, authLoading, session?.access_token]);
+  }, [authConfigured, authLoading, session?.access_token, markSaved]);
 
   const setBudget = useCallback(
     (budget: number) => {
@@ -457,22 +497,18 @@ export function usePortfolio(): UsePortfolioResult {
         const body = (await res.json()) as ApiPortfolioResponse;
         normalized = normalizePortfolio(body.portfolio);
         nextSource = body.source === 'cloud' ? 'cloud' : 'file';
-        setSyncStatus('saved');
+        markSaved(normalized, nextSource);
       } else {
         normalized = await loadFromFile();
-        setSyncStatus('offline');
+        markSaved(normalized, 'file');
       }
-
-      setPortfolio(normalized);
-      setSource(nextSource);
-      saveLocal(normalized);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to reset');
       setSyncStatus('error');
     } finally {
       setLoading(false);
     }
-  }, [source, cloudEnabled]);
+  }, [source, cloudEnabled, markSaved]);
 
   const exportJson = useCallback(() => {
     if (!portfolio) return;
@@ -490,6 +526,7 @@ export function usePortfolio(): UsePortfolioResult {
 
   const refreshMarketValues = useCallback(async () => {
     if (!portfolio) return { ok: false, message: 'No portfolio loaded' };
+    setSaving(true);
     setSyncStatus('saving');
     try {
       const res = await fetch('/api/portfolio/market-values', {
@@ -508,12 +545,11 @@ export function usePortfolio(): UsePortfolioResult {
       }
       if (body.portfolio) {
         const normalized = normalizePortfolio(body.portfolio);
-        setPortfolio(normalized);
-        persist(normalized, source === 'file' ? 'local' : source);
+        markSaved(normalized, source === 'file' ? 'local' : source);
       }
       const count = body.results?.length ?? 0;
       const errCount = body.errors?.length ?? 0;
-      setSyncStatus(errCount > 0 ? 'error' : 'saved');
+      if (errCount > 0) setSyncStatus('error');
       return {
         ok: errCount === 0,
         message:
@@ -527,14 +563,20 @@ export function usePortfolio(): UsePortfolioResult {
         ok: false,
         message: e instanceof Error ? e.message : 'Market value refresh failed',
       };
+    } finally {
+      setSaving(false);
     }
-  }, [portfolio, persist, source]);
+  }, [portfolio, markSaved, source]);
 
   useEffect(() => {
-    return () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
+    if (!isDirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
     };
-  }, []);
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [isDirty]);
 
   return {
     portfolio,
@@ -543,6 +585,10 @@ export function usePortfolio(): UsePortfolioResult {
     source,
     syncStatus,
     cloudEnabled,
+    isDirty,
+    saving,
+    save,
+    discardChanges,
     setBudget,
     updatePortfolioSetting,
     updateTaxProfile,

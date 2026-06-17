@@ -4,6 +4,10 @@ interface HeaderProps {
   source: DataSource;
   syncStatus: SyncStatus;
   cloudEnabled: boolean;
+  isDirty?: boolean;
+  saving?: boolean;
+  onSave?: () => void;
+  onDiscard?: () => void;
   onReset: () => void;
   onExport: () => void;
   onScheduleOfRealEstate?: () => void;
@@ -14,7 +18,12 @@ interface HeaderProps {
   compact?: boolean;
 }
 
-function syncLabel(syncStatus: SyncStatus, cloudEnabled: boolean): string | null {
+function syncLabel(
+  syncStatus: SyncStatus,
+  cloudEnabled: boolean,
+  isDirty: boolean,
+): string | null {
+  if (isDirty) return 'Unsaved changes';
   if (!cloudEnabled) return null;
   switch (syncStatus) {
     case 'saving':
@@ -22,7 +31,7 @@ function syncLabel(syncStatus: SyncStatus, cloudEnabled: boolean): string | null
     case 'saved':
       return 'Saved';
     case 'error':
-      return 'Failed';
+      return 'Save failed';
     default:
       return null;
   }
@@ -32,6 +41,10 @@ export function Header({
   source,
   syncStatus,
   cloudEnabled,
+  isDirty = false,
+  saving = false,
+  onSave,
+  onDiscard,
   onReset,
   onExport,
   onScheduleOfRealEstate,
@@ -41,7 +54,47 @@ export function Header({
   userEmail,
   compact = false,
 }: HeaderProps) {
-  const sync = syncLabel(syncStatus, cloudEnabled);
+  const sync = syncLabel(syncStatus, cloudEnabled, isDirty);
+
+  const saveButton =
+    onSave && isDirty ? (
+      <button
+        type="button"
+        onClick={onSave}
+        disabled={saving}
+        className="rounded-lg bg-cyan-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-cyan-500 disabled:opacity-50"
+      >
+        {saving ? 'Saving…' : 'Save changes'}
+      </button>
+    ) : null;
+
+  const discardButton =
+    onDiscard && isDirty ? (
+      <button
+        type="button"
+        onClick={onDiscard}
+        disabled={saving}
+        className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-slate-200 transition hover:bg-white/10 disabled:opacity-50"
+      >
+        Discard
+      </button>
+    ) : null;
+
+  const statusBadge = sync ? (
+    <span
+      className={`rounded-full px-3 py-1 text-xs font-medium ${
+        isDirty
+          ? 'bg-amber-500/20 text-amber-300'
+          : syncStatus === 'error'
+            ? 'bg-red-500/20 text-red-300'
+            : syncStatus === 'saving'
+              ? 'bg-slate-500/20 text-slate-300'
+              : 'bg-emerald-500/20 text-emerald-300'
+      }`}
+    >
+      {sync}
+    </span>
+  ) : null;
 
   if (compact) {
     return (
@@ -50,23 +103,33 @@ export function Header({
           <h1 className="truncate text-lg font-bold tracking-tight text-white">
             Rental Snowball
           </h1>
-          <p className="mt-0.5 text-xs text-slate-500">
-            Payoff simulation
-          </p>
+          <p className="mt-0.5 text-xs text-slate-500">Payoff simulation</p>
         </div>
-        <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-          {sync ? (
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+          {statusBadge ? (
             <span
               className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                syncStatus === 'error'
-                  ? 'bg-red-500/20 text-red-300'
-                  : syncStatus === 'saving'
-                    ? 'bg-slate-500/20 text-slate-300'
-                    : 'bg-emerald-500/20 text-emerald-300'
+                isDirty
+                  ? 'bg-amber-500/20 text-amber-300'
+                  : syncStatus === 'error'
+                    ? 'bg-red-500/20 text-red-300'
+                    : syncStatus === 'saving'
+                      ? 'bg-slate-500/20 text-slate-300'
+                      : 'bg-emerald-500/20 text-emerald-300'
               }`}
             >
               {sync}
             </span>
+          ) : null}
+          {saveButton ? (
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={saving}
+              className="rounded-lg bg-cyan-600 px-2 py-1 text-[10px] font-medium text-white disabled:opacity-50"
+            >
+              {saving ? 'Saving…' : 'Save'}
+            </button>
           ) : null}
         </div>
       </header>
@@ -84,19 +147,9 @@ export function Header({
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        {sync ? (
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-medium ${
-              syncStatus === 'error'
-                ? 'bg-red-500/20 text-red-300'
-                : syncStatus === 'saving'
-                  ? 'bg-slate-500/20 text-slate-300'
-                  : 'bg-emerald-500/20 text-emerald-300'
-            }`}
-          >
-            {sync}
-          </span>
-        ) : null}
+        {statusBadge}
+        {discardButton}
+        {saveButton}
         <button
           type="button"
           onClick={onReset}
@@ -132,7 +185,7 @@ export function Header({
         <button
           type="button"
           onClick={onExport}
-          className="rounded-lg bg-cyan-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-cyan-500"
+          className="rounded-lg border border-cyan-500/30 bg-cyan-600/20 px-3 py-1.5 text-sm font-medium text-cyan-200 transition hover:bg-cyan-600/30"
         >
           Export
         </button>

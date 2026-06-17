@@ -41,6 +41,10 @@ function DashboardApp() {
     source,
     syncStatus,
     cloudEnabled,
+    isDirty,
+    saving,
+    save,
+    discardChanges,
     setBudget,
     updatePortfolioSetting,
     updateTaxProfile,
@@ -64,6 +68,15 @@ function DashboardApp() {
   const [portfolioYear, setPortfolioYear] = useState(1);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [marketValuesRefreshing, setMarketValuesRefreshing] = useState(false);
+
+  const handleSave = () => {
+    void (async () => {
+      const ok = await save();
+      if (!ok && cloudEnabled) {
+        window.alert('Could not save your portfolio. Try again or export a backup.');
+      }
+    })();
+  };
 
   const handleRefreshMarketValues = () => {
     void (async () => {
@@ -200,6 +213,10 @@ function DashboardApp() {
               source={source}
               syncStatus={syncStatus}
               cloudEnabled={cloudEnabled}
+              isDirty={isDirty}
+              saving={saving}
+              onSave={handleSave}
+              onDiscard={discardChanges}
               onReset={() => void resetFromFile()}
               onExport={exportJson}
               onScheduleOfRealEstate={() => setScheduleOpen(true)}
@@ -274,6 +291,10 @@ function DashboardApp() {
               onRemove={removeProperty}
               mobileCards
               asOfMonth={insightMonth}
+              isDirty={isDirty}
+              saving={saving}
+              onSave={handleSave}
+              onDiscard={discardChanges}
             />
             <PropertyInsights
               insights={propertyInsights}
@@ -340,6 +361,10 @@ function DashboardApp() {
         source={source}
         syncStatus={syncStatus}
         cloudEnabled={cloudEnabled}
+        isDirty={isDirty}
+        saving={saving}
+        onSave={handleSave}
+        onDiscard={discardChanges}
         onReset={() => void resetFromFile()}
         onExport={exportJson}
         onScheduleOfRealEstate={() => setScheduleOpen(true)}
@@ -426,6 +451,10 @@ function DashboardApp() {
         onAdd={addProperty}
         onRemove={removeProperty}
         asOfMonth={insightMonth}
+        isDirty={isDirty}
+        saving={saving}
+        onSave={handleSave}
+        onDiscard={discardChanges}
       />
     </div>
   );

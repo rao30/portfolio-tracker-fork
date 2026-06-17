@@ -83,7 +83,7 @@ export function AddPropertyModal({ open, onClose, onAdd, template }: AddProperty
           Add property
         </h3>
         <p className="mt-1 text-xs text-slate-400">
-          New properties save automatically when cloud storage is enabled.
+          Click Save changes after editing your portfolio.
         </p>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
