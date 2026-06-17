@@ -19,6 +19,12 @@ import {
   resetPortfolioToSeed,
   savePortfolio,
 } from './server/portfolio-store.js';
+import {
+  createStrategyLabScenario,
+  deleteStrategyLabScenario,
+  listStrategyLabScenarios,
+  updateStrategyLabScenario,
+} from './server/strategy-lab-store.js';
 import { bootstrapAdminUserIfConfigured } from './server/startup-bootstrap.js';
 import { getSupabaseClientConfig } from './server/client-config.js';
 
@@ -126,6 +132,84 @@ app.post('/api/portfolio/market-values', requirePortfolioWebAccess, async (req, 
     console.error('POST /api/portfolio/market-values', err);
     res.status(err.message?.includes('RENTCAST') ? 503 : 500).json({
       error: err instanceof Error ? err.message : 'Failed to refresh market values',
+    });
+  }
+});
+
+function requireAuthenticatedUser(req, res) {
+  if (!req.supabaseUser?.id) {
+    res.status(401).json({
+      error: 'Sign in required',
+      hint: 'Strategy Lab requires an authenticated account when cloud storage is enabled.',
+    });
+    return false;
+  }
+  if (!isCloudStorageEnabled()) {
+    res.status(503).json({ error: 'Cloud storage is not configured' });
+    return false;
+  }
+  return true;
+}
+
+app.get('/api/strategy-lab', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const scenarios = await listStrategyLabScenarios(req.supabaseUser.id);
+    res.json({ scenarios });
+  } catch (err) {
+    console.error('GET /api/strategy-lab', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load Strategy Lab',
+    });
+  }
+});
+
+app.post('/api/strategy-lab', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const scenario = await createStrategyLabScenario(req.supabaseUser.id, req.body ?? {});
+    res.status(201).json({ scenario });
+  } catch (err) {
+    console.error('POST /api/strategy-lab', err);
+    const status = err.statusCode ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to create scenario',
+    });
+  }
+});
+
+app.put('/api/strategy-lab/:id', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const scenario = await updateStrategyLabScenario(
+      req.supabaseUser.id,
+      req.params.id,
+      req.body ?? {},
+    );
+    res.json({ scenario });
+  } catch (err) {
+    console.error('PUT /api/strategy-lab/:id', err);
+    const status = err.statusCode ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to update scenario',
+    });
+  }
+});
+
+app.delete('/api/strategy-lab/:id', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    await deleteStrategyLabScenario(req.supabaseUser.id, req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('DELETE /api/strategy-lab/:id', err);
+    const status = err.statusCode ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to delete scenario',
     });
   }
 });
