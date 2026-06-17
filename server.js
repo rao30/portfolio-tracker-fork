@@ -12,13 +12,23 @@ import {
 } from './server/auth.js';
 import { buildWwwAuthenticateHeader } from './server/oauth.js';
 import { createOAuthRouter } from './server/oauth-routes.js';
-import { isSupabaseAuthEnabled } from './server/supabase-auth.js';
+import {
+  getSupabaseUserFromRequest,
+  isSupabaseAuthEnabled,
+} from './server/supabase-auth.js';
 import {
   isCloudStorageEnabled,
   loadPortfolio,
   resetPortfolioToSeed,
   savePortfolio,
 } from './server/portfolio-store.js';
+import {
+  createStrategyLabScenario,
+  deleteStrategyLabScenario,
+  isStrategyLabEnabled,
+  listStrategyLabScenarios,
+  updateStrategyLabScenario,
+} from './server/strategy-lab-store.js';
 import { bootstrapAdminUserIfConfigured } from './server/startup-bootstrap.js';
 import { getSupabaseClientConfig } from './server/client-config.js';
 
@@ -46,6 +56,7 @@ app.get('/api/health', (_req, res) => {
     apiKeyRequired: Boolean(getPortfolioApiKey()),
     oauthEnabled: Boolean(getPortfolioApiKey()),
     supabaseAuthEnabled: isSupabaseAuthEnabled(),
+    strategyLabEnabled: isStrategyLabEnabled(),
   });
 });
 
@@ -127,6 +138,83 @@ app.post('/api/portfolio/market-values', requirePortfolioWebAccess, async (req, 
     res.status(err.message?.includes('RENTCAST') ? 503 : 500).json({
       error: err instanceof Error ? err.message : 'Failed to refresh market values',
     });
+  }
+});
+
+async function requireStrategyLabUser(req, res, next) {
+  try {
+    const user = await getSupabaseUserFromRequest(req);
+    if (!user) {
+      res.status(401).json({
+        error: 'Sign in required for Strategy Lab',
+        hint: 'Create an account to sync pinned scenarios across devices',
+      });
+      return;
+    }
+    if (!isStrategyLabEnabled()) {
+      res.status(503).json({ error: 'Strategy Lab storage is not configured' });
+      return;
+    }
+    req.supabaseUser = user;
+    next();
+  } catch (err) {
+    next(err);
+  }
+}
+
+app.get('/api/strategy-lab', requireStrategyLabUser, async (req, res) => {
+  try {
+    const scenarios = await listStrategyLabScenarios(req.supabaseUser.id);
+    res.json({ scenarios });
+  } catch (err) {
+    console.error('GET /api/strategy-lab', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load scenarios',
+    });
+  }
+});
+
+app.post('/api/strategy-lab', requireStrategyLabUser, async (req, res) => {
+  try {
+    const scenario = await createStrategyLabScenario(req.supabaseUser.id, req.body ?? {});
+    res.status(201).json({ scenario });
+  } catch (err) {
+    console.error('POST /api/strategy-lab', err);
+    const message = err instanceof Error ? err.message : 'Failed to create scenario';
+    const status = message.includes('at most') || message.includes('already exists') ? 400 : 500;
+    res.status(status).json({ error: message });
+  }
+});
+
+app.put('/api/strategy-lab/:id', requireStrategyLabUser, async (req, res) => {
+  try {
+    const scenario = await updateStrategyLabScenario(
+      req.supabaseUser.id,
+      req.params.id,
+      req.body ?? {},
+    );
+    res.json({ scenario });
+  } catch (err) {
+    console.error('PUT /api/strategy-lab/:id', err);
+    const message = err instanceof Error ? err.message : 'Failed to update scenario';
+    const status =
+      message === 'Scenario not found'
+        ? 404
+        : message.includes('already exists')
+          ? 400
+          : 500;
+    res.status(status).json({ error: message });
+  }
+});
+
+app.delete('/api/strategy-lab/:id', requireStrategyLabUser, async (req, res) => {
+  try {
+    await deleteStrategyLabScenario(req.supabaseUser.id, req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('DELETE /api/strategy-lab/:id', err);
+    const message = err instanceof Error ? err.message : 'Failed to delete scenario';
+    res.status(message === 'Scenario not found' ? 404 : 500).json({ error: message });
   }
 });
 

@@ -16,6 +16,7 @@ import { PropertyTable } from './components/PropertyTable';
 import { ScheduleOfRealEstateModal } from './components/ScheduleOfRealEstateModal';
 import { ScenarioControls } from './components/ScenarioControls';
 import { StrategyComparison } from './components/StrategyComparison';
+import { StrategyLab } from './components/StrategyLab';
 import { TaxPlanner } from './components/TaxPlanner';
 import { WealthCompositionChart } from './components/WealthCompositionChart';
 import { ChartVariantContext } from './components/chart-theme';
@@ -31,6 +32,7 @@ import {
 import type { ScenarioConfig } from './lib/types';
 import { useIsMobile } from './lib/useMediaQuery';
 import { usePortfolio } from './lib/usePortfolio';
+import { useStrategyLab } from './lib/useStrategyLab';
 import { useAuth } from './context/AuthContext';
 
 function DashboardApp() {
@@ -60,6 +62,7 @@ function DashboardApp() {
     refreshMarketValues,
   } = usePortfolio();
   const { user, signOut } = useAuth();
+  const strategyLab = useStrategyLab();
 
   const isMobile = useIsMobile();
   const [mobileTab, setMobileTab] = useState<MobileTab>('overview');
@@ -244,6 +247,18 @@ function DashboardApp() {
               onYearChange={setPortfolioYear}
               compact
             />
+            <StrategyLab
+              portfolio={portfolio}
+              liveStrategyId={activeStrategy}
+              liveBudget={portfolio.extraMonthlyBudget}
+              scenario={scenario}
+              lab={strategyLab}
+              onApply={(strategyId, budget) => {
+                setActiveStrategy(strategyId);
+                setBudget(budget);
+              }}
+              embedded
+            />
             <div className="app-surface overflow-hidden">
               <ChartVariantContext.Provider value="flat">
                 <NetWorthChart
@@ -383,6 +398,18 @@ function DashboardApp() {
       />
 
       <Controls {...controlProps} />
+
+      <StrategyLab
+        portfolio={portfolio}
+        liveStrategyId={activeStrategy}
+        liveBudget={portfolio.extraMonthlyBudget}
+        scenario={scenario}
+        lab={strategyLab}
+        onApply={(strategyId, budget) => {
+          setActiveStrategy(strategyId);
+          setBudget(budget);
+        }}
+      />
 
       <PortfolioDashboard
         portfolio={portfolio}
