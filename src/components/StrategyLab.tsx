@@ -21,6 +21,7 @@ import {
   impactToneClass,
   pinToSnapshot,
   resolveScenarioConfig,
+  resolveStrategyId,
   snapshotsMatch,
 } from '../lib/strategyLab';
 import type { StrategyLabScenario } from '../lib/strategyLabTypes';
@@ -157,7 +158,7 @@ function PinCard({
             )}
           </div>
           <p className="mt-0.5 truncate text-[11px] text-slate-500">
-            {STRATEGY_LABELS[pin.strategyId]} · {formatCurrency(pin.extraMonthlyBudget)}/mo ·{' '}
+            {STRATEGY_LABELS[resolveStrategyId(pin.strategyId)]} · {formatCurrency(pin.extraMonthlyBudget)}/mo ·{' '}
             {scenarioSummary(pin.scenario)}
           </p>
         </div>
@@ -348,7 +349,7 @@ export function StrategyLab({
     const scenario = resolveScenarioConfig(portfolio, previewPin.scenario);
     onApply({
       budget: previewPin.extraMonthlyBudget,
-      strategy: previewPin.strategyId,
+      strategy: resolveStrategyId(previewPin.strategyId),
       scenario,
     });
     void setCommittedPinId(previewPin.id);

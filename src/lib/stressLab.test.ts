@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   analyzeStressScenario,
   buildCustomScenario,
@@ -112,5 +114,18 @@ describe('stressLab', () => {
     const c = buildCustomScenario({ vacancy: 0.12, capex: 0.05, rateShock: 0, pauseMonths: 0 });
     expect(scenariosEqual(a, b)).toBe(true);
     expect(scenariosEqual(a, c)).toBe(false);
+  });
+
+  it('rate shock presets do not throw on seeded portfolio', () => {
+    const seeded = normalizePortfolio(
+      JSON.parse(
+        readFileSync(join(process.cwd(), 'public/data/portfolio.json'), 'utf-8'),
+      ),
+    );
+    for (const preset of SCENARIO_PRESETS) {
+      expect(() =>
+        analyzeStressScenario(seeded, 'highestRate', preset),
+      ).not.toThrow();
+    }
   });
 });

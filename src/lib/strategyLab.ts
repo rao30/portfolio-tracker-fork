@@ -4,6 +4,7 @@ import {
   runSimulationWithPayoffOrder,
   SCENARIO_PRESETS,
   snapshotAtMonth,
+  STRATEGIES,
   STRATEGY_LABELS,
   type StrategyId,
 } from './snowball';
@@ -41,6 +42,10 @@ export function resolveScenarioConfig(
   return scenario;
 }
 
+export function resolveStrategyId(strategyId: StrategyId): StrategyId {
+  return strategyId in STRATEGIES ? strategyId : 'highestRate';
+}
+
 export function computeStrategyLabMetrics(
   portfolio: Portfolio,
   budget: number,
@@ -48,13 +53,14 @@ export function computeStrategyLabMetrics(
   scenario: ScenarioConfig,
   customOrder?: string[] | null,
 ): StrategyLabMetrics {
+  const safeStrategyId = resolveStrategyId(strategyId);
   const working: Portfolio = { ...portfolio, extraMonthlyBudget: budget };
   const baseline = customOrder?.length
     ? runSimulationWithPayoffOrder(working, customOrder, scenario)
     : runSimulation(working, 'baseline', scenario);
   const active = customOrder?.length
     ? runSimulationWithPayoffOrder(working, customOrder, scenario)
-    : runSimulation(working, strategyId, scenario);
+    : runSimulation(working, safeStrategyId, scenario);
   const year10 = snapshotAtMonth(active, 120);
   const year15 = snapshotAtMonth(active, 180);
 
@@ -75,7 +81,7 @@ export function pinToSnapshot(
     pinId: pin.id,
     name: pin.name,
     extraMonthlyBudget: pin.extraMonthlyBudget,
-    strategyId: pin.strategyId,
+    strategyId: resolveStrategyId(pin.strategyId),
     scenario: resolveScenarioConfig(portfolio, pin.scenario),
   };
 }
