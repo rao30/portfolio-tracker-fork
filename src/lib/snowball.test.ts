@@ -215,16 +215,18 @@ describe('amortizeOneMonth', () => {
     ).toThrow(/Negative input/);
   });
 
-  it('throws when payment does not cover interest', () => {
-    expect(() =>
-      amortizeOneMonth({
-        balance: 100000,
-        annualInterestRate: 0.12,
-        scheduledPayment: 100,
-        extraPayment: 0,
-        propertyName: 'TestProp',
-      }),
-    ).toThrow(/does not cover interest.*TestProp/);
+  it('handles negative amortization when payment does not cover interest', () => {
+    const r = amortizeOneMonth({
+      balance: 100000,
+      annualInterestRate: 0.12,
+      scheduledPayment: 100,
+      extraPayment: 0,
+      propertyName: 'TestProp',
+    });
+    expect(r.interestPaid).toBe(100);
+    expect(r.principalPaid).toBeLessThan(0);
+    expect(r.balance).toBeGreaterThan(100000);
+    expect(r.paidOff).toBe(false);
   });
 });
 

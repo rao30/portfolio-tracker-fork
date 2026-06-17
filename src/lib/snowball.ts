@@ -423,10 +423,14 @@ export function amortizeOneMonth(inputs: AmortizeInputs): AmortizeResult {
   const interest = balance * monthlyRate;
 
   if (scheduledPayment < interest - 1e-9) {
-    const label = propertyName ? ` (${propertyName})` : '';
-    throw new Error(
-      `Scheduled payment does not cover interest${label}: payment ${scheduledPayment}, interest ${interest}`,
-    );
+    const unpaidInterest = interest - scheduledPayment;
+    return {
+      balance: balance + unpaidInterest,
+      interestPaid: scheduledPayment,
+      principalPaid: -unpaidInterest,
+      extraApplied: 0,
+      paidOff: false,
+    };
   }
 
   const scheduledPrincipal = Math.min(scheduledPayment - interest, balance);

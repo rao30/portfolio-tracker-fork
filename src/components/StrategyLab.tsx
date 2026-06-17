@@ -4,6 +4,7 @@ import {
   runSimulation,
   SCENARIO_PRESETS,
   snapshotAtMonth,
+  STRATEGIES,
   STRATEGY_LABELS,
   type StrategyId,
 } from '../lib/snowball';
@@ -50,15 +51,20 @@ function resolveScenarioConfig(
   return scenario;
 }
 
+function resolveStrategyId(strategyId: StrategyId): StrategyId {
+  return strategyId in STRATEGIES ? strategyId : 'highestRate';
+}
+
 function computeMetrics(
   portfolio: Portfolio,
   budget: number,
   strategyId: StrategyId,
   scenario: ScenarioConfig,
 ): StrategyLabMetrics {
+  const safeStrategyId = resolveStrategyId(strategyId);
   const working: Portfolio = { ...portfolio, extraMonthlyBudget: budget };
   const baseline = runSimulation(working, 'baseline', scenario);
-  const active = runSimulation(working, strategyId, scenario);
+  const active = runSimulation(working, safeStrategyId, scenario);
   const year10 = snapshotAtMonth(active, 120);
   const year15 = snapshotAtMonth(active, 180);
 
@@ -105,15 +111,16 @@ export function StrategyLab({
   const pinnedWithMetrics = useMemo(() => {
     return lab.scenarios.map((pin) => {
       const scenario = resolveScenarioConfig(portfolio, pin.scenario);
+      const safeStrategyId = resolveStrategyId(pin.strategyId);
       const metrics = computeMetrics(
         portfolio,
         pin.extraMonthlyBudget,
-        pin.strategyId,
+        safeStrategyId,
         scenario,
       );
       const monthsDelta = metrics.monthsToPayoff - baselineMetrics.monthsToPayoff;
       const interestDelta = metrics.interestSaved - baselineMetrics.interestSaved;
-      return { pin, scenario, metrics, monthsDelta, interestDelta };
+      return { pin, scenario, metrics, monthsDelta, interestDelta, safeStrategyId };
     });
   }, [lab.scenarios, portfolio, baselineMetrics]);
 
@@ -131,11 +138,11 @@ export function StrategyLab({
   );
 
   const handleApply = useCallback(
-    (pin: StrategyLabScenario, scenario: ScenarioConfig) => {
+    (pin: StrategyLabScenario, scenario: ScenarioConfig, strategyId: StrategyId) => {
       setActivePinId(pin.id);
       onApply({
         budget: pin.extraMonthlyBudget,
-        strategy: pin.strategyId,
+        strategy: strategyId,
         scenario,
       });
     },
@@ -177,7 +184,7 @@ export function StrategyLab({
         const entry = pinnedWithMetrics.find((p) => p.pin.sortOrder === num);
         if (entry) {
           e.preventDefault();
-          handleApply(entry.pin, entry.scenario);
+          handleApply(entry.pin, entry.scenario, entry.safeStrategyId);
         }
       }
     };
@@ -279,7 +286,7 @@ export function StrategyLab({
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {pinnedWithMetrics.map(
-            ({ pin, scenario, metrics, monthsDelta, interestDelta }) => {
+            ({ pin, scenario, metrics, monthsDelta, interestDelta, safeStrategyId }) => {
               const isActive =
                 activePinId === pin.id || matchesCurrent(pin, scenario);
               const isFastest =
@@ -338,7 +345,7 @@ export function StrategyLab({
                         )}
                       </div>
                       <p className="mt-0.5 truncate text-[11px] text-slate-500">
-                        {STRATEGY_LABELS[pin.strategyId]} ·{' '}
+                        {STRATEGY_LABELS[safeStrategyId]} ·{' '}
                         {formatCurrency(pin.extraMonthlyBudget)}/mo ·{' '}
                         {scenarioSummary(pin.scenario)}
                       </p>
@@ -403,7 +410,7 @@ export function StrategyLab({
 
                   <button
                     type="button"
-                    onClick={() => handleApply(pin, scenario)}
+                    onClick={() => handleApply(pin, scenario, safeStrategyId)}
                     className={`mt-3 w-full rounded-lg py-1.5 text-xs font-medium transition ${
                       isActive
                         ? 'bg-cyan-600 text-white'
