@@ -59,6 +59,11 @@ import {
   isPropertyDeckEnabled,
   upsertPropertyDeckPreferences,
 } from './server/property-deck-store.js';
+import {
+  getGoalCommandPreferences,
+  isGoalCommandEnabled,
+  upsertGoalCommandPreferences,
+} from './server/goal-command-store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -417,6 +422,38 @@ app.put('/api/property-deck', requirePortfolioWebAccess, async (req, res) => {
     const status = err.status ?? 500;
     res.status(status).json({
       error: err instanceof Error ? err.message : 'Failed to save Property Deck preferences',
+    });
+  }
+});
+
+app.get('/api/goal-command', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await getGoalCommandPreferences(req.supabaseUser.id);
+    res.json({ preferences, enabled: isGoalCommandEnabled() });
+  } catch (err) {
+    console.error('GET /api/goal-command', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load Freedom Date preferences',
+    });
+  }
+});
+
+app.put('/api/goal-command', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await upsertGoalCommandPreferences(
+      req.supabaseUser.id,
+      req.body ?? {},
+    );
+    res.json({ preferences });
+  } catch (err) {
+    console.error('PUT /api/goal-command', err);
+    const status = err.status ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to save Freedom Date preferences',
     });
   }
 });

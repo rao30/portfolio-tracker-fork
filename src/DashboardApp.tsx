@@ -51,6 +51,7 @@ import { useDecisionPulse } from './lib/useDecisionPulse';
 import { useBalloonSafety } from './lib/useBalloonSafety';
 import { usePayoffLandscape } from './lib/usePayoffLandscape';
 import { usePropertyDeck } from './lib/usePropertyDeck';
+import { useGoalCommand } from './lib/useGoalCommand';
 import { useAuth } from './context/AuthContext';
 import { useToast } from './context/ToastContext';
 
@@ -90,6 +91,7 @@ function DashboardApp() {
   const balloonSafetyHook = useBalloonSafety();
   const payoffLandscapeHook = usePayoffLandscape();
   const propertyDeckHook = usePropertyDeck();
+  const goalCommandHook = useGoalCommand(portfolio, updateGoals);
   const { pushToast } = useToast();
 
   const isMobile = useIsMobile();
@@ -274,8 +276,11 @@ function DashboardApp() {
     active: activeResult,
     baseline: baselineResult,
     strategyId: activeStrategy,
+    customOrder: playbookOrder,
+    budgetMax,
+    goalHook: goalCommandHook,
     scenarioDelta,
-    onGoalsChange: updateGoals,
+    onApplyBudget: setBudget,
   };
 
   const playbookProps = {
