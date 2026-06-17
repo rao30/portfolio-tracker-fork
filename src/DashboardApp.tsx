@@ -15,7 +15,7 @@ import { PropertyInsights } from './components/PropertyInsights';
 import { PropertyTable } from './components/PropertyTable';
 import { ScheduleOfRealEstateModal } from './components/ScheduleOfRealEstateModal';
 import { ScenarioControls } from './components/ScenarioControls';
-import { StrategyComparison } from './components/StrategyComparison';
+import { StrategyLab } from './components/StrategyLab';
 import { TaxPlanner } from './components/TaxPlanner';
 import { WealthCompositionChart } from './components/WealthCompositionChart';
 import { ChartVariantContext } from './components/chart-theme';
@@ -31,6 +31,7 @@ import {
 import type { ScenarioConfig } from './lib/types';
 import { useIsMobile } from './lib/useMediaQuery';
 import { usePortfolio } from './lib/usePortfolio';
+import { useStrategyLab } from './lib/useStrategyLab';
 import { useAuth } from './context/AuthContext';
 
 function DashboardApp() {
@@ -60,6 +61,8 @@ function DashboardApp() {
     refreshMarketValues,
   } = usePortfolio();
   const { user, signOut } = useAuth();
+  const strategyLab = useStrategyLab(Boolean(user));
+  const [pinningScenario, setPinningScenario] = useState(false);
 
   const isMobile = useIsMobile();
   const [mobileTab, setMobileTab] = useState<MobileTab>('overview');
@@ -195,6 +198,40 @@ function DashboardApp() {
     onPortfolioSettingChange: updatePortfolioSetting,
   };
 
+  const handlePinScenario = async (name: string) => {
+    setPinningScenario(true);
+    const result = await strategyLab.pinScenario({
+      name,
+      extraMonthlyBudget: portfolio.extraMonthlyBudget,
+      strategyId: activeStrategy,
+    });
+    setPinningScenario(false);
+    return result;
+  };
+
+  const handleLoadScenario = (scenario: {
+    extraMonthlyBudget: number;
+    strategyId: StrategyId;
+  }) => {
+    setBudget(scenario.extraMonthlyBudget);
+    setActiveStrategy(scenario.strategyId);
+  };
+
+  const strategyLabProps = {
+    results: comparisons,
+    activeStrategy,
+    budget: portfolio.extraMonthlyBudget,
+    budgetMax,
+    onBudgetChange: setBudget,
+    onSelect: setActiveStrategy,
+    pinnedScenarios: strategyLab.scenarios,
+    canPin: Boolean(user) && strategyLab.cloudEnabled,
+    pinning: pinningScenario,
+    onPinCurrent: handlePinScenario,
+    onLoadScenario: handleLoadScenario,
+    onRemoveScenario: strategyLab.removeScenario,
+  };
+
   const goalProps = {
     portfolio,
     active: activeResult,
@@ -250,11 +287,7 @@ function DashboardApp() {
                   result={activeResult}
                   baseline={scenario.id !== 'base' ? baseCaseResult : null}
                 />
-                <StrategyComparison
-                  results={comparisons}
-                  activeStrategy={activeStrategy}
-                  onSelect={setActiveStrategy}
-                />
+                <StrategyLab {...strategyLabProps} compact />
               </ChartVariantContext.Provider>
             </div>
             <GoalTracker {...goalProps} section="insights" />
@@ -382,7 +415,9 @@ function DashboardApp() {
         scenario={scenario}
       />
 
-      <Controls {...controlProps} />
+      <Controls {...controlProps} mode="advanced" />
+
+      <StrategyLab {...strategyLabProps} />
 
       <PortfolioDashboard
         portfolio={portfolio}
@@ -417,15 +452,9 @@ function DashboardApp() {
       <GoalTracker {...goalProps} />
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <StrategyComparison
-          results={comparisons}
-          activeStrategy={activeStrategy}
-          onSelect={setActiveStrategy}
-        />
         <PayoffTimeline result={activeResult} />
+        <BalanceChart result={activeResult} properties={portfolio.properties} />
       </div>
-
-      <BalanceChart result={activeResult} properties={portfolio.properties} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <InterestChart active={activeResult} baseline={baselineResult} />

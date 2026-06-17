@@ -21,6 +21,13 @@ import {
 } from './server/portfolio-store.js';
 import { bootstrapAdminUserIfConfigured } from './server/startup-bootstrap.js';
 import { getSupabaseClientConfig } from './server/client-config.js';
+import { refreshPortfolioMarketValues } from './server/market-values.js';
+import {
+  createStrategyLabScenario,
+  deleteStrategyLabScenario,
+  isStrategyLabEnabled,
+  listStrategyLabScenarios,
+} from './server/strategy-lab-store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -152,6 +159,67 @@ app.put('/api/portfolio', requirePortfolioWebAccess, async (req, res) => {
     });
   }
 });
+
+app.get('/api/strategy-lab/scenarios', requirePortfolioWebAccess, async (req, res) => {
+  try {
+    if (!req.supabaseUser) {
+      res.json({ scenarios: [], cloudEnabled: isStrategyLabEnabled() });
+      return;
+    }
+
+    const scenarios = await listStrategyLabScenarios(req.supabaseUser.id);
+    res.json({ scenarios, cloudEnabled: isStrategyLabEnabled() });
+  } catch (err) {
+    console.error('GET /api/strategy-lab/scenarios', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load scenarios',
+    });
+  }
+});
+
+app.post('/api/strategy-lab/scenarios', requirePortfolioWebAccess, async (req, res) => {
+  if (!req.supabaseUser) {
+    res.status(401).json({ error: 'Sign in to pin Strategy Lab scenarios' });
+    return;
+  }
+
+  try {
+    const scenario = await createStrategyLabScenario(req.supabaseUser.id, {
+      name: req.body?.name,
+      extraMonthlyBudget: req.body?.extraMonthlyBudget,
+      strategyId: req.body?.strategyId,
+      notes: req.body?.notes,
+    });
+    res.status(201).json({ scenario, cloudEnabled: isStrategyLabEnabled() });
+  } catch (err) {
+    console.error('POST /api/strategy-lab/scenarios', err);
+    const message = err instanceof Error ? err.message : 'Failed to save scenario';
+    const status = message.includes('already exists') ? 409 : 400;
+    res.status(status).json({ error: message });
+  }
+});
+
+app.delete(
+  '/api/strategy-lab/scenarios/:id',
+  requirePortfolioWebAccess,
+  async (req, res) => {
+    if (!req.supabaseUser) {
+      res.status(401).json({ error: 'Sign in to manage Strategy Lab scenarios' });
+      return;
+    }
+
+    try {
+      await deleteStrategyLabScenario(req.supabaseUser.id, req.params.id);
+      res.json({ ok: true });
+    } catch (err) {
+      console.error('DELETE /api/strategy-lab/scenarios', err);
+      const message =
+        err instanceof Error ? err.message : 'Failed to delete scenario';
+      const status = message.includes('not found') ? 404 : 400;
+      res.status(status).json({ error: message });
+    }
+  },
+);
 
 app.get('/api/analyze/capabilities', requirePortfolioApiKey, (_req, res) => {
   res.json(listCapabilities());
