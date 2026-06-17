@@ -20,6 +20,7 @@ import {
   savePortfolio,
 } from './server/portfolio-store.js';
 import { bootstrapAdminUserIfConfigured } from './server/startup-bootstrap.js';
+import { getSupabaseClientConfig } from './server/client-config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -45,6 +46,16 @@ app.get('/api/health', (_req, res) => {
     apiKeyRequired: Boolean(getPortfolioApiKey()),
     oauthEnabled: Boolean(getPortfolioApiKey()),
     supabaseAuthEnabled: isSupabaseAuthEnabled(),
+  });
+});
+
+app.get('/api/client-config', (_req, res) => {
+  const config = getSupabaseClientConfig();
+  res.json({
+    supabaseUrl: config.supabaseUrl,
+    supabaseAnonKey: config.supabaseAnonKey,
+    portfolioApiKey: config.portfolioApiKey,
+    portfolioWriteKey: config.portfolioWriteKey,
   });
 });
 

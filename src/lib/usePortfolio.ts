@@ -12,6 +12,7 @@ import type {
 import { denormalizePortfolio, normalizePortfolio, resolveMonthlyExpenses } from './snowball';
 import { calendarToSimMonth } from './format';
 import { bonusDepreciationForYear } from './tax';
+import { getClientConfig } from './clientConfig';
 import { getAccessToken } from './supabaseClient';
 import { useAuth } from '../context/AuthContext';
 
@@ -107,14 +108,13 @@ async function loadHealth(): Promise<HealthResponse | null> {
   }
 }
 
-function portfolioApiKey(): string | undefined {
-  const apiKey = import.meta.env.VITE_PORTFOLIO_API_KEY;
-  const writeKey = import.meta.env.VITE_PORTFOLIO_WRITE_KEY;
-  return apiKey || writeKey || undefined;
+async function portfolioApiKey(): Promise<string | undefined> {
+  const config = await getClientConfig();
+  return config.portfolioApiKey || config.portfolioWriteKey || undefined;
 }
 
-function apiHeaders(jsonBody = false): HeadersInit {
-  const key = portfolioApiKey();
+async function apiHeaders(jsonBody = false): Promise<HeadersInit> {
+  const key = await portfolioApiKey();
   const headers: Record<string, string> = {};
   if (jsonBody) headers['Content-Type'] = 'application/json';
   if (key) headers.Authorization = `Bearer ${key}`;

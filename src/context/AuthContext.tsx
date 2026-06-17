@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
-import { getSupabase, isSupabaseClientConfigured } from '../lib/supabaseClient';
+import { getSupabase, initSupabaseConfig } from '../lib/supabaseClient';
 
 interface AuthContextValue {
   configured: boolean;
@@ -23,42 +23,48 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const configured = isSupabaseClientConfigured();
-  const [loading, setLoading] = useState(configured);
+  const [configured, setConfigured] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
-    if (!configured) {
-      setLoading(false);
-      return;
-    }
+    let unsubscribe: (() => void) | undefined;
 
-    const supabase = getSupabase();
-    supabase.auth.getSession().then(({ data }) => {
+    void (async () => {
+      const ready = await initSupabaseConfig();
+      setConfigured(ready);
+      if (!ready) {
+        setLoading(false);
+        return;
+      }
+
+      const supabase = await getSupabase();
+      const { data } = await supabase.auth.getSession();
       setSession(data.session);
-      setLoading(false);
-    });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
+      const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+        setSession(nextSession);
+        setLoading(false);
+      });
+      unsubscribe = () => listener.subscription.unsubscribe();
       setLoading(false);
-    });
+    })();
 
-    return () => listener.subscription.unsubscribe();
-  }, [configured]);
+    return () => unsubscribe?.();
+  }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    const { error } = await getSupabase().auth.signInWithPassword({ email, password });
+    const { error } = await (await getSupabase()).auth.signInWithPassword({ email, password });
     return { error: error?.message ?? null };
   }, []);
 
   const signUp = useCallback(async (email: string, password: string) => {
-    const { error } = await getSupabase().auth.signUp({ email, password });
+    const { error } = await (await getSupabase()).auth.signUp({ email, password });
     return { error: error?.message ?? null };
   }, []);
 
   const signOut = useCallback(async () => {
-    await getSupabase().auth.signOut();
+    await (await getSupabase()).auth.signOut();
   }, []);
 
   const value = useMemo(
