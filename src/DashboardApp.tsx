@@ -23,6 +23,7 @@ import { StrategyComparison } from './components/StrategyComparison';
 import { DecisionPulse } from './components/DecisionPulse';
 import { BalloonSafety } from './components/BalloonSafety';
 import { PayoffLandscape } from './components/PayoffLandscape';
+import { PrincipalVelocity } from './components/PrincipalVelocity';
 import { TaxPlanner } from './components/TaxPlanner';
 import { WealthCompositionChart } from './components/WealthCompositionChart';
 import { ChartVariantContext } from './components/chart-theme';
@@ -53,6 +54,7 @@ import { usePayoffLandscape } from './lib/usePayoffLandscape';
 import { usePropertyDeck } from './lib/usePropertyDeck';
 import { useGoalCommand } from './lib/useGoalCommand';
 import { useStressLab } from './lib/useStressLab';
+import { usePrincipalVelocity } from './lib/usePrincipalVelocity';
 import { useAuth } from './context/AuthContext';
 import { useToast } from './context/ToastContext';
 
@@ -94,6 +96,7 @@ function DashboardApp() {
   const propertyDeckHook = usePropertyDeck();
   const goalCommandHook = useGoalCommand(portfolio, updateGoals);
   const stressLabHook = useStressLab();
+  const principalVelocityHook = usePrincipalVelocity();
   const { pushToast } = useToast();
 
   const isMobile = useIsMobile();
@@ -369,6 +372,15 @@ function DashboardApp() {
     onApplyScenario: setScenario,
   };
 
+  const principalVelocityProps = {
+    portfolio,
+    activeStrategy,
+    customOrder: playbookOrder,
+    budgetMax,
+    velocityHook: principalVelocityHook,
+    onApplyBudget: setBudget,
+  };
+
   const yearLabel =
     portfolioYear === 1
       ? `${portfolio.simulationAnchorYear ?? 2026} (now)`
@@ -480,6 +492,7 @@ function DashboardApp() {
                   />
                 </div>
               </div>
+              <PrincipalVelocity {...principalVelocityProps} embedded />
               <PortfolioDashboard
                 portfolio={portfolio}
                 result={activeResult}
@@ -634,6 +647,7 @@ function DashboardApp() {
 
             {activeSection === 'portfolio' && (
               <>
+                <PrincipalVelocity {...principalVelocityProps} />
                 <PortfolioDashboard
                   portfolio={portfolio}
                   result={activeResult}

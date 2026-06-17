@@ -49,7 +49,7 @@ export const DESKTOP_SECTIONS: SectionConfig[] = [
     id: 'portfolio',
     label: 'Portfolio Snapshot',
     shortLabel: 'Snapshot',
-    description: 'Metrics, insights, and horizon views',
+    description: 'Principal velocity, metrics, insights, and horizon views',
   },
   {
     id: 'charts',
