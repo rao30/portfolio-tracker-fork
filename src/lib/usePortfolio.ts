@@ -7,8 +7,10 @@ import type {
   PortfolioFile,
   Property,
   PropertyDraft,
+  PropertyEvent,
   TaxProfile,
 } from './types';
+import { validatePropertyEvent } from './timeline';
 import { denormalizePortfolio, normalizePortfolio, resolveMonthlyExpenses } from './snowball';
 import { calendarToSimMonth } from './format';
 import { bonusDepreciationForYear } from './tax';
@@ -61,6 +63,9 @@ export interface UsePortfolioResult {
   updatePropertyBoolean: (index: number, field: keyof Property, value: boolean) => void;
   addProperty: (draft: PropertyDraft) => void;
   removeProperty: (index: number) => void;
+  addPropertyEvent: (propertyIndex: number, event: PropertyEvent) => void;
+  updatePropertyEvent: (propertyIndex: number, eventIndex: number, event: PropertyEvent) => void;
+  removePropertyEvent: (propertyIndex: number, eventIndex: number) => void;
   resetFromFile: () => Promise<void>;
   exportJson: () => void;
   refreshMarketValues: () => Promise<{ ok: boolean; message: string }>;
@@ -439,6 +444,59 @@ export function usePortfolio(): UsePortfolioResult {
     [portfolio, persist, source],
   );
 
+  const addPropertyEvent = useCallback(
+    (propertyIndex: number, event: PropertyEvent) => {
+      if (!portfolio) return;
+      if (validatePropertyEvent(event)) return;
+      const props = [...portfolio.properties];
+      const current = { ...props[propertyIndex] };
+      current.events = [...(current.events ?? []), event];
+      props[propertyIndex] = current;
+      persist(
+        { ...portfolio, properties: props },
+        source === 'file' ? 'local' : source,
+      );
+    },
+    [portfolio, persist, source],
+  );
+
+  const updatePropertyEvent = useCallback(
+    (propertyIndex: number, eventIndex: number, event: PropertyEvent) => {
+      if (!portfolio) return;
+      if (validatePropertyEvent(event)) return;
+      const props = [...portfolio.properties];
+      const current = { ...props[propertyIndex] };
+      const events = [...(current.events ?? [])];
+      if (eventIndex < 0 || eventIndex >= events.length) return;
+      events[eventIndex] = event;
+      current.events = events;
+      props[propertyIndex] = current;
+      persist(
+        { ...portfolio, properties: props },
+        source === 'file' ? 'local' : source,
+      );
+    },
+    [portfolio, persist, source],
+  );
+
+  const removePropertyEvent = useCallback(
+    (propertyIndex: number, eventIndex: number) => {
+      if (!portfolio) return;
+      const props = [...portfolio.properties];
+      const current = { ...props[propertyIndex] };
+      const events = [...(current.events ?? [])];
+      if (eventIndex < 0 || eventIndex >= events.length) return;
+      events.splice(eventIndex, 1);
+      current.events = events.length > 0 ? events : undefined;
+      props[propertyIndex] = current;
+      persist(
+        { ...portfolio, properties: props },
+        source === 'file' ? 'local' : source,
+      );
+    },
+    [portfolio, persist, source],
+  );
+
   const updateAcquisitionDate = useCallback(
     (index: number, value: string) => {
       if (!portfolio) return;
@@ -600,6 +658,9 @@ export function usePortfolio(): UsePortfolioResult {
     updatePropertyBoolean,
     addProperty,
     removeProperty,
+    addPropertyEvent,
+    updatePropertyEvent,
+    removePropertyEvent,
     resetFromFile,
     exportJson,
     refreshMarketValues,

@@ -4,6 +4,7 @@ import { CashflowChart } from './components/CashflowChart';
 import { Controls } from './components/Controls';
 import { GoalTracker } from './components/GoalTracker';
 import { Header } from './components/Header';
+import { LifeEventsTimeline } from './components/LifeEventsTimeline';
 import { IncomeVsExpenseChart } from './components/IncomeVsExpenseChart';
 import { InterestChart } from './components/InterestChart';
 import { MonteCarloChart } from './components/MonteCarloChart';
@@ -55,6 +56,9 @@ function DashboardApp() {
     updateExpenseBreakdown,
     addProperty,
     removeProperty,
+    addPropertyEvent,
+    updatePropertyEvent,
+    removePropertyEvent,
     resetFromFile,
     exportJson,
     refreshMarketValues,
@@ -258,6 +262,14 @@ function DashboardApp() {
               </ChartVariantContext.Provider>
             </div>
             <GoalTracker {...goalProps} section="insights" />
+            <LifeEventsTimeline
+              portfolio={portfolio}
+              strategyId={activeStrategy}
+              onAddEvent={addPropertyEvent}
+              onUpdateEvent={updatePropertyEvent}
+              onRemoveEvent={removePropertyEvent}
+              embedded
+            />
           </div>
         )}
 
@@ -395,6 +407,14 @@ function DashboardApp() {
         portfolio={portfolio}
         scenarioId={scenario.id}
         onScenarioChange={setScenario}
+      />
+
+      <LifeEventsTimeline
+        portfolio={portfolio}
+        strategyId={activeStrategy}
+        onAddEvent={addPropertyEvent}
+        onUpdateEvent={updatePropertyEvent}
+        onRemoveEvent={removePropertyEvent}
       />
 
       <TaxPlanner
