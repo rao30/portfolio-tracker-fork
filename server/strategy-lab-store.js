@@ -253,3 +253,95 @@ export async function deleteStrategyLabScenario(userId, scenarioId) {
 
   return { ok: true };
 }
+
+function rowToPreferences(row) {
+  return {
+    isCollapsed: Boolean(row.is_collapsed),
+    lastExploredPinId: row.last_explored_pin_id ?? null,
+    committedPinId: row.committed_pin_id ?? null,
+    updatedAt: row.updated_at,
+  };
+}
+
+function validatePreferencesPayload(body) {
+  const errors = [];
+
+  if (body.isCollapsed !== undefined && typeof body.isCollapsed !== 'boolean') {
+    errors.push('isCollapsed must be a boolean');
+  }
+
+  for (const field of ['lastExploredPinId', 'committedPinId']) {
+    if (body[field] !== undefined && body[field] !== null) {
+      if (typeof body[field] !== 'string' || body[field].trim().length === 0) {
+        errors.push(`${field} must be a non-empty string or null`);
+      }
+    }
+  }
+
+  return errors;
+}
+
+export async function getStrategyLabPreferences(userId) {
+  const client = getSupabase();
+  if (!client) {
+    throw new Error('Cloud storage is not configured');
+  }
+
+  const { data, error } = await client
+    .from('strategy_lab_preferences')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) {
+    return {
+      isCollapsed: false,
+      lastExploredPinId: null,
+      committedPinId: null,
+      updatedAt: null,
+    };
+  }
+
+  return rowToPreferences(data);
+}
+
+export async function upsertStrategyLabPreferences(userId, body) {
+  const client = getSupabase();
+  if (!client) {
+    throw new Error('Cloud storage is not configured');
+  }
+
+  const errors = validatePreferencesPayload(body);
+  if (errors.length > 0) {
+    const err = new Error(errors.join('; '));
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const row = {
+    user_id: userId,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (body.isCollapsed !== undefined) row.is_collapsed = body.isCollapsed;
+  if (body.lastExploredPinId !== undefined) {
+    row.last_explored_pin_id = body.lastExploredPinId;
+  }
+  if (body.committedPinId !== undefined) {
+    row.committed_pin_id = body.committedPinId;
+  }
+
+  const { data, error } = await client
+    .from('strategy_lab_preferences')
+    .upsert(row, { onConflict: 'user_id' })
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  return rowToPreferences(data);
+}
+
+export function isStrategyLabEnabled() {
+  return Boolean(getSupabase());
+}
