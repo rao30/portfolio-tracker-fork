@@ -20,6 +20,7 @@ import { PayoffPlaybook } from './components/PayoffPlaybook';
 import { TimelineStudio } from './components/TimelineStudio';
 import { StrategyComparison } from './components/StrategyComparison';
 import { DecisionPulse } from './components/DecisionPulse';
+import { BalloonSafety } from './components/BalloonSafety';
 import { PayoffLandscape } from './components/PayoffLandscape';
 import { TaxPlanner } from './components/TaxPlanner';
 import { WealthCompositionChart } from './components/WealthCompositionChart';
@@ -40,6 +41,7 @@ import { usePortfolio } from './lib/usePortfolio';
 import { useStrategyLab } from './lib/useStrategyLab';
 import { usePayoffPlaybook } from './lib/usePayoffPlaybook';
 import { useDecisionPulse } from './lib/useDecisionPulse';
+import { useBalloonSafety } from './lib/useBalloonSafety';
 import { usePayoffLandscape } from './lib/usePayoffLandscape';
 import { useAuth } from './context/AuthContext';
 
@@ -76,6 +78,7 @@ function DashboardApp() {
   const strategyLab = useStrategyLab();
   const payoffPlaybookHook = usePayoffPlaybook();
   const decisionPulseHook = useDecisionPulse();
+  const balloonSafetyHook = useBalloonSafety();
   const payoffLandscapeHook = usePayoffLandscape();
 
   const isMobile = useIsMobile();
@@ -272,6 +275,24 @@ function DashboardApp() {
     },
   };
 
+  const balloonSafetyProps = {
+    portfolio,
+    activeStrategy,
+    activeResult,
+    customOrder: playbookOrder,
+    safetyHook: balloonSafetyHook,
+    onBudgetChange: setBudget,
+    onPrioritizeInPlaybook: (order: string[]) => {
+      setPlaybookOrder(order);
+      void payoffPlaybookHook.savePlaybook({
+        propertyOrder: order,
+        baseStrategy: payoffPlaybookHook.playbook?.baseStrategy ?? activeStrategy,
+        isActive: true,
+      });
+    },
+    currentPlaybookOrder: playbookOrder ?? undefined,
+  };
+
   if (isMobile) {
     return (
       <div className="mx-auto min-h-screen max-w-7xl space-y-3 p-3 pb-24">
@@ -295,6 +316,7 @@ function DashboardApp() {
               compact
             />
             <DecisionPulse {...decisionPulseProps} embedded />
+            <BalloonSafety {...balloonSafetyProps} embedded />
             <PayoffLandscape {...payoffLandscapeProps} embedded />
             <div className="app-surface space-y-4 p-4">
               <Controls {...controlProps} mode="primary" embedded />
@@ -481,6 +503,8 @@ function DashboardApp() {
       />
 
       <DecisionPulse {...decisionPulseProps} />
+
+      <BalloonSafety {...balloonSafetyProps} />
 
       <PayoffLandscape {...payoffLandscapeProps} />
 
