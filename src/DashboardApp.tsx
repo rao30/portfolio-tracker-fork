@@ -16,6 +16,7 @@ import { PropertyTable } from './components/PropertyTable';
 import { ScheduleOfRealEstateModal } from './components/ScheduleOfRealEstateModal';
 import { ScenarioControls } from './components/ScenarioControls';
 import { StrategyComparison } from './components/StrategyComparison';
+import { StrategyLab } from './components/StrategyLab';
 import { TaxPlanner } from './components/TaxPlanner';
 import { WealthCompositionChart } from './components/WealthCompositionChart';
 import { ChartVariantContext } from './components/chart-theme';
@@ -228,6 +229,15 @@ function DashboardApp() {
             />
             <div className="app-surface space-y-4 p-4">
               <Controls {...controlProps} mode="primary" embedded />
+              <StrategyLab
+                portfolio={portfolio}
+                activeBudget={portfolio.extraMonthlyBudget}
+                activeStrategyId={activeStrategy}
+                onApply={(budget, strategyId) => {
+                  setBudget(budget);
+                  setActiveStrategy(strategyId);
+                }}
+              />
               <div className="border-t border-white/10 pt-4">
                 <ScenarioControls
                   portfolio={portfolio}
@@ -383,6 +393,16 @@ function DashboardApp() {
       />
 
       <Controls {...controlProps} />
+
+      <StrategyLab
+        portfolio={portfolio}
+        activeBudget={portfolio.extraMonthlyBudget}
+        activeStrategyId={activeStrategy}
+        onApply={(budget, strategyId) => {
+          setBudget(budget);
+          setActiveStrategy(strategyId);
+        }}
+      />
 
       <PortfolioDashboard
         portfolio={portfolio}
