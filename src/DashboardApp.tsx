@@ -347,6 +347,7 @@ function DashboardApp() {
     activeStrategy,
     activeScenario: scenario,
     activeScenarioId: scenario.id,
+    customOrder: playbookOrder,
     lab: strategyLab,
     onApply: ({ budget, strategy, scenario: nextScenario }: {
       budget: number;

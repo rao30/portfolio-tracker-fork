@@ -22,8 +22,10 @@ import {
 import {
   createStrategyLabScenario,
   deleteStrategyLabScenario,
+  getStrategyLabPreferences,
   listStrategyLabScenarios,
   updateStrategyLabScenario,
+  upsertStrategyLabPreferences,
 } from './server/strategy-lab-store.js';
 import {
   deletePayoffPlaybook,
@@ -197,8 +199,11 @@ app.get('/api/strategy-lab', requirePortfolioWebAccess, async (req, res) => {
   if (!requireAuthenticatedUser(req, res)) return;
 
   try {
-    const scenarios = await listStrategyLabScenarios(req.supabaseUser.id);
-    res.json({ scenarios });
+    const [scenarios, preferences] = await Promise.all([
+      listStrategyLabScenarios(req.supabaseUser.id),
+      getStrategyLabPreferences(req.supabaseUser.id),
+    ]);
+    res.json({ scenarios, preferences });
   } catch (err) {
     console.error('GET /api/strategy-lab', err);
     res.status(500).json({
@@ -252,6 +257,24 @@ app.delete('/api/strategy-lab/:id', requirePortfolioWebAccess, async (req, res) 
     const status = err.statusCode ?? 500;
     res.status(status).json({
       error: err instanceof Error ? err.message : 'Failed to delete scenario',
+    });
+  }
+});
+
+app.put('/api/strategy-lab/preferences', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await upsertStrategyLabPreferences(
+      req.supabaseUser.id,
+      req.body ?? {},
+    );
+    res.json({ preferences });
+  } catch (err) {
+    console.error('PUT /api/strategy-lab/preferences', err);
+    const status = err.statusCode ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to save Strategy Lab preferences',
     });
   }
 });
