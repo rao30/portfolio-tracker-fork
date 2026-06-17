@@ -15,7 +15,7 @@ import { PortfolioDashboard } from './components/PortfolioDashboard';
 import { PropertyInsights } from './components/PropertyInsights';
 import { PropertyDeck } from './components/PropertyDeck';
 import { ScheduleOfRealEstateModal } from './components/ScheduleOfRealEstateModal';
-import { ScenarioControls } from './components/ScenarioControls';
+import { StressLab } from './components/StressLab';
 import { StrategyLab } from './components/StrategyLab';
 import { PayoffPlaybook } from './components/PayoffPlaybook';
 import { TimelineStudio } from './components/TimelineStudio';
@@ -52,6 +52,7 @@ import { useBalloonSafety } from './lib/useBalloonSafety';
 import { usePayoffLandscape } from './lib/usePayoffLandscape';
 import { usePropertyDeck } from './lib/usePropertyDeck';
 import { useGoalCommand } from './lib/useGoalCommand';
+import { useStressLab } from './lib/useStressLab';
 import { useAuth } from './context/AuthContext';
 import { useToast } from './context/ToastContext';
 
@@ -92,6 +93,7 @@ function DashboardApp() {
   const payoffLandscapeHook = usePayoffLandscape();
   const propertyDeckHook = usePropertyDeck();
   const goalCommandHook = useGoalCommand(portfolio, updateGoals);
+  const stressLabHook = useStressLab();
   const { pushToast } = useToast();
 
   const isMobile = useIsMobile();
@@ -357,6 +359,15 @@ function DashboardApp() {
     },
   };
 
+  const stressLabProps = {
+    portfolio,
+    activeStrategy,
+    committedScenario: scenario,
+    customOrder: playbookOrder,
+    stressHook: stressLabHook,
+    onApplyScenario: setScenario,
+  };
+
   const yearLabel =
     portfolioYear === 1
       ? `${portfolio.simulationAnchorYear ?? 2026} (now)`
@@ -454,14 +465,7 @@ function DashboardApp() {
               <PayoffLandscape {...payoffLandscapeProps} embedded />
               <div className="app-surface space-y-4 p-4">
                 <Controls {...controlProps} mode="primary" embedded idPrefix="overview" />
-                <div className="border-t border-white/10 pt-4">
-                  <ScenarioControls
-                    portfolio={portfolio}
-                    scenarioId={scenario.id}
-                    onScenarioChange={setScenario}
-                    embedded
-                  />
-                </div>
+                <StressLab {...stressLabProps} embedded />
                 <div className="border-t border-white/10 pt-4">
                   <TimelineStudio
                     portfolio={portfolio}
@@ -613,11 +617,7 @@ function DashboardApp() {
               <>
                 <Controls {...controlProps} idPrefix="strategy" />
                 <PayoffPlaybook {...playbookProps} />
-                <ScenarioControls
-                  portfolio={portfolio}
-                  scenarioId={scenario.id}
-                  onScenarioChange={setScenario}
-                />
+                <StressLab {...stressLabProps} />
                 <TimelineStudio
                   portfolio={portfolio}
                   strategyId={activeStrategy}

@@ -64,6 +64,11 @@ import {
   isGoalCommandEnabled,
   upsertGoalCommandPreferences,
 } from './server/goal-command-store.js';
+import {
+  getStressLabPreferences,
+  isStressLabEnabled,
+  upsertStressLabPreferences,
+} from './server/stress-lab-store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -454,6 +459,38 @@ app.put('/api/goal-command', requirePortfolioWebAccess, async (req, res) => {
     const status = err.status ?? 500;
     res.status(status).json({
       error: err instanceof Error ? err.message : 'Failed to save Freedom Date preferences',
+    });
+  }
+});
+
+app.get('/api/stress-lab', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await getStressLabPreferences(req.supabaseUser.id);
+    res.json({ preferences, enabled: isStressLabEnabled() });
+  } catch (err) {
+    console.error('GET /api/stress-lab', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load Stress Lab preferences',
+    });
+  }
+});
+
+app.put('/api/stress-lab', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await upsertStressLabPreferences(
+      req.supabaseUser.id,
+      req.body ?? {},
+    );
+    res.json({ preferences });
+  } catch (err) {
+    console.error('PUT /api/stress-lab', err);
+    const status = err.status ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to save Stress Lab preferences',
     });
   }
 });

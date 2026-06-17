@@ -43,7 +43,7 @@ export const DESKTOP_SECTIONS: SectionConfig[] = [
     id: 'strategy',
     label: 'Strategy & Planning',
     shortLabel: 'Strategy',
-    description: 'Budget, playbook, scenarios, timeline, lab',
+    description: 'Budget, playbook, stress lab, timeline, lab',
   },
   {
     id: 'portfolio',
