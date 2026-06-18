@@ -129,9 +129,9 @@ export function computeAcquisitionMetrics(template: AcquisitionTemplate): {
 }
 
 function laneLabel(lane: DeployLane): string {
-  if (lane === 'paydown') return 'Snowball paydown';
-  if (lane === 'reserve') return 'Reserve fortress';
-  return 'Acquisition war chest';
+  if (lane === 'paydown') return 'Pay down debt';
+  if (lane === 'reserve') return 'Build cash reserves';
+  return 'Save for next purchase';
 }
 
 function buildLiquiditySnapshot(
@@ -265,7 +265,7 @@ function pickWinner(
     const spread = acquisitionCoc - liquidity.weightedAvgMortgageRate;
     return {
       winner: 'acquisition',
-      verdict: `Fund the war chest — template deal clears your hurdle by ${formatPercent(spread)} over weighted avg mortgage rate.`,
+      verdict: `Save for the next purchase — the template deal beats your loan rate by ${formatPercent(spread)}.`,
       tone: 'positive',
     };
   }
@@ -288,7 +288,7 @@ function pickWinner(
 
   return {
     winner: 'acquisition',
-    verdict: `Build acquisition fund — template CoC (${formatPercent(acquisitionCoc)}) exceeds paydown return.`,
+    verdict: `Save for the next purchase — template return (${formatPercent(acquisitionCoc)}) beats paying down debt.`,
     tone: 'neutral',
   };
 }

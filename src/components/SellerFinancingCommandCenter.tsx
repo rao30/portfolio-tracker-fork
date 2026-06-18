@@ -269,15 +269,15 @@ export function SellerFinancingCommandCenter({
       ref={sectionRef}
       className={shell}
       data-seller-financing
-      aria-label="Seller Financing Command Center"
+      aria-label="Seller Financing"
     >
       <div className="flex flex-wrap items-start justify-between gap-2 border-b border-white/10 px-3 py-2.5">
         <div>
           <h4 className="text-xs font-semibold uppercase tracking-wide text-violet-400">
-            Seller Financing Command Center
+            Seller Financing
           </h4>
           <p className="mt-0.5 text-[11px] text-slate-500">
-            Yield-maintenance caps · balloon timing · post-refi impact — safe preview
+            Balloon timing and what the loan looks like after it refinances.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

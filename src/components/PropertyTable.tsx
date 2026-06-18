@@ -650,7 +650,7 @@ export function PropertyTable({
                           className={`text-xs hover:text-cyan-300 ${
                             activePanel === 'financing' ? 'text-cyan-300' : 'text-slate-400'
                           }`}
-                          title="Seller Financing Command Center"
+                          title="Seller Financing"
                         >
                           {activePanel === 'financing' ? '▾' : '◈'}
                         </button>

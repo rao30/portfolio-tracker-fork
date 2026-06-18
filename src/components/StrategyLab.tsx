@@ -453,7 +453,7 @@ export function StrategyLab({
         >
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-violet-400">
-              Strategy Lab
+              Saved Scenarios
             </p>
             <p className="truncate text-sm text-slate-200">
               {lab.scenarios.length} pinned plan{lab.scenarios.length === 1 ? '' : 's'}
@@ -472,15 +472,15 @@ export function StrategyLab({
     <section
       ref={sectionRef}
       className={shell}
-      aria-label="Strategy Lab"
+      aria-label="Saved Scenarios"
       data-strategy-lab
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-slate-100">Strategy Lab</h2>
+          <h2 className="text-base font-semibold text-slate-100">Saved Scenarios</h2>
           <p className="mt-1 max-w-2xl text-xs text-slate-400">
-            Pin payoff plans and compare side-by-side without corrupting your live dashboard.
-            Select a pin to preview — press <kbd className="rounded bg-slate-800 px-1">Enter</kbd>{' '}
+            Save different plans (budget + strategy) and compare them side by side without changing
+            your live numbers. Select one to preview — press <kbd className="rounded bg-slate-800 px-1">Enter</kbd>{' '}
             to apply or <kbd className="rounded bg-slate-800 px-1">Esc</kbd> to reset. Keys{' '}
             <kbd className="rounded bg-slate-800 px-1">1</kbd>–
             <kbd className="rounded bg-slate-800 px-1">9</kbd> preview pins.
