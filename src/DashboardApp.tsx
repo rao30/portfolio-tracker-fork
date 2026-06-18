@@ -56,6 +56,7 @@ import { useGoalCommand } from './lib/useGoalCommand';
 import { useStressLab } from './lib/useStressLab';
 import { usePrincipalVelocity } from './lib/usePrincipalVelocity';
 import { useTimelinePreferences } from './lib/useTimelinePreferences';
+import { useTaxShield } from './lib/useTaxShield';
 import { useAuth } from './context/AuthContext';
 import { useToast } from './context/ToastContext';
 
@@ -74,6 +75,7 @@ function DashboardApp() {
     setBudget,
     updatePortfolioSetting,
     updateTaxProfile,
+    applyTaxProfilePatch,
     updateAcquisitionTemplate,
     updateGoals,
     updateProperty,
@@ -99,6 +101,7 @@ function DashboardApp() {
   const stressLabHook = useStressLab();
   const principalVelocityHook = usePrincipalVelocity();
   const timelineHook = useTimelinePreferences();
+  const taxShieldHook = useTaxShield();
   const { pushToast } = useToast();
 
   const isMobile = useIsMobile();
@@ -579,7 +582,11 @@ function DashboardApp() {
                   Export
                 </button>
               </div>
-              <TaxPlanner portfolio={portfolio} onTaxProfileChange={updateTaxProfile} />
+              <TaxPlanner
+                portfolio={portfolio}
+                taxShieldHook={taxShieldHook}
+                onApplyTaxProfile={applyTaxProfilePatch}
+              />
               <Controls {...controlProps} mode="advanced" idPrefix="settings" />
               <GoalTracker {...goalProps} section="goals" />
               <GoalTracker {...goalProps} section="milestones" />
@@ -672,7 +679,11 @@ function DashboardApp() {
 
             {activeSection === 'tax' && (
               <>
-                <TaxPlanner portfolio={portfolio} onTaxProfileChange={updateTaxProfile} />
+                <TaxPlanner
+                  portfolio={portfolio}
+                  taxShieldHook={taxShieldHook}
+                  onApplyTaxProfile={applyTaxProfilePatch}
+                />
                 <GoalTracker {...goalProps} />
               </>
             )}
