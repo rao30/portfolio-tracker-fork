@@ -53,6 +53,7 @@ import { usePayoffLandscape } from './lib/usePayoffLandscape';
 import { usePropertyDeck } from './lib/usePropertyDeck';
 import { useGoalCommand } from './lib/useGoalCommand';
 import { useStressLab } from './lib/useStressLab';
+import { useTaxShield } from './lib/useTaxShield';
 import { useAuth } from './context/AuthContext';
 import { useToast } from './context/ToastContext';
 
@@ -71,6 +72,7 @@ function DashboardApp() {
     setBudget,
     updatePortfolioSetting,
     updateTaxProfile,
+    applyTaxProfilePatch,
     updateAcquisitionTemplate,
     updateGoals,
     updateProperty,
@@ -94,6 +96,7 @@ function DashboardApp() {
   const propertyDeckHook = usePropertyDeck();
   const goalCommandHook = useGoalCommand(portfolio, updateGoals);
   const stressLabHook = useStressLab();
+  const taxShieldHook = useTaxShield();
   const { pushToast } = useToast();
 
   const isMobile = useIsMobile();
@@ -563,7 +566,11 @@ function DashboardApp() {
                   Export
                 </button>
               </div>
-              <TaxPlanner portfolio={portfolio} onTaxProfileChange={updateTaxProfile} />
+              <TaxPlanner
+                portfolio={portfolio}
+                taxShieldHook={taxShieldHook}
+                onApplyTaxProfile={applyTaxProfilePatch}
+              />
               <Controls {...controlProps} mode="advanced" idPrefix="settings" />
               <GoalTracker {...goalProps} section="goals" />
               <GoalTracker {...goalProps} section="milestones" />
@@ -654,7 +661,11 @@ function DashboardApp() {
 
             {activeSection === 'tax' && (
               <>
-                <TaxPlanner portfolio={portfolio} onTaxProfileChange={updateTaxProfile} />
+                <TaxPlanner
+                  portfolio={portfolio}
+                  taxShieldHook={taxShieldHook}
+                  onApplyTaxProfile={applyTaxProfilePatch}
+                />
                 <GoalTracker {...goalProps} />
               </>
             )}

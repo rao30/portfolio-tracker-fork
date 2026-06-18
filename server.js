@@ -71,6 +71,11 @@ import {
   isStressLabEnabled,
   upsertStressLabPreferences,
 } from './server/stress-lab-store.js';
+import {
+  getTaxShieldPreferences,
+  isTaxShieldEnabled,
+  upsertTaxShieldPreferences,
+} from './server/tax-shield-store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -514,6 +519,38 @@ app.put('/api/stress-lab', requirePortfolioWebAccess, async (req, res) => {
     const status = err.status ?? 500;
     res.status(status).json({
       error: err instanceof Error ? err.message : 'Failed to save Stress Lab preferences',
+    });
+  }
+});
+
+app.get('/api/tax-shield', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await getTaxShieldPreferences(req.supabaseUser.id);
+    res.json({ preferences, enabled: isTaxShieldEnabled() });
+  } catch (err) {
+    console.error('GET /api/tax-shield', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load Tax Shield preferences',
+    });
+  }
+});
+
+app.put('/api/tax-shield', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await upsertTaxShieldPreferences(
+      req.supabaseUser.id,
+      req.body ?? {},
+    );
+    res.json({ preferences });
+  } catch (err) {
+    console.error('PUT /api/tax-shield', err);
+    const status = err.status ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to save Tax Shield preferences',
     });
   }
 });

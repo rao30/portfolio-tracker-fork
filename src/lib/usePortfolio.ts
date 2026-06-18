@@ -55,6 +55,7 @@ export interface UsePortfolioResult {
   setBudget: (budget: number) => void;
   updatePortfolioSetting: (field: PortfolioSettingKey, value: number | boolean) => void;
   updateTaxProfile: (field: keyof TaxProfile, value: number | boolean | string) => void;
+  applyTaxProfilePatch: (patch: Partial<TaxProfile>) => void;
   updateAcquisitionTemplate: (
     field: keyof AcquisitionTemplate,
     value: number | boolean | string,
@@ -368,6 +369,21 @@ export function usePortfolio(): UsePortfolioResult {
     [portfolio, persist, source],
   );
 
+  const applyTaxProfilePatch = useCallback(
+    (patch: Partial<TaxProfile>) => {
+      if (!portfolio || Object.keys(patch).length === 0) return;
+      const next = { ...portfolio.taxProfile, ...patch };
+      if (patch.taxYear != null) {
+        next.bonusDepreciationRate = bonusDepreciationForYear(patch.taxYear);
+      }
+      persist(
+        { ...portfolio, taxProfile: next },
+        source === 'file' ? 'local' : source,
+      );
+    },
+    [portfolio, persist, source],
+  );
+
   const updateAcquisitionTemplate = useCallback(
     (field: keyof AcquisitionTemplate, value: number | boolean | string) => {
       if (!portfolio) return;
@@ -660,6 +676,7 @@ export function usePortfolio(): UsePortfolioResult {
     setBudget,
     updatePortfolioSetting,
     updateTaxProfile,
+    applyTaxProfilePatch,
     updateAcquisitionTemplate,
     updateGoals,
     updateProperty,
