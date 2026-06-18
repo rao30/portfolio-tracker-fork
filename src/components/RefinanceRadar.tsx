@@ -288,7 +288,7 @@ export function RefinanceRadar({
         >
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-violet-400">
-              Refinance Radar
+              Refinance Opportunities
             </p>
             <p className="truncate text-sm text-slate-200">{analysis.verdict}</p>
           </div>
@@ -313,10 +313,10 @@ export function RefinanceRadar({
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-white/10 px-4 py-4">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-violet-400">
-            Refinance Radar
+            Refinance Opportunities
           </p>
           <p className="mt-1 text-sm text-slate-300">
-            Portfolio-wide refi scanner — break-even, cash-out, and DSCR gates in one view.
+            Checks every loan for a worthwhile refinance — monthly savings, break-even time, and cash-out potential.
           </p>
         </div>
         <button

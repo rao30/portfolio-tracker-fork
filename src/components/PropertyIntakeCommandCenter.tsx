@@ -316,10 +316,10 @@ export function PropertyIntakeCommandCenter({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h3 id="property-intake-title" className="text-lg font-semibold text-white">
-                Property Intake Command Center
+                Add a Property
               </h3>
               <p className="mt-1 text-xs text-slate-400">
-                Guided add with live health preview · autosaves to your portfolio
+                Step-by-step setup with a live health check as you type · saves to your portfolio
               </p>
             </div>
             <button

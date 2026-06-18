@@ -4,6 +4,7 @@ import { CashflowChart } from './components/CashflowChart';
 import { ChartNavigator } from './components/ChartNavigator';
 import { Controls } from './components/Controls';
 import { DashboardNav, SectionHeader } from './components/DashboardNav';
+import { GettingStarted } from './components/GettingStarted';
 import { GoalTracker } from './components/GoalTracker';
 import { Header } from './components/Header';
 import { IncomeVsExpenseChart } from './components/IncomeVsExpenseChart';
@@ -124,7 +125,7 @@ function DashboardApp() {
 
   const isMobile = useIsMobile();
   const [mobileTab, setMobileTab] = useState<MobileTab>('overview');
-  const [activeSection, setActiveSection] = useState<DashboardSection>('command');
+  const [activeSection, setActiveSection] = useState<DashboardSection>('overview');
   const [activeStrategy, setActiveStrategy] = useState<StrategyId>('highestRate');
   const [playbookOrder, setPlaybookOrder] = useState<string[] | null>(null);
   const [scenario, setScenario] = useState<ScenarioConfig>(SCENARIO_PRESETS[0]);
@@ -678,22 +679,40 @@ function DashboardApp() {
               />
             )}
 
-            {activeSection === 'command' && (
+            {activeSection === 'overview' && (
               <>
-                <CapitalDeploy {...capitalDeployProps} />
-                <ExitCompass {...exitCompassProps} />
+                <GettingStarted onNavigate={handleSectionChange} />
                 <DecisionPulse {...decisionPulseProps} />
-                <BalloonSafety {...balloonSafetyProps} />
-                <RefinanceRadar portfolio={portfolio} radarHook={refinanceRadarHook} />
-                <Controls {...controlProps} mode="advanced" embedded idPrefix="command" />
-                <PayoffLandscape {...payoffLandscapeProps} />
+                <PortfolioDashboard
+                  portfolio={portfolio}
+                  result={activeResult}
+                  year={portfolioYear}
+                  onYearChange={setPortfolioYear}
+                />
+                <GoalTracker {...goalProps} section="insights" />
               </>
             )}
 
-            {activeSection === 'strategy' && (
+            {activeSection === 'plan' && (
               <>
-                <Controls {...controlProps} idPrefix="strategy" />
+                <Controls {...controlProps} mode="full" idPrefix="plan" />
                 <PayoffPlaybook {...playbookProps} />
+                <PayoffLandscape {...payoffLandscapeProps} />
+                <PrincipalVelocity {...principalVelocityProps} />
+              </>
+            )}
+
+            {activeSection === 'decisions' && (
+              <>
+                <CapitalDeploy {...capitalDeployProps} />
+                <BalloonSafety {...balloonSafetyProps} />
+                <RefinanceRadar portfolio={portfolio} radarHook={refinanceRadarHook} />
+                <ExitCompass {...exitCompassProps} />
+              </>
+            )}
+
+            {activeSection === 'scenarios' && (
+              <>
                 <StressLab {...stressLabProps} />
                 <TimelineStudio
                   portfolio={portfolio}
@@ -706,38 +725,6 @@ function DashboardApp() {
                   onClearEvents={clearTimelineEvents}
                 />
                 <StrategyLab {...strategyLabProps} />
-              </>
-            )}
-
-            {activeSection === 'portfolio' && (
-              <>
-                <PrincipalVelocity {...principalVelocityProps} />
-                <PortfolioDashboard
-                  portfolio={portfolio}
-                  result={activeResult}
-                  year={portfolioYear}
-                  onYearChange={setPortfolioYear}
-                />
-                <PropertyInsights
-                  insights={propertyInsights}
-                  result={activeResult}
-                  yearLabel={yearLabel}
-                  ownedCount={propertyInsights.length}
-                />
-                <GoalTracker {...goalProps} section="insights" />
-              </>
-            )}
-
-            {activeSection === 'charts' && chartsSection}
-
-            {activeSection === 'tax' && (
-              <>
-                <TaxPlanner
-                  portfolio={portfolio}
-                  taxShieldHook={taxShieldHook}
-                  onApplyTaxProfile={applyTaxProfilePatch}
-                />
-                <GoalTracker {...goalProps} />
               </>
             )}
 
@@ -760,6 +747,25 @@ function DashboardApp() {
                   onSave={handleSave}
                   onDiscard={discardChanges}
                 />
+                <PropertyInsights
+                  insights={propertyInsights}
+                  result={activeResult}
+                  yearLabel={yearLabel}
+                  ownedCount={propertyInsights.length}
+                />
+              </>
+            )}
+
+            {activeSection === 'charts' && chartsSection}
+
+            {activeSection === 'tax' && (
+              <>
+                <TaxPlanner
+                  portfolio={portfolio}
+                  taxShieldHook={taxShieldHook}
+                  onApplyTaxProfile={applyTaxProfilePatch}
+                />
+                <GoalTracker {...goalProps} />
               </>
             )}
           </div>

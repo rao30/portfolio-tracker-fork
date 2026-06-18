@@ -146,7 +146,7 @@ export function Header({
           Rental Snowball
         </h1>
         <p className="mt-1 text-sm text-slate-400">
-          Aggressive payoff simulation across your rental portfolio
+          See the fastest path to paying off your rental mortgages
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-3">

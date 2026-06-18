@@ -290,7 +290,7 @@ export function TaxPlanner({
         >
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-violet-400">
-              Tax Shield
+              Tax Savings
             </p>
             <p className="truncate text-sm text-slate-200">{committedAnalysis.statusHeadline}</p>
           </div>
@@ -312,16 +312,16 @@ export function TaxPlanner({
     <section
       ref={sectionRef}
       className={shell}
-      aria-label="Tax Shield Command Center"
+      aria-label="Tax savings from depreciation"
       data-tax-shield
     >
       <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-violet-400">
-            Tax Shield
+            Tax Savings
           </h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            {analysis.taxYear} depreciation · safe profile preview · apply-only
+            How much depreciation on your rentals could lower your {analysis.taxYear} tax bill.
           </p>
         </div>
         {!embedded && (

@@ -183,7 +183,7 @@ export function OperatingCostsCommandCenter({
     <div
       ref={sectionRef}
       className={shell}
-      aria-label="Operating Costs Command Center"
+      aria-label="Operating Costs"
     >
       <div className="border-b border-white/10 px-3 py-3 sm:px-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -194,7 +194,7 @@ export function OperatingCostsCommandCenter({
                 style={{ backgroundColor: propertyColor(property.name) }}
               />
               <h3 className="truncate text-sm font-semibold text-white">
-                Operating Costs Command Center
+                Operating Costs
               </h3>
             </div>
             <p className="mt-0.5 text-xs text-slate-500">

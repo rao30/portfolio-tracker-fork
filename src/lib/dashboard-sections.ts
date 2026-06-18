@@ -1,10 +1,11 @@
 export type DashboardSection =
-  | 'command'
-  | 'strategy'
-  | 'portfolio'
+  | 'overview'
+  | 'plan'
+  | 'decisions'
+  | 'scenarios'
+  | 'properties'
   | 'charts'
-  | 'tax'
-  | 'properties';
+  | 'tax';
 
 export type MobileTab = 'overview' | 'charts' | 'portfolio' | 'settings';
 
@@ -34,40 +35,46 @@ export interface ChartConfig {
 
 export const DESKTOP_SECTIONS: SectionConfig[] = [
   {
-    id: 'command',
-    label: 'Command Center',
-    shortLabel: 'Command',
-    description: 'Capital deploy, exit compass, decision pulse, balloon safety, refinance radar, payoff landscape',
+    id: 'overview',
+    label: 'Overview',
+    shortLabel: 'Overview',
+    description: 'Your portfolio at a glance and when you become debt-free',
   },
   {
-    id: 'strategy',
-    label: 'Strategy & Planning',
-    shortLabel: 'Strategy',
-    description: 'Budget, playbook, stress lab, timeline, lab',
+    id: 'plan',
+    label: 'Payoff Plan',
+    shortLabel: 'Plan',
+    description: 'Set your extra budget and payoff strategy, then compare the trade-offs',
   },
   {
-    id: 'portfolio',
-    label: 'Portfolio Snapshot',
-    shortLabel: 'Snapshot',
-    description: 'Principal velocity, metrics, insights, and horizon views',
+    id: 'decisions',
+    label: 'Decisions',
+    shortLabel: 'Decisions',
+    description: 'What to do with extra cash, plus time-sensitive risks and opportunities',
   },
   {
-    id: 'charts',
-    label: 'Charts',
-    shortLabel: 'Charts',
-    description: 'Visualize wealth, cashflow, and payoff paths',
-  },
-  {
-    id: 'tax',
-    label: 'Tax & Goals',
-    shortLabel: 'Tax',
-    description: 'Tax Shield command center, freedom date goals, and milestones',
+    id: 'scenarios',
+    label: 'Scenarios',
+    shortLabel: 'Scenarios',
+    description: 'Stress-test your plan and model future events before they happen',
   },
   {
     id: 'properties',
     label: 'Properties',
     shortLabel: 'Properties',
-    description: 'Edit portfolio and per-property details',
+    description: 'Add or edit properties and review the numbers for each one',
+  },
+  {
+    id: 'charts',
+    label: 'Charts',
+    shortLabel: 'Charts',
+    description: 'Visualize wealth, cashflow, and payoff paths over time',
+  },
+  {
+    id: 'tax',
+    label: 'Tax & Goals',
+    shortLabel: 'Tax',
+    description: 'Estimate the tax savings from your rentals and track your debt-free goal',
   },
 ];
 
