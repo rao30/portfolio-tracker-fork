@@ -14,13 +14,16 @@ import {
   resolveMonthlyUtilities,
 } from '../lib/snowball';
 import { AddPropertyModal } from './AddPropertyModal';
-import { ExpenseBreakdownEditor } from './ExpenseBreakdownEditor';
-import { FinancingEditor } from './FinancingEditor';
+import { OperatingCostsCommandCenter } from './OperatingCostsCommandCenter';
+import { SellerFinancingCommandCenter } from './SellerFinancingCommandCenter';
+import type { UseOperatingCostsResult } from '../lib/useOperatingCosts';
 import {
   financingBadgeLabel,
   resolveFinancingType,
   type PropertyFinancingPatch,
 } from '../lib/propertyFinancing';
+import type { UsePropertyIntakeResult } from '../lib/usePropertyIntake';
+import type { UseSellerFinancingResult } from '../lib/useSellerFinancing';
 
 interface PropertyTableProps {
   portfolio: Portfolio;
@@ -29,8 +32,11 @@ interface PropertyTableProps {
   onExpenseBreakdownChange?: (index: number, breakdown: ExpenseBreakdown) => void;
   onFinancingChange?: (index: number, patch: PropertyFinancingPatch) => void;
   onDeriveFinancingFromCap?: (index: number, balance: number, monthlyPayment: number) => void;
-  onAdd: (property: PropertyDraft) => void;
+  sellerFinancingHook: UseSellerFinancingResult;
+  onAdd: (property: PropertyDraft) => number;
   onRemove: (index: number) => void;
+  intakeHook: UsePropertyIntakeResult;
+  operatingCostsHook: UseOperatingCostsResult;
   mobileCards?: boolean;
   /** Simulation month for totals / active rows (matches portfolio year slider). */
   asOfMonth?: number;
@@ -307,8 +313,11 @@ export function PropertyTable({
   onExpenseBreakdownChange,
   onFinancingChange,
   onDeriveFinancingFromCap,
+  sellerFinancingHook,
   onAdd,
   onRemove,
+  intakeHook,
+  operatingCostsHook,
   mobileCards = false,
   asOfMonth = 1,
   isDirty = false,
@@ -531,7 +540,9 @@ export function PropertyTable({
           open={modalOpen}
           onClose={() => setModalOpen(false)}
           onAdd={onAdd}
+          portfolio={portfolio}
           template={lastProperty}
+          intakeHook={intakeHook}
         />
       </div>
     );
@@ -639,12 +650,12 @@ export function PropertyTable({
                           className={`text-xs hover:text-cyan-300 ${
                             activePanel === 'financing' ? 'text-cyan-300' : 'text-slate-400'
                           }`}
-                          title="Financing studio"
+                          title="Seller Financing Command Center"
                         >
                           {activePanel === 'financing' ? '▾' : '◈'}
                         </button>
                       )}
-                      {showAdvanced && onExpenseBreakdownChange && (
+                      {onExpenseBreakdownChange && (
                         <button
                           type="button"
                           onClick={() =>
@@ -657,9 +668,9 @@ export function PropertyTable({
                           className={`text-xs hover:text-cyan-300 ${
                             activePanel === 'expenses' ? 'text-cyan-300' : 'text-slate-400'
                           }`}
-                          title="Expense breakdown"
+                          title="Operating costs"
                         >
-                          {activePanel === 'expenses' ? '▾' : '▸'}
+                          {activePanel === 'expenses' ? '▾' : '◎'}
                         </button>
                       )}
                       <button
@@ -677,14 +688,16 @@ export function PropertyTable({
                 {isExpanded && activePanel === 'financing' && onFinancingChange ? (
                   <tr key={`${p.name}-${i}-financing`}>
                     <td colSpan={columns.length + 3} className="pb-3 pl-8 pr-2">
-                      <FinancingEditor
+                      <SellerFinancingCommandCenter
                         property={p}
                         portfolio={portfolio}
                         asOfMonth={asOfMonth}
-                        onChange={(patch) => onFinancingChange(i, patch)}
-                        onDeriveFromCap={(balance, monthlyPayment) => {
-                          onFinancingChange(i, { balance, monthlyPayment });
-                          onDeriveFinancingFromCap?.(i, balance, monthlyPayment);
+                        sellerFinancingHook={sellerFinancingHook}
+                        onApplyFinancing={(patch) => {
+                          onFinancingChange(i, patch);
+                          if (patch.balance != null && patch.monthlyPayment != null) {
+                            onDeriveFinancingFromCap?.(i, patch.balance, patch.monthlyPayment);
+                          }
                         }}
                       />
                     </td>
@@ -693,9 +706,15 @@ export function PropertyTable({
                 {isExpanded && activePanel === 'expenses' && onExpenseBreakdownChange ? (
                   <tr key={`${p.name}-${i}-breakdown`}>
                     <td colSpan={columns.length + 3} className="pb-3 pl-8 pr-2">
-                      <ExpenseBreakdownEditor
+                      <OperatingCostsCommandCenter
+                        portfolio={portfolio}
                         property={p}
-                        onChange={(b) => onExpenseBreakdownChange(i, b)}
+                        propertyIndex={i}
+                        propertyCount={properties.length}
+                        costsHook={operatingCostsHook}
+                        onApply={(b) => onExpenseBreakdownChange(i, b)}
+                        onFocusProperty={(index) => setExpandPanel({ index, panel: 'expenses' })}
+                        embedded
                       />
                     </td>
                   </tr>
@@ -744,7 +763,9 @@ export function PropertyTable({
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         onAdd={onAdd}
+        portfolio={portfolio}
         template={lastProperty}
+        intakeHook={intakeHook}
       />
     </div>
   );

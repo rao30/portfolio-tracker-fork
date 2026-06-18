@@ -24,6 +24,9 @@ import { DecisionPulse } from './components/DecisionPulse';
 import { BalloonSafety } from './components/BalloonSafety';
 import { PayoffLandscape } from './components/PayoffLandscape';
 import { PrincipalVelocity } from './components/PrincipalVelocity';
+import { RefinanceRadar } from './components/RefinanceRadar';
+import { CapitalDeploy } from './components/CapitalDeploy';
+import { ExitCompass } from './components/ExitCompass';
 import { TaxPlanner } from './components/TaxPlanner';
 import { MobileMissionControl } from './components/MobileMissionControl';
 import { WealthCompositionChart } from './components/WealthCompositionChart';
@@ -53,10 +56,17 @@ import { useDecisionPulse } from './lib/useDecisionPulse';
 import { useBalloonSafety } from './lib/useBalloonSafety';
 import { usePayoffLandscape } from './lib/usePayoffLandscape';
 import { usePropertyDeck } from './lib/usePropertyDeck';
+import { usePropertyIntake } from './lib/usePropertyIntake';
+import { useOperatingCosts } from './lib/useOperatingCosts';
 import { useGoalCommand } from './lib/useGoalCommand';
 import { useStressLab } from './lib/useStressLab';
 import { usePrincipalVelocity } from './lib/usePrincipalVelocity';
+import { useCapitalDeploy } from './lib/useCapitalDeploy';
 import { useTimelinePreferences } from './lib/useTimelinePreferences';
+import { useRefinanceRadar } from './lib/useRefinanceRadar';
+import { useTaxShield } from './lib/useTaxShield';
+import { useSellerFinancing } from './lib/useSellerFinancing';
+import { useExitCompass } from './lib/useExitCompass';
 import { useMobileMissionControl } from './lib/useMobileMissionControl';
 import { useAuth } from './context/AuthContext';
 import { useToast } from './context/ToastContext';
@@ -76,6 +86,7 @@ function DashboardApp() {
     setBudget,
     updatePortfolioSetting,
     updateTaxProfile,
+    applyTaxProfilePatch,
     updateAcquisitionTemplate,
     updateGoals,
     updateProperty,
@@ -97,10 +108,17 @@ function DashboardApp() {
   const balloonSafetyHook = useBalloonSafety();
   const payoffLandscapeHook = usePayoffLandscape();
   const propertyDeckHook = usePropertyDeck();
+  const propertyIntakeHook = usePropertyIntake();
+  const operatingCostsHook = useOperatingCosts();
   const goalCommandHook = useGoalCommand(portfolio, updateGoals);
   const stressLabHook = useStressLab();
   const principalVelocityHook = usePrincipalVelocity();
+  const capitalDeployHook = useCapitalDeploy();
   const timelineHook = useTimelinePreferences();
+  const refinanceRadarHook = useRefinanceRadar();
+  const taxShieldHook = useTaxShield();
+  const sellerFinancingHook = useSellerFinancing();
+  const exitCompassHook = useExitCompass();
   const mobileMissionHook = useMobileMissionControl();
   const { pushToast } = useToast();
 
@@ -160,6 +178,18 @@ function DashboardApp() {
     if (!portfolio) return 20000;
     const piSum = portfolio.properties.reduce((s, p) => s + p.monthlyPayment, 0);
     return Math.max(20000, Math.round(piSum * 2));
+  }, [portfolio]);
+
+  const deployMax = useMemo(() => {
+    if (!portfolio) return 5000;
+    const surplus = portfolio.properties.reduce((sum, p) => {
+      const gross = p.monthlyRent * (1 - portfolio.defaultVacancyRate);
+      const capex =
+        p.monthlyRent * (p.capexReserveRate ?? portfolio.defaultCapexReserveRate) +
+        (p.capexReserveFlat ?? portfolio.defaultCapexReserveFlat);
+      return sum + Math.max(0, gross - p.monthlyExpenses - p.monthlyPayment - capex);
+    }, 0);
+    return Math.max(2000, Math.round(Math.max(surplus, portfolio.extraMonthlyBudget) * 3));
   }, [portfolio]);
 
   const {
@@ -386,6 +416,21 @@ function DashboardApp() {
     onApplyBudget: setBudget,
   };
 
+  const capitalDeployProps = {
+    portfolio,
+    activeStrategy,
+    customOrder: playbookOrder,
+    deployMax,
+    deployHook: capitalDeployHook,
+  };
+
+  const exitCompassProps = {
+    portfolio,
+    activeStrategy,
+    customOrder: playbookOrder,
+    compassHook: exitCompassHook,
+  };
+
   const yearLabel =
     portfolioYear === 1
       ? `${portfolio.simulationAnchorYear ?? 2026} (now)`
@@ -477,6 +522,9 @@ function DashboardApp() {
           {mobileTab === 'overview' && (
             <>
               <Header {...headerProps} compact />
+              <CapitalDeploy {...capitalDeployProps} embedded />
+              <ExitCompass {...exitCompassProps} embedded />
+              <RefinanceRadar portfolio={portfolio} radarHook={refinanceRadarHook} embedded />
               <MobileMissionControl
                 portfolio={portfolio}
                 activeResult={activeResult}
@@ -536,8 +584,11 @@ function DashboardApp() {
                 onUpdateAcquisitionDate={updateAcquisitionDate}
                 onExpenseBreakdownChange={updateExpenseBreakdown}
                 onFinancingChange={updatePropertyFinancing}
+                sellerFinancingHook={sellerFinancingHook}
                 onAdd={addProperty}
                 onRemove={removeProperty}
+                intakeHook={propertyIntakeHook}
+                operatingCostsHook={operatingCostsHook}
                 asOfMonth={insightMonth}
                 isDirty={isDirty}
                 saving={saving}
@@ -581,7 +632,11 @@ function DashboardApp() {
                   Export
                 </button>
               </div>
-              <TaxPlanner portfolio={portfolio} onTaxProfileChange={updateTaxProfile} />
+              <TaxPlanner
+                portfolio={portfolio}
+                taxShieldHook={taxShieldHook}
+                onApplyTaxProfile={applyTaxProfilePatch}
+              />
               <Controls {...controlProps} mode="advanced" idPrefix="settings" />
               <GoalTracker {...goalProps} section="goals" />
               <GoalTracker {...goalProps} section="milestones" />
@@ -625,8 +680,11 @@ function DashboardApp() {
 
             {activeSection === 'command' && (
               <>
+                <CapitalDeploy {...capitalDeployProps} />
+                <ExitCompass {...exitCompassProps} />
                 <DecisionPulse {...decisionPulseProps} />
                 <BalloonSafety {...balloonSafetyProps} />
+                <RefinanceRadar portfolio={portfolio} radarHook={refinanceRadarHook} />
                 <Controls {...controlProps} mode="advanced" embedded idPrefix="command" />
                 <PayoffLandscape {...payoffLandscapeProps} />
               </>
@@ -674,7 +732,11 @@ function DashboardApp() {
 
             {activeSection === 'tax' && (
               <>
-                <TaxPlanner portfolio={portfolio} onTaxProfileChange={updateTaxProfile} />
+                <TaxPlanner
+                  portfolio={portfolio}
+                  taxShieldHook={taxShieldHook}
+                  onApplyTaxProfile={applyTaxProfilePatch}
+                />
                 <GoalTracker {...goalProps} />
               </>
             )}
@@ -690,6 +752,8 @@ function DashboardApp() {
                   onFinancingChange={updatePropertyFinancing}
                   onAdd={addProperty}
                   onRemove={removeProperty}
+                  intakeHook={propertyIntakeHook}
+                  operatingCostsHook={operatingCostsHook}
                   asOfMonth={insightMonth}
                   isDirty={isDirty}
                   saving={saving}

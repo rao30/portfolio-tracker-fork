@@ -37,7 +37,7 @@ export const DESKTOP_SECTIONS: SectionConfig[] = [
     id: 'command',
     label: 'Command Center',
     shortLabel: 'Command',
-    description: 'Decision pulse, balloon safety, payoff landscape',
+    description: 'Capital deploy, exit compass, decision pulse, balloon safety, refinance radar, payoff landscape',
   },
   {
     id: 'strategy',
@@ -61,7 +61,7 @@ export const DESKTOP_SECTIONS: SectionConfig[] = [
     id: 'tax',
     label: 'Tax & Goals',
     shortLabel: 'Tax',
-    description: 'Depreciation planner, freedom date goals, and milestones',
+    description: 'Tax Shield command center, freedom date goals, and milestones',
   },
   {
     id: 'properties',

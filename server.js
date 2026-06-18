@@ -62,6 +62,11 @@ import {
   upsertPropertyDeckPreferences,
 } from './server/property-deck-store.js';
 import {
+  getPropertyIntakePreferences,
+  isPropertyIntakeEnabled,
+  upsertPropertyIntakePreferences,
+} from './server/property-intake-store.js';
+import {
   getGoalCommandPreferences,
   isGoalCommandEnabled,
   upsertGoalCommandPreferences,
@@ -86,6 +91,36 @@ import {
   isTimelinePreferencesEnabled,
   upsertTimelinePreferences,
 } from './server/timeline-preferences-store.js';
+import {
+  getRefinanceRadarPreferences,
+  isRefinanceRadarEnabled,
+  upsertRefinanceRadarPreferences,
+} from './server/refinance-radar-store.js';
+import {
+  getTaxShieldPreferences,
+  isTaxShieldEnabled,
+  upsertTaxShieldPreferences,
+} from './server/tax-shield-store.js';
+import {
+  getCapitalDeployPreferences,
+  isCapitalDeployEnabled,
+  upsertCapitalDeployPreferences,
+} from './server/capital-deploy-store.js';
+import {
+  getOperatingCostsPreferences,
+  isOperatingCostsEnabled,
+  upsertOperatingCostsPreferences,
+} from './server/operating-costs-store.js';
+import {
+  getExitCompassPreferences,
+  isExitCompassEnabled,
+  upsertExitCompassPreferences,
+} from './server/exit-compass-store.js';
+import {
+  getSellerFinancingPreferences,
+  isSellerFinancingEnabled,
+  upsertSellerFinancingPreferences,
+} from './server/seller-financing-store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -475,6 +510,38 @@ app.put('/api/balloon-safety', requirePortfolioWebAccess, async (req, res) => {
   }
 });
 
+app.get('/api/refinance-radar', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await getRefinanceRadarPreferences(req.supabaseUser.id);
+    res.json({ preferences, enabled: isRefinanceRadarEnabled() });
+  } catch (err) {
+    console.error('GET /api/refinance-radar', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load Refinance Radar preferences',
+    });
+  }
+});
+
+app.put('/api/refinance-radar', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await upsertRefinanceRadarPreferences(
+      req.supabaseUser.id,
+      req.body ?? {},
+    );
+    res.json({ preferences });
+  } catch (err) {
+    console.error('PUT /api/refinance-radar', err);
+    const status = err.status ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to save Refinance Radar preferences',
+    });
+  }
+});
+
 app.get('/api/property-deck', requirePortfolioWebAccess, async (req, res) => {
   if (!requireAuthenticatedUser(req, res)) return;
 
@@ -503,6 +570,70 @@ app.put('/api/property-deck', requirePortfolioWebAccess, async (req, res) => {
     const status = err.status ?? 500;
     res.status(status).json({
       error: err instanceof Error ? err.message : 'Failed to save Property Deck preferences',
+    });
+  }
+});
+
+app.get('/api/property-intake', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await getPropertyIntakePreferences(req.supabaseUser.id);
+    res.json({ preferences, enabled: isPropertyIntakeEnabled() });
+  } catch (err) {
+    console.error('GET /api/property-intake', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load Property Intake preferences',
+    });
+  }
+});
+
+app.put('/api/property-intake', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await upsertPropertyIntakePreferences(
+      req.supabaseUser.id,
+      req.body ?? {},
+    );
+    res.json({ preferences });
+  } catch (err) {
+    console.error('PUT /api/property-intake', err);
+    const status = err.status ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to save Property Intake preferences',
+    });
+  }
+});
+
+app.get('/api/operating-costs', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await getOperatingCostsPreferences(req.supabaseUser.id);
+    res.json({ preferences, enabled: isOperatingCostsEnabled() });
+  } catch (err) {
+    console.error('GET /api/operating-costs', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load Operating Costs preferences',
+    });
+  }
+});
+
+app.put('/api/operating-costs', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await upsertOperatingCostsPreferences(
+      req.supabaseUser.id,
+      req.body ?? {},
+    );
+    res.json({ preferences });
+  } catch (err) {
+    console.error('PUT /api/operating-costs', err);
+    const status = err.status ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to save Operating Costs preferences',
     });
   }
 });
@@ -599,6 +730,134 @@ app.put('/api/principal-velocity', requirePortfolioWebAccess, async (req, res) =
     const status = err.status ?? 500;
     res.status(status).json({
       error: err instanceof Error ? err.message : 'Failed to save Principal Velocity preferences',
+    });
+  }
+});
+
+app.get('/api/tax-shield', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await getTaxShieldPreferences(req.supabaseUser.id);
+    res.json({ preferences, enabled: isTaxShieldEnabled() });
+  } catch (err) {
+    console.error('GET /api/tax-shield', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load Tax Shield preferences',
+    });
+  }
+});
+
+app.put('/api/tax-shield', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await upsertTaxShieldPreferences(
+      req.supabaseUser.id,
+      req.body ?? {},
+    );
+    res.json({ preferences });
+  } catch (err) {
+    console.error('PUT /api/tax-shield', err);
+    const status = err.status ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to save Tax Shield preferences',
+    });
+  }
+});
+
+app.get('/api/capital-deploy', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await getCapitalDeployPreferences(req.supabaseUser.id);
+    res.json({ preferences, enabled: isCapitalDeployEnabled() });
+  } catch (err) {
+    console.error('GET /api/capital-deploy', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load Capital Deploy preferences',
+    });
+  }
+});
+
+app.put('/api/capital-deploy', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await upsertCapitalDeployPreferences(
+      req.supabaseUser.id,
+      req.body ?? {},
+    );
+    res.json({ preferences });
+  } catch (err) {
+    console.error('PUT /api/capital-deploy', err);
+    const status = err.status ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to save Capital Deploy preferences',
+    });
+  }
+});
+
+app.get('/api/seller-financing', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await getSellerFinancingPreferences(req.supabaseUser.id);
+    res.json({ preferences, enabled: isSellerFinancingEnabled() });
+  } catch (err) {
+    console.error('GET /api/seller-financing', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load Seller Financing preferences',
+    });
+  }
+});
+
+app.put('/api/seller-financing', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await upsertSellerFinancingPreferences(
+      req.supabaseUser.id,
+      req.body ?? {},
+    );
+    res.json({ preferences });
+  } catch (err) {
+    console.error('PUT /api/seller-financing', err);
+    const status = err.status ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to save Seller Financing preferences',
+    });
+  }
+});
+
+app.get('/api/exit-compass', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await getExitCompassPreferences(req.supabaseUser.id);
+    res.json({ preferences, enabled: isExitCompassEnabled() });
+  } catch (err) {
+    console.error('GET /api/exit-compass', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load Exit Compass preferences',
+    });
+  }
+});
+
+app.put('/api/exit-compass', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await upsertExitCompassPreferences(
+      req.supabaseUser.id,
+      req.body ?? {},
+    );
+    res.json({ preferences });
+  } catch (err) {
+    console.error('PUT /api/exit-compass', err);
+    const status = err.status ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to save Exit Compass preferences',
     });
   }
 });
