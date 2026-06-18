@@ -76,6 +76,11 @@ import {
   isPrincipalVelocityEnabled,
   upsertPrincipalVelocityPreferences,
 } from './server/principal-velocity-store.js';
+import {
+  getTimelinePreferences,
+  isTimelinePreferencesEnabled,
+  upsertTimelinePreferences,
+} from './server/timeline-preferences-store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -624,6 +629,38 @@ app.delete('/api/timeline-scenarios/:id', requirePortfolioWebAccess, requireTime
     const status = err.message === 'Scenario not found' ? 404 : 500;
     res.status(status).json({
       error: err instanceof Error ? err.message : 'Failed to delete timeline scenario',
+    });
+  }
+});
+
+app.get('/api/timeline-preferences', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await getTimelinePreferences(req.supabaseUser.id);
+    res.json({ preferences, enabled: isTimelinePreferencesEnabled() });
+  } catch (err) {
+    console.error('GET /api/timeline-preferences', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load Timeline preferences',
+    });
+  }
+});
+
+app.put('/api/timeline-preferences', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await upsertTimelinePreferences(
+      req.supabaseUser.id,
+      req.body ?? {},
+    );
+    res.json({ preferences });
+  } catch (err) {
+    console.error('PUT /api/timeline-preferences', err);
+    const status = err.status ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to save Timeline preferences',
     });
   }
 });

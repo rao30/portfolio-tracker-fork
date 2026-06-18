@@ -55,6 +55,7 @@ import { usePropertyDeck } from './lib/usePropertyDeck';
 import { useGoalCommand } from './lib/useGoalCommand';
 import { useStressLab } from './lib/useStressLab';
 import { usePrincipalVelocity } from './lib/usePrincipalVelocity';
+import { useTimelinePreferences } from './lib/useTimelinePreferences';
 import { useAuth } from './context/AuthContext';
 import { useToast } from './context/ToastContext';
 
@@ -97,6 +98,7 @@ function DashboardApp() {
   const goalCommandHook = useGoalCommand(portfolio, updateGoals);
   const stressLabHook = useStressLab();
   const principalVelocityHook = usePrincipalVelocity();
+  const timelineHook = useTimelinePreferences();
   const { pushToast } = useToast();
 
   const isMobile = useIsMobile();
@@ -486,6 +488,7 @@ function DashboardApp() {
                     monthsToPayoff={activeResult.monthsToPayoff}
                     cloudEnabled={cloudEnabled}
                     userId={user?.id}
+                    timelineHook={timelineHook}
                     onApplyEvents={applyTimelineEvents}
                     onClearEvents={clearTimelineEvents}
                     embedded
@@ -638,6 +641,7 @@ function DashboardApp() {
                   monthsToPayoff={activeResult.monthsToPayoff}
                   cloudEnabled={cloudEnabled}
                   userId={user?.id}
+                  timelineHook={timelineHook}
                   onApplyEvents={applyTimelineEvents}
                   onClearEvents={clearTimelineEvents}
                 />
