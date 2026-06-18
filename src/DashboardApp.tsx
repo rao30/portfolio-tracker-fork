@@ -28,6 +28,7 @@ import { RefinanceRadar } from './components/RefinanceRadar';
 import { CapitalDeploy } from './components/CapitalDeploy';
 import { ExitCompass } from './components/ExitCompass';
 import { TaxPlanner } from './components/TaxPlanner';
+import { MobileMissionControl } from './components/MobileMissionControl';
 import { WealthCompositionChart } from './components/WealthCompositionChart';
 import { ChartVariantContext } from './components/chart-theme';
 import {
@@ -66,6 +67,7 @@ import { useRefinanceRadar } from './lib/useRefinanceRadar';
 import { useTaxShield } from './lib/useTaxShield';
 import { useSellerFinancing } from './lib/useSellerFinancing';
 import { useExitCompass } from './lib/useExitCompass';
+import { useMobileMissionControl } from './lib/useMobileMissionControl';
 import { useAuth } from './context/AuthContext';
 import { useToast } from './context/ToastContext';
 
@@ -117,6 +119,7 @@ function DashboardApp() {
   const taxShieldHook = useTaxShield();
   const sellerFinancingHook = useSellerFinancing();
   const exitCompassHook = useExitCompass();
+  const mobileMissionHook = useMobileMissionControl();
   const { pushToast } = useToast();
 
   const isMobile = useIsMobile();
@@ -521,39 +524,38 @@ function DashboardApp() {
               <Header {...headerProps} compact />
               <CapitalDeploy {...capitalDeployProps} embedded />
               <ExitCompass {...exitCompassProps} embedded />
-              <DecisionPulse {...decisionPulseProps} embedded />
-              <BalloonSafety {...balloonSafetyProps} embedded />
               <RefinanceRadar portfolio={portfolio} radarHook={refinanceRadarHook} embedded />
-              <Controls {...controlProps} mode="advanced" embedded idPrefix="overview" />
-              <PayoffLandscape {...payoffLandscapeProps} embedded />
-              <div className="app-surface space-y-4 p-4">
-                <Controls {...controlProps} mode="primary" embedded idPrefix="overview" />
-                <StressLab {...stressLabProps} embedded />
-                <div className="border-t border-white/10 pt-4">
-                  <TimelineStudio
-                    portfolio={portfolio}
-                    strategyId={activeStrategy}
-                    monthsToPayoff={activeResult.monthsToPayoff}
-                    cloudEnabled={cloudEnabled}
-                    userId={user?.id}
-                    timelineHook={timelineHook}
-                    onApplyEvents={applyTimelineEvents}
-                    onClearEvents={clearTimelineEvents}
-                    embedded
-                  />
-                </div>
-              </div>
-              <PrincipalVelocity {...principalVelocityProps} embedded />
-              <PortfolioDashboard
+              <MobileMissionControl
                 portfolio={portfolio}
-                result={activeResult}
-                year={portfolioYear}
+                activeResult={activeResult}
+                activeStrategy={activeStrategy}
+                portfolioYear={portfolioYear}
                 onYearChange={setPortfolioYear}
-                compact
+                monthsToPayoff={activeResult.monthsToPayoff}
+                cloudEnabled={cloudEnabled}
+                userId={user?.id}
+                missionHook={mobileMissionHook}
+                timelineHook={timelineHook}
+                onApplyTimelineEvents={applyTimelineEvents}
+                onClearTimelineEvents={clearTimelineEvents}
+                sync={{
+                  isDirty,
+                  saving,
+                  syncStatus,
+                  cloudEnabled,
+                  onSave: handleSave,
+                  onDiscard: discardChanges,
+                }}
+                decisionPulseProps={decisionPulseProps}
+                controlProps={controlProps}
+                balloonSafetyProps={balloonSafetyProps}
+                payoffLandscapeProps={payoffLandscapeProps}
+                stressLabProps={stressLabProps}
+                principalVelocityProps={principalVelocityProps}
+                playbookProps={playbookProps}
+                strategyLabProps={strategyLabProps}
+                goalProps={goalProps}
               />
-              <PayoffPlaybook {...playbookProps} embedded />
-              <StrategyLab {...strategyLabProps} embedded />
-              <GoalTracker {...goalProps} section="insights" />
             </>
           )}
 
