@@ -447,10 +447,9 @@ export function CapitalDeploy({
             <label className="text-xs text-slate-400">Reserve target (months)</label>
             <NumericInput
               value={preferences.targetReserveMonths}
-              onChange={(v) => void setTargetReserveMonths(v)}
+              onChange={(v) => void setTargetReserveMonths(v ?? 6)}
               min={1}
               max={24}
-              step={1}
               className="mt-1"
             />
           </div>

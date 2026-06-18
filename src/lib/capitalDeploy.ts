@@ -156,10 +156,7 @@ function buildLiquiditySnapshot(
   };
 }
 
-function computeSafeExtraBudgetCeiling(
-  portfolio: Portfolio,
-  liquidity: LiquiditySnapshot,
-): number {
+function computeSafeExtraBudgetCeiling(liquidity: LiquiditySnapshot): number {
   const { monthlySurplus, operatingBurn, reserveRunwayMonths, targetReserveMonths } =
     liquidity;
   if (reserveRunwayMonths >= targetReserveMonths) {
@@ -263,7 +260,6 @@ function pickWinner(
   }
 
   const paydownLane = lanes.find((l) => l.lane === 'paydown')!;
-  const acquisitionLane = lanes.find((l) => l.lane === 'acquisition')!;
 
   if (acquisitionCoc > liquidity.weightedAvgMortgageRate && acquisitionCoc >= acquisitionCocHurdle) {
     const spread = acquisitionCoc - liquidity.weightedAvgMortgageRate;
@@ -309,17 +305,6 @@ export function computeCapitalDeployAnalysis(
   },
 ): CapitalDeployAnalysis {
   const committed = runActiveSimulation(portfolio, strategyId, customOrder);
-  const baseline = runActiveSimulation(
-    { ...portfolio, extraMonthlyBudget: 0 },
-    strategyId,
-    customOrder,
-  );
-  const preview = runActiveSimulation(
-    portfolio,
-    strategyId,
-    customOrder,
-    portfolio.extraMonthlyBudget + options.deployAmount,
-  );
 
   const liquidity = buildLiquiditySnapshot(
     portfolio,
@@ -355,7 +340,7 @@ export function computeCapitalDeployAnalysis(
     lane.isWinner = lane.lane === winner;
   }
 
-  const safeExtraBudgetCeiling = computeSafeExtraBudgetCeiling(portfolio, liquidity);
+  const safeExtraBudgetCeiling = computeSafeExtraBudgetCeiling(liquidity);
 
   const savingsRate = Math.max(
     liquidity.monthlySurplus,
@@ -372,9 +357,6 @@ export function computeCapitalDeployAnalysis(
     liquidity.cashReserve / Math.max(acquisition.downPayment, 1),
   );
 
-  const interestDelta =
-    baseline.totalInterestPaid - preview.totalInterestPaid;
-
   return {
     liquidity,
     lanes,
@@ -386,8 +368,6 @@ export function computeCapitalDeployAnalysis(
     acquisitionCocFromTemplate: acquisition.cashOnCash,
     monthsToAcquisitionFund: monthsToFund > 0 ? monthsToFund : null,
     acquisitionFundProgress,
-    // attach for preview delta usage
-    ...(interestDelta >= 0 ? {} : {}),
   };
 }
 

@@ -16,6 +16,7 @@ const basePortfolio: Portfolio = {
   defaultCapexReserveRate: 0.05,
   defaultCapexReserveFlat: 0,
   taxProfile: {
+    taxYear: 2026,
     annualW2Income: 200000,
     spouseIsReps: true,
     marginalTaxRate: 0.32,
@@ -45,6 +46,7 @@ const basePortfolio: Portfolio = {
       balance: 180000,
       marketValue: 280000,
       annualInterestRate: 0.065,
+      annualAppreciationRate: 0.03,
       monthlyPayment: 1400,
       monthlyRent: 2200,
       monthlyExpenses: 400,
@@ -61,6 +63,7 @@ const basePortfolio: Portfolio = {
       balance: 95000,
       marketValue: 160000,
       annualInterestRate: 0.055,
+      annualAppreciationRate: 0.03,
       monthlyPayment: 650,
       monthlyRent: 1400,
       monthlyExpenses: 250,
@@ -132,5 +135,21 @@ describe('computeCapitalDeployAnalysis', () => {
     );
     expect(delta.deployAmountPreview).toBe(300);
     expect(delta.reserveRunwayDelta).toBeGreaterThan(0);
+  });
+
+  it('honors pinned lane over automatic winner', () => {
+    const analysis = computeCapitalDeployAnalysis(
+      basePortfolio,
+      'highestRate',
+      null,
+      {
+        targetReserveMonths: 6,
+        acquisitionCocHurdle: 0.08,
+        deployAmount: 200,
+        pinnedLane: 'acquisition',
+      },
+    );
+    expect(analysis.winner).toBe('acquisition');
+    expect(analysis.verdict).toContain('Pinned');
   });
 });
