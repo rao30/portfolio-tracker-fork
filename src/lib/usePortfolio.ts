@@ -65,7 +65,7 @@ export interface UsePortfolioResult {
   updateExpenseBreakdown: (index: number, breakdown: ExpenseBreakdown) => void;
   updatePropertyBoolean: (index: number, field: keyof Property, value: boolean) => void;
   updatePropertyFinancing: (index: number, patch: PropertyFinancingPatch) => void;
-  addProperty: (draft: PropertyDraft) => void;
+  addProperty: (draft: PropertyDraft) => number;
   removeProperty: (index: number) => void;
   resetFromFile: () => Promise<void>;
   exportJson: () => void;
@@ -440,12 +440,14 @@ export function usePortfolio(): UsePortfolioResult {
 
   const addProperty = useCallback(
     (draft: PropertyDraft) => {
-      if (!portfolio) return;
+      if (!portfolio) return -1;
       const props = [...portfolio.properties, draft];
+      const newIndex = props.length - 1;
       persist(
         { ...portfolio, properties: props },
         source === 'file' ? 'local' : source,
       );
+      return newIndex;
     },
     [portfolio, persist, source],
   );
