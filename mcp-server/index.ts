@@ -275,6 +275,84 @@ server.tool(
   },
 );
 
+server.tool(
+  'list_agent_feature_claims',
+  'List active parallel-agent feature claims so cloud agents avoid building the same feature twice.',
+  {
+    includeCompleted: z
+      .boolean()
+      .optional()
+      .describe('Include completed and abandoned claims'),
+  },
+  async ({ includeCompleted }) => {
+    const data = await trackerFetch(
+      `/api/agent-features?includeCompleted=${includeCompleted ? 'true' : 'false'}`,
+    );
+    return {
+      content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
+    };
+  },
+);
+
+server.tool(
+  'claim_agent_feature',
+  'Claim a feature slug before building it. Returns 409 if another agent already holds an active claim.',
+  {
+    featureSlug: z
+      .string()
+      .describe('Lowercase kebab-case id, e.g. refinance-radar or tax-shield'),
+    featureTitle: z.string().describe('Human-readable feature name'),
+    agentSessionId: z.string().describe('Unique id for this agent run'),
+    branchName: z.string().optional().describe('Git branch being used'),
+    rationale: z.string().optional().describe('Why this feature was chosen'),
+    claimHours: z
+      .number()
+      .int()
+      .min(1)
+      .max(168)
+      .optional()
+      .describe('Claim TTL in hours (default 48)'),
+  },
+  async ({ featureSlug, featureTitle, agentSessionId, branchName, rationale, claimHours }) => {
+    const data = await trackerFetch('/api/agent-features/claim', {
+      method: 'POST',
+      body: JSON.stringify({
+        featureSlug,
+        featureTitle,
+        agentSessionId,
+        branchName,
+        rationale,
+        claimHours,
+      }),
+    });
+    return {
+      content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
+    };
+  },
+);
+
+server.tool(
+  'update_agent_feature_claim',
+  'Update claim status (in_progress, completed, abandoned), branch, or PR URL.',
+  {
+    featureSlug: z.string(),
+    status: z.enum(['claimed', 'in_progress', 'completed', 'abandoned']).optional(),
+    branchName: z.string().optional(),
+    prUrl: z.string().optional(),
+    rationale: z.string().optional(),
+    extendHours: z.number().int().min(1).max(168).optional(),
+  },
+  async ({ featureSlug, status, branchName, prUrl, rationale, extendHours }) => {
+    const data = await trackerFetch(`/api/agent-features/${encodeURIComponent(featureSlug)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status, branchName, prUrl, rationale, extendHours }),
+    });
+    return {
+      content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
+    };
+  },
+);
+
   return server;
 }
 

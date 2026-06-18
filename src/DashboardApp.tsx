@@ -22,6 +22,7 @@ import { TimelineStudio } from './components/TimelineStudio';
 import { StrategyComparison } from './components/StrategyComparison';
 import { DecisionPulse } from './components/DecisionPulse';
 import { BalloonSafety } from './components/BalloonSafety';
+import { RefinanceRadar } from './components/RefinanceRadar';
 import { PayoffLandscape } from './components/PayoffLandscape';
 import { PrincipalVelocity } from './components/PrincipalVelocity';
 import { TaxPlanner } from './components/TaxPlanner';
@@ -50,6 +51,7 @@ import { useStrategyLab } from './lib/useStrategyLab';
 import { usePayoffPlaybook } from './lib/usePayoffPlaybook';
 import { useDecisionPulse } from './lib/useDecisionPulse';
 import { useBalloonSafety } from './lib/useBalloonSafety';
+import { useRefinanceRadar } from './lib/useRefinanceRadar';
 import { usePayoffLandscape } from './lib/usePayoffLandscape';
 import { usePropertyDeck } from './lib/usePropertyDeck';
 import { useGoalCommand } from './lib/useGoalCommand';
@@ -93,6 +95,7 @@ function DashboardApp() {
   const payoffPlaybookHook = usePayoffPlaybook();
   const decisionPulseHook = useDecisionPulse();
   const balloonSafetyHook = useBalloonSafety();
+  const refinanceRadarHook = useRefinanceRadar();
   const payoffLandscapeHook = usePayoffLandscape();
   const propertyDeckHook = usePropertyDeck();
   const goalCommandHook = useGoalCommand(portfolio, updateGoals);
@@ -346,6 +349,11 @@ function DashboardApp() {
     currentPlaybookOrder: playbookOrder ?? undefined,
   };
 
+  const refinanceRadarProps = {
+    portfolio,
+    radarHook: refinanceRadarHook,
+  };
+
   const strategyLabProps = {
     portfolio,
     activeBudget: portfolio.extraMonthlyBudget,
@@ -476,6 +484,7 @@ function DashboardApp() {
               <Header {...headerProps} compact />
               <DecisionPulse {...decisionPulseProps} embedded />
               <BalloonSafety {...balloonSafetyProps} embedded />
+              <RefinanceRadar {...refinanceRadarProps} embedded />
               <Controls {...controlProps} mode="advanced" embedded idPrefix="overview" />
               <PayoffLandscape {...payoffLandscapeProps} embedded />
               <div className="app-surface space-y-4 p-4">
@@ -625,6 +634,7 @@ function DashboardApp() {
               <>
                 <DecisionPulse {...decisionPulseProps} />
                 <BalloonSafety {...balloonSafetyProps} />
+                <RefinanceRadar {...refinanceRadarProps} />
                 <Controls {...controlProps} mode="advanced" embedded idPrefix="command" />
                 <PayoffLandscape {...payoffLandscapeProps} />
               </>

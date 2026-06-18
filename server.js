@@ -81,6 +81,18 @@ import {
   isTimelinePreferencesEnabled,
   upsertTimelinePreferences,
 } from './server/timeline-preferences-store.js';
+import {
+  getRefinanceRadarPreferences,
+  isRefinanceRadarEnabled,
+  upsertRefinanceRadarPreferences,
+} from './server/refinance-radar-store.js';
+import {
+  claimAgentFeature,
+  isAgentFeatureRegistryEnabled,
+  listAgentFeatureClaims,
+  releaseAgentFeatureClaim,
+  updateAgentFeatureClaim,
+} from './server/agent-feature-registry.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -556,6 +568,102 @@ app.put('/api/principal-velocity', requirePortfolioWebAccess, async (req, res) =
     const status = err.status ?? 500;
     res.status(status).json({
       error: err instanceof Error ? err.message : 'Failed to save Principal Velocity preferences',
+    });
+  }
+});
+
+app.get('/api/refinance-radar', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await getRefinanceRadarPreferences(req.supabaseUser.id);
+    res.json({ preferences, enabled: isRefinanceRadarEnabled() });
+  } catch (err) {
+    console.error('GET /api/refinance-radar', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load Refinance Radar preferences',
+    });
+  }
+});
+
+app.put('/api/refinance-radar', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await upsertRefinanceRadarPreferences(
+      req.supabaseUser.id,
+      req.body ?? {},
+    );
+    res.json({ preferences });
+  } catch (err) {
+    console.error('PUT /api/refinance-radar', err);
+    const status = err.status ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to save Refinance Radar preferences',
+    });
+  }
+});
+
+function requireAgentFeatureRegistry(req, res, next) {
+  if (!isAgentFeatureRegistryEnabled()) {
+    res.status(503).json({ error: 'Agent feature registry is not configured' });
+    return;
+  }
+  next();
+}
+
+app.get('/api/agent-features', requirePortfolioApiKey, requireAgentFeatureRegistry, async (req, res) => {
+  try {
+    const includeCompleted = req.query.includeCompleted === 'true';
+    const claims = await listAgentFeatureClaims({ includeCompleted });
+    res.json({ claims, enabled: isAgentFeatureRegistryEnabled() });
+  } catch (err) {
+    console.error('GET /api/agent-features', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to list agent feature claims',
+    });
+  }
+});
+
+app.post('/api/agent-features/claim', requirePortfolioApiKey, requireAgentFeatureRegistry, async (req, res) => {
+  try {
+    const claim = await claimAgentFeature(req.body ?? {});
+    res.status(201).json({ claim });
+  } catch (err) {
+    console.error('POST /api/agent-features/claim', err);
+    const status = err.status ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to claim feature',
+      existingClaim: err.existingClaim,
+    });
+  }
+});
+
+app.put('/api/agent-features/:slug', requirePortfolioApiKey, requireAgentFeatureRegistry, async (req, res) => {
+  try {
+    const claim = await updateAgentFeatureClaim(req.params.slug, req.body ?? {});
+    res.json({ claim });
+  } catch (err) {
+    console.error('PUT /api/agent-features/:slug', err);
+    const status = err.status ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to update feature claim',
+    });
+  }
+});
+
+app.post('/api/agent-features/:slug/release', requirePortfolioApiKey, requireAgentFeatureRegistry, async (req, res) => {
+  try {
+    const claim = await releaseAgentFeatureClaim(
+      req.params.slug,
+      req.body?.agentSessionId,
+    );
+    res.json({ claim });
+  } catch (err) {
+    console.error('POST /api/agent-features/:slug/release', err);
+    const status = err.status ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to release feature claim',
     });
   }
 });
