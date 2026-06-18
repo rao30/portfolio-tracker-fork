@@ -55,6 +55,7 @@ import { useBalloonSafety } from './lib/useBalloonSafety';
 import { usePayoffLandscape } from './lib/usePayoffLandscape';
 import { usePropertyDeck } from './lib/usePropertyDeck';
 import { usePropertyIntake } from './lib/usePropertyIntake';
+import { useOperatingCosts } from './lib/useOperatingCosts';
 import { useGoalCommand } from './lib/useGoalCommand';
 import { useStressLab } from './lib/useStressLab';
 import { usePrincipalVelocity } from './lib/usePrincipalVelocity';
@@ -103,6 +104,7 @@ function DashboardApp() {
   const payoffLandscapeHook = usePayoffLandscape();
   const propertyDeckHook = usePropertyDeck();
   const propertyIntakeHook = usePropertyIntake();
+  const operatingCostsHook = useOperatingCosts();
   const goalCommandHook = useGoalCommand(portfolio, updateGoals);
   const stressLabHook = useStressLab();
   const principalVelocityHook = usePrincipalVelocity();
@@ -570,6 +572,7 @@ function DashboardApp() {
                 onAdd={addProperty}
                 onRemove={removeProperty}
                 intakeHook={propertyIntakeHook}
+                operatingCostsHook={operatingCostsHook}
                 asOfMonth={insightMonth}
                 isDirty={isDirty}
                 saving={saving}
@@ -733,6 +736,7 @@ function DashboardApp() {
                   onAdd={addProperty}
                   onRemove={removeProperty}
                   intakeHook={propertyIntakeHook}
+                  operatingCostsHook={operatingCostsHook}
                   asOfMonth={insightMonth}
                   isDirty={isDirty}
                   saving={saving}

@@ -101,6 +101,11 @@ import {
   isCapitalDeployEnabled,
   upsertCapitalDeployPreferences,
 } from './server/capital-deploy-store.js';
+import {
+  getOperatingCostsPreferences,
+  isOperatingCostsEnabled,
+  upsertOperatingCostsPreferences,
+} from './server/operating-costs-store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -544,6 +549,38 @@ app.put('/api/property-intake', requirePortfolioWebAccess, async (req, res) => {
     const status = err.status ?? 500;
     res.status(status).json({
       error: err instanceof Error ? err.message : 'Failed to save Property Intake preferences',
+    });
+  }
+});
+
+app.get('/api/operating-costs', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await getOperatingCostsPreferences(req.supabaseUser.id);
+    res.json({ preferences, enabled: isOperatingCostsEnabled() });
+  } catch (err) {
+    console.error('GET /api/operating-costs', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load Operating Costs preferences',
+    });
+  }
+});
+
+app.put('/api/operating-costs', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await upsertOperatingCostsPreferences(
+      req.supabaseUser.id,
+      req.body ?? {},
+    );
+    res.json({ preferences });
+  } catch (err) {
+    console.error('PUT /api/operating-costs', err);
+    const status = err.status ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to save Operating Costs preferences',
     });
   }
 });
