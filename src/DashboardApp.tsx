@@ -24,6 +24,7 @@ import { DecisionPulse } from './components/DecisionPulse';
 import { BalloonSafety } from './components/BalloonSafety';
 import { PayoffLandscape } from './components/PayoffLandscape';
 import { PrincipalVelocity } from './components/PrincipalVelocity';
+import { CapitalDeploy } from './components/CapitalDeploy';
 import { TaxPlanner } from './components/TaxPlanner';
 import { WealthCompositionChart } from './components/WealthCompositionChart';
 import { ChartVariantContext } from './components/chart-theme';
@@ -55,6 +56,7 @@ import { usePropertyDeck } from './lib/usePropertyDeck';
 import { useGoalCommand } from './lib/useGoalCommand';
 import { useStressLab } from './lib/useStressLab';
 import { usePrincipalVelocity } from './lib/usePrincipalVelocity';
+import { useCapitalDeploy } from './lib/useCapitalDeploy';
 import { useTimelinePreferences } from './lib/useTimelinePreferences';
 import { useAuth } from './context/AuthContext';
 import { useToast } from './context/ToastContext';
@@ -98,6 +100,7 @@ function DashboardApp() {
   const goalCommandHook = useGoalCommand(portfolio, updateGoals);
   const stressLabHook = useStressLab();
   const principalVelocityHook = usePrincipalVelocity();
+  const capitalDeployHook = useCapitalDeploy();
   const timelineHook = useTimelinePreferences();
   const { pushToast } = useToast();
 
@@ -383,6 +386,26 @@ function DashboardApp() {
     onApplyBudget: setBudget,
   };
 
+  const deployMax = useMemo(() => {
+    if (!portfolio) return 5000;
+    const surplus = portfolio.properties.reduce((sum, p) => {
+      const gross = p.monthlyRent * (1 - portfolio.defaultVacancyRate);
+      const capex =
+        p.monthlyRent * (p.capexReserveRate ?? portfolio.defaultCapexReserveRate) +
+        (p.capexReserveFlat ?? portfolio.defaultCapexReserveFlat);
+      return sum + Math.max(0, gross - p.monthlyExpenses - p.monthlyPayment - capex);
+    }, 0);
+    return Math.max(2000, Math.round(Math.max(surplus, portfolio.extraMonthlyBudget) * 3));
+  }, [portfolio]);
+
+  const capitalDeployProps = {
+    portfolio,
+    activeStrategy,
+    customOrder: playbookOrder,
+    deployMax,
+    deployHook: capitalDeployHook,
+  };
+
   const yearLabel =
     portfolioYear === 1
       ? `${portfolio.simulationAnchorYear ?? 2026} (now)`
@@ -474,6 +497,7 @@ function DashboardApp() {
           {mobileTab === 'overview' && (
             <>
               <Header {...headerProps} compact />
+              <CapitalDeploy {...capitalDeployProps} embedded />
               <DecisionPulse {...decisionPulseProps} embedded />
               <BalloonSafety {...balloonSafetyProps} embedded />
               <Controls {...controlProps} mode="advanced" embedded idPrefix="overview" />
@@ -623,6 +647,7 @@ function DashboardApp() {
 
             {activeSection === 'command' && (
               <>
+                <CapitalDeploy {...capitalDeployProps} />
                 <DecisionPulse {...decisionPulseProps} />
                 <BalloonSafety {...balloonSafetyProps} />
                 <Controls {...controlProps} mode="advanced" embedded idPrefix="command" />
