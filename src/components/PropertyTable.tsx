@@ -15,7 +15,7 @@ import {
 } from '../lib/snowball';
 import { AddPropertyModal } from './AddPropertyModal';
 import { OperatingCostsCommandCenter } from './OperatingCostsCommandCenter';
-import { FinancingEditor } from './FinancingEditor';
+import { SellerFinancingCommandCenter } from './SellerFinancingCommandCenter';
 import type { UseOperatingCostsResult } from '../lib/useOperatingCosts';
 import {
   financingBadgeLabel,
@@ -23,6 +23,7 @@ import {
   type PropertyFinancingPatch,
 } from '../lib/propertyFinancing';
 import type { UsePropertyIntakeResult } from '../lib/usePropertyIntake';
+import type { UseSellerFinancingResult } from '../lib/useSellerFinancing';
 
 interface PropertyTableProps {
   portfolio: Portfolio;
@@ -31,6 +32,7 @@ interface PropertyTableProps {
   onExpenseBreakdownChange?: (index: number, breakdown: ExpenseBreakdown) => void;
   onFinancingChange?: (index: number, patch: PropertyFinancingPatch) => void;
   onDeriveFinancingFromCap?: (index: number, balance: number, monthlyPayment: number) => void;
+  sellerFinancingHook: UseSellerFinancingResult;
   onAdd: (property: PropertyDraft) => number;
   onRemove: (index: number) => void;
   intakeHook: UsePropertyIntakeResult;
@@ -311,6 +313,7 @@ export function PropertyTable({
   onExpenseBreakdownChange,
   onFinancingChange,
   onDeriveFinancingFromCap,
+  sellerFinancingHook,
   onAdd,
   onRemove,
   intakeHook,
@@ -647,7 +650,7 @@ export function PropertyTable({
                           className={`text-xs hover:text-cyan-300 ${
                             activePanel === 'financing' ? 'text-cyan-300' : 'text-slate-400'
                           }`}
-                          title="Financing studio"
+                          title="Seller Financing Command Center"
                         >
                           {activePanel === 'financing' ? '▾' : '◈'}
                         </button>
@@ -685,14 +688,16 @@ export function PropertyTable({
                 {isExpanded && activePanel === 'financing' && onFinancingChange ? (
                   <tr key={`${p.name}-${i}-financing`}>
                     <td colSpan={columns.length + 3} className="pb-3 pl-8 pr-2">
-                      <FinancingEditor
+                      <SellerFinancingCommandCenter
                         property={p}
                         portfolio={portfolio}
                         asOfMonth={asOfMonth}
-                        onChange={(patch) => onFinancingChange(i, patch)}
-                        onDeriveFromCap={(balance, monthlyPayment) => {
-                          onFinancingChange(i, { balance, monthlyPayment });
-                          onDeriveFinancingFromCap?.(i, balance, monthlyPayment);
+                        sellerFinancingHook={sellerFinancingHook}
+                        onApplyFinancing={(patch) => {
+                          onFinancingChange(i, patch);
+                          if (patch.balance != null && patch.monthlyPayment != null) {
+                            onDeriveFinancingFromCap?.(i, patch.balance, patch.monthlyPayment);
+                          }
                         }}
                       />
                     </td>
