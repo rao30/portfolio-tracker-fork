@@ -94,6 +94,8 @@ describe('buildRefinanceRadarAnalysis', () => {
     const analysis = buildRefinanceRadarAnalysis(portfolio, DEFAULT_REFINANCE_ASSUMPTIONS);
     expect(analysis.properties[0].primaryVerdict).toBe('balloon_pending');
     expect(analysis.properties[0].monthsUntilBalloon).toBeGreaterThan(12);
+    expect(analysis.properties[0].headline.length).toBeGreaterThan(0);
+    expect(analysis.properties[0].headline).toContain('Balloon refi');
   });
 
   it('sorts strong opportunities ahead of skip', () => {

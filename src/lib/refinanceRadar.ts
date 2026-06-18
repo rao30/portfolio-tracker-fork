@@ -196,7 +196,7 @@ function analyzeProperty(
 
   if (isSellerFinancing && balloonLeft != null && balloonLeft > 12) {
     const rateTermVerdict: RefinanceVerdict = 'balloon_pending';
-    return {
+    const row: PropertyRefinanceOpportunity = {
       propertyName: p.name,
       balance: p.balance,
       marketValue: p.marketValue,
@@ -226,6 +226,8 @@ function analyzeProperty(
       primaryVerdict: 'balloon_pending',
       headline: '',
     };
+    row.headline = headlineForProperty(row);
+    return row;
   }
 
   const refiBalance = p.balance;

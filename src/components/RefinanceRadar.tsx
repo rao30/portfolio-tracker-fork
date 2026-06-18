@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import type { Portfolio } from '../lib/types';
 import {
   buildRefinanceRadarAnalysis,
@@ -221,7 +221,6 @@ export function RefinanceRadar({
 
   const committedPrefs = preferences;
   const [previewPrefs, setPreviewPrefs] = useState<RefinanceRadarPreferences>(committedPrefs);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setPreviewPrefs(committedPrefs);
@@ -252,9 +251,9 @@ export function RefinanceRadar({
   const analysis = isDirty ? previewAnalysis : committedAnalysis;
 
   const pinned =
-    preferences.pinnedProperty != null
+    (preferences.pinnedProperty != null
       ? analysis.properties.find((p) => p.propertyName === preferences.pinnedProperty)
-      : analysis.properties[0];
+      : analysis.properties[0]) ?? analysis.properties[0];
 
   const handlePreviewPatch = useCallback((patch: Partial<RefinanceRadarPreferences>) => {
     setPreviewPrefs((prev) => ({ ...prev, ...patch }));
@@ -379,77 +378,78 @@ export function RefinanceRadar({
 
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <label className="block space-y-1">
-              <span className="text-[11px] text-slate-500">Market rate</span>
+              <span className="text-[11px] text-slate-500">Market rate (%)</span>
               <NumericInput
                 value={previewPrefs.marketRate * 100}
-                onChange={(v) => handlePreviewPatch({ marketRate: v / 100 })}
+                onChange={(v) => handlePreviewPatch({ marketRate: (v ?? 7) / 100 })}
                 min={1}
                 max={20}
-                step={0.125}
-                suffix="%"
+                allowDecimal
+                className="w-full rounded-lg border border-white/10 bg-slate-900/80 px-2 py-1.5 font-mono text-sm text-slate-100"
               />
             </label>
             <label className="block space-y-1">
-              <span className="text-[11px] text-slate-500">Closing costs</span>
+              <span className="text-[11px] text-slate-500">Closing costs (%)</span>
               <NumericInput
                 value={previewPrefs.closingCostPct * 100}
-                onChange={(v) => handlePreviewPatch({ closingCostPct: v / 100 })}
+                onChange={(v) => handlePreviewPatch({ closingCostPct: (v ?? 2.5) / 100 })}
                 min={0}
                 max={10}
-                step={0.25}
-                suffix="%"
+                allowDecimal
+                className="w-full rounded-lg border border-white/10 bg-slate-900/80 px-2 py-1.5 font-mono text-sm text-slate-100"
               />
             </label>
             <label className="block space-y-1">
               <span className="text-[11px] text-slate-500">Hold period (mo)</span>
               <NumericInput
                 value={previewPrefs.holdPeriodMonths}
-                onChange={(v) => handlePreviewPatch({ holdPeriodMonths: Math.round(v) })}
+                onChange={(v) => handlePreviewPatch({ holdPeriodMonths: Math.round(v ?? 60) })}
                 min={12}
                 max={360}
-                step={12}
+                className="w-full rounded-lg border border-white/10 bg-slate-900/80 px-2 py-1.5 font-mono text-sm text-slate-100"
               />
             </label>
             <label className="block space-y-1">
-              <span className="text-[11px] text-slate-500">Cash-out LTV cap</span>
+              <span className="text-[11px] text-slate-500">Cash-out LTV cap (%)</span>
               <NumericInput
                 value={previewPrefs.cashOutLtv * 100}
-                onChange={(v) => handlePreviewPatch({ cashOutLtv: v / 100 })}
+                onChange={(v) => handlePreviewPatch({ cashOutLtv: (v ?? 75) / 100 })}
                 min={50}
                 max={85}
-                step={1}
-                suffix="%"
+                allowDecimal
+                className="w-full rounded-lg border border-white/10 bg-slate-900/80 px-2 py-1.5 font-mono text-sm text-slate-100"
               />
             </label>
             <label className="block space-y-1">
               <span className="text-[11px] text-slate-500">Min DSCR</span>
               <NumericInput
                 value={previewPrefs.minDscr}
-                onChange={(v) => handlePreviewPatch({ minDscr: v })}
+                onChange={(v) => handlePreviewPatch({ minDscr: v ?? 1 })}
                 min={0.5}
                 max={2}
-                step={0.05}
+                allowDecimal
+                className="w-full rounded-lg border border-white/10 bg-slate-900/80 px-2 py-1.5 font-mono text-sm text-slate-100"
               />
             </label>
             <label className="block space-y-1">
-              <span className="text-[11px] text-slate-500">Deploy yield</span>
+              <span className="text-[11px] text-slate-500">Deploy yield (%)</span>
               <NumericInput
                 value={previewPrefs.deploymentYield * 100}
-                onChange={(v) => handlePreviewPatch({ deploymentYield: v / 100 })}
+                onChange={(v) => handlePreviewPatch({ deploymentYield: (v ?? 12) / 100 })}
                 min={0}
                 max={50}
-                step={1}
-                suffix="%"
+                allowDecimal
+                className="w-full rounded-lg border border-white/10 bg-slate-900/80 px-2 py-1.5 font-mono text-sm text-slate-100"
               />
             </label>
             <label className="block space-y-1">
               <span className="text-[11px] text-slate-500">Refi term (mo)</span>
               <NumericInput
                 value={previewPrefs.refiTermMonths}
-                onChange={(v) => handlePreviewPatch({ refiTermMonths: Math.round(v) })}
+                onChange={(v) => handlePreviewPatch({ refiTermMonths: Math.round(v ?? 360) })}
                 min={60}
                 max={480}
-                step={12}
+                className="w-full rounded-lg border border-white/10 bg-slate-900/80 px-2 py-1.5 font-mono text-sm text-slate-100"
               />
             </label>
           </div>
