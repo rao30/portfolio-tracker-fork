@@ -31,9 +31,10 @@ import {
 import type { PropertyDeckInspectorTab } from '../lib/propertyDeckTypes';
 import type { UsePropertyDeckResult } from '../lib/usePropertyDeck';
 import type { UsePropertyIntakeResult } from '../lib/usePropertyIntake';
+import type { UseSellerFinancingResult } from '../lib/useSellerFinancing';
 import { AddPropertyModal } from './AddPropertyModal';
 import { ExpenseBreakdownEditor } from './ExpenseBreakdownEditor';
-import { FinancingEditor } from './FinancingEditor';
+import { SellerFinancingCommandCenter } from './SellerFinancingCommandCenter';
 import { PropertyTable } from './PropertyTable';
 
 type EditableField = keyof Property;
@@ -73,6 +74,7 @@ interface PropertyDeckProps {
   onUpdateAcquisitionDate?: (index: number, value: string) => void;
   onExpenseBreakdownChange?: (index: number, breakdown: ExpenseBreakdown) => void;
   onFinancingChange?: (index: number, patch: PropertyFinancingPatch) => void;
+  sellerFinancingHook: UseSellerFinancingResult;
   onAdd: (property: PropertyDraft) => number;
   onRemove: (index: number) => void;
   intakeHook: UsePropertyIntakeResult;
@@ -314,6 +316,7 @@ function PropertyInspectorPanel({
   onUpdateAcquisitionDate,
   onExpenseBreakdownChange,
   onFinancingChange,
+  sellerFinancingHook,
   onRemove,
   onInspectorTab,
 }: {
@@ -329,6 +332,7 @@ function PropertyInspectorPanel({
   onUpdateAcquisitionDate?: (index: number, value: string) => void;
   onExpenseBreakdownChange?: (index: number, breakdown: ExpenseBreakdown) => void;
   onFinancingChange?: (index: number, patch: PropertyFinancingPatch) => void;
+  sellerFinancingHook: UseSellerFinancingResult;
   onRemove: (index: number) => void;
   onInspectorTab: (tab: PropertyDeckInspectorTab) => void;
 }) {
@@ -471,14 +475,12 @@ function PropertyInspectorPanel({
         ) : null}
 
         {preferences.inspectorTab === 'financing' && onFinancingChange ? (
-          <FinancingEditor
+          <SellerFinancingCommandCenter
             property={focusedProperty}
             portfolio={portfolio}
             asOfMonth={asOfMonth}
-            onChange={(patch) => onFinancingChange(focusedIndex, patch)}
-            onDeriveFromCap={(balance, monthlyPayment) => {
-              onFinancingChange(focusedIndex, { balance, monthlyPayment });
-            }}
+            sellerFinancingHook={sellerFinancingHook}
+            onApplyFinancing={(patch) => onFinancingChange(focusedIndex, patch)}
           />
         ) : null}
 
@@ -567,6 +569,7 @@ export function PropertyDeck({
   onUpdateAcquisitionDate,
   onExpenseBreakdownChange,
   onFinancingChange,
+  sellerFinancingHook,
   onAdd,
   onRemove,
   intakeHook,
@@ -724,6 +727,7 @@ export function PropertyDeck({
           onUpdateAcquisitionDate={onUpdateAcquisitionDate}
           onExpenseBreakdownChange={onExpenseBreakdownChange}
           onFinancingChange={onFinancingChange}
+          sellerFinancingHook={sellerFinancingHook}
           onAdd={onAdd}
           onRemove={onRemove}
           intakeHook={intakeHook}
@@ -754,6 +758,7 @@ export function PropertyDeck({
         onUpdateAcquisitionDate,
         onExpenseBreakdownChange,
         onFinancingChange,
+        sellerFinancingHook,
         onRemove,
         onInspectorTab: (tab: PropertyDeckInspectorTab) => void setInspectorTab(tab),
       }

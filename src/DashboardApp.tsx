@@ -62,6 +62,7 @@ import { useCapitalDeploy } from './lib/useCapitalDeploy';
 import { useTimelinePreferences } from './lib/useTimelinePreferences';
 import { useRefinanceRadar } from './lib/useRefinanceRadar';
 import { useTaxShield } from './lib/useTaxShield';
+import { useSellerFinancing } from './lib/useSellerFinancing';
 import { useAuth } from './context/AuthContext';
 import { useToast } from './context/ToastContext';
 
@@ -110,6 +111,7 @@ function DashboardApp() {
   const timelineHook = useTimelinePreferences();
   const refinanceRadarHook = useRefinanceRadar();
   const taxShieldHook = useTaxShield();
+  const sellerFinancingHook = useSellerFinancing();
   const { pushToast } = useToast();
 
   const isMobile = useIsMobile();
@@ -567,6 +569,7 @@ function DashboardApp() {
                 onUpdateAcquisitionDate={updateAcquisitionDate}
                 onExpenseBreakdownChange={updateExpenseBreakdown}
                 onFinancingChange={updatePropertyFinancing}
+                sellerFinancingHook={sellerFinancingHook}
                 onAdd={addProperty}
                 onRemove={removeProperty}
                 intakeHook={propertyIntakeHook}

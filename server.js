@@ -101,6 +101,11 @@ import {
   isCapitalDeployEnabled,
   upsertCapitalDeployPreferences,
 } from './server/capital-deploy-store.js';
+import {
+  getSellerFinancingPreferences,
+  isSellerFinancingEnabled,
+  upsertSellerFinancingPreferences,
+} from './server/seller-financing-store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -704,6 +709,38 @@ app.put('/api/capital-deploy', requirePortfolioWebAccess, async (req, res) => {
     const status = err.status ?? 500;
     res.status(status).json({
       error: err instanceof Error ? err.message : 'Failed to save Capital Deploy preferences',
+    });
+  }
+});
+
+app.get('/api/seller-financing', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await getSellerFinancingPreferences(req.supabaseUser.id);
+    res.json({ preferences, enabled: isSellerFinancingEnabled() });
+  } catch (err) {
+    console.error('GET /api/seller-financing', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load Seller Financing preferences',
+    });
+  }
+});
+
+app.put('/api/seller-financing', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await upsertSellerFinancingPreferences(
+      req.supabaseUser.id,
+      req.body ?? {},
+    );
+    res.json({ preferences });
+  } catch (err) {
+    console.error('PUT /api/seller-financing', err);
+    const status = err.status ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to save Seller Financing preferences',
     });
   }
 });
