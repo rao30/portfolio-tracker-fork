@@ -61,7 +61,7 @@ export const DESKTOP_SECTIONS: SectionConfig[] = [
     id: 'tax',
     label: 'Tax & Goals',
     shortLabel: 'Tax',
-    description: 'Tax Shield command center, freedom date goals, and milestones',
+    description: 'Exit Compass hold/sell/1031, Tax Shield, freedom date goals, and milestones',
   },
   {
     id: 'properties',

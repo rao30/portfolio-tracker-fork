@@ -26,6 +26,7 @@ import { PayoffLandscape } from './components/PayoffLandscape';
 import { PrincipalVelocity } from './components/PrincipalVelocity';
 import { RefinanceRadar } from './components/RefinanceRadar';
 import { CapitalDeploy } from './components/CapitalDeploy';
+import { ExitCompass } from './components/ExitCompass';
 import { TaxPlanner } from './components/TaxPlanner';
 import { WealthCompositionChart } from './components/WealthCompositionChart';
 import { ChartVariantContext } from './components/chart-theme';
@@ -59,6 +60,7 @@ import { useGoalCommand } from './lib/useGoalCommand';
 import { useStressLab } from './lib/useStressLab';
 import { usePrincipalVelocity } from './lib/usePrincipalVelocity';
 import { useCapitalDeploy } from './lib/useCapitalDeploy';
+import { useExitCompass } from './lib/useExitCompass';
 import { useTimelinePreferences } from './lib/useTimelinePreferences';
 import { useRefinanceRadar } from './lib/useRefinanceRadar';
 import { useTaxShield } from './lib/useTaxShield';
@@ -107,6 +109,7 @@ function DashboardApp() {
   const stressLabHook = useStressLab();
   const principalVelocityHook = usePrincipalVelocity();
   const capitalDeployHook = useCapitalDeploy();
+  const exitCompassHook = useExitCompass();
   const timelineHook = useTimelinePreferences();
   const refinanceRadarHook = useRefinanceRadar();
   const taxShieldHook = useTaxShield();
@@ -414,6 +417,13 @@ function DashboardApp() {
     deployHook: capitalDeployHook,
   };
 
+  const exitCompassProps = {
+    portfolio,
+    activeStrategy,
+    customOrder: playbookOrder,
+    compassHook: exitCompassHook,
+  };
+
   const yearLabel =
     portfolioYear === 1
       ? `${portfolio.simulationAnchorYear ?? 2026} (now)`
@@ -712,6 +722,7 @@ function DashboardApp() {
 
             {activeSection === 'tax' && (
               <>
+                <ExitCompass {...exitCompassProps} />
                 <TaxPlanner
                   portfolio={portfolio}
                   taxShieldHook={taxShieldHook}
