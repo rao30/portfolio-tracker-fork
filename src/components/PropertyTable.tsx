@@ -21,6 +21,7 @@ import {
   resolveFinancingType,
   type PropertyFinancingPatch,
 } from '../lib/propertyFinancing';
+import type { UsePropertyIntakeResult } from '../lib/usePropertyIntake';
 
 interface PropertyTableProps {
   portfolio: Portfolio;
@@ -29,8 +30,9 @@ interface PropertyTableProps {
   onExpenseBreakdownChange?: (index: number, breakdown: ExpenseBreakdown) => void;
   onFinancingChange?: (index: number, patch: PropertyFinancingPatch) => void;
   onDeriveFinancingFromCap?: (index: number, balance: number, monthlyPayment: number) => void;
-  onAdd: (property: PropertyDraft) => void;
+  onAdd: (property: PropertyDraft) => number;
   onRemove: (index: number) => void;
+  intakeHook: UsePropertyIntakeResult;
   mobileCards?: boolean;
   /** Simulation month for totals / active rows (matches portfolio year slider). */
   asOfMonth?: number;
@@ -309,6 +311,7 @@ export function PropertyTable({
   onDeriveFinancingFromCap,
   onAdd,
   onRemove,
+  intakeHook,
   mobileCards = false,
   asOfMonth = 1,
   isDirty = false,
@@ -531,7 +534,9 @@ export function PropertyTable({
           open={modalOpen}
           onClose={() => setModalOpen(false)}
           onAdd={onAdd}
+          portfolio={portfolio}
           template={lastProperty}
+          intakeHook={intakeHook}
         />
       </div>
     );
@@ -744,7 +749,9 @@ export function PropertyTable({
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         onAdd={onAdd}
+        portfolio={portfolio}
         template={lastProperty}
+        intakeHook={intakeHook}
       />
     </div>
   );

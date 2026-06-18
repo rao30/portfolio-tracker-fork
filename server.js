@@ -62,6 +62,11 @@ import {
   upsertPropertyDeckPreferences,
 } from './server/property-deck-store.js';
 import {
+  getPropertyIntakePreferences,
+  isPropertyIntakeEnabled,
+  upsertPropertyIntakePreferences,
+} from './server/property-intake-store.js';
+import {
   getGoalCommandPreferences,
   isGoalCommandEnabled,
   upsertGoalCommandPreferences,
@@ -86,6 +91,11 @@ import {
   isTaxShieldEnabled,
   upsertTaxShieldPreferences,
 } from './server/tax-shield-store.js';
+import {
+  getCapitalDeployPreferences,
+  isCapitalDeployEnabled,
+  upsertCapitalDeployPreferences,
+} from './server/capital-deploy-store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -469,6 +479,38 @@ app.put('/api/property-deck', requirePortfolioWebAccess, async (req, res) => {
   }
 });
 
+app.get('/api/property-intake', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await getPropertyIntakePreferences(req.supabaseUser.id);
+    res.json({ preferences, enabled: isPropertyIntakeEnabled() });
+  } catch (err) {
+    console.error('GET /api/property-intake', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load Property Intake preferences',
+    });
+  }
+});
+
+app.put('/api/property-intake', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await upsertPropertyIntakePreferences(
+      req.supabaseUser.id,
+      req.body ?? {},
+    );
+    res.json({ preferences });
+  } catch (err) {
+    console.error('PUT /api/property-intake', err);
+    const status = err.status ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to save Property Intake preferences',
+    });
+  }
+});
+
 app.get('/api/goal-command', requirePortfolioWebAccess, async (req, res) => {
   if (!requireAuthenticatedUser(req, res)) return;
 
@@ -593,6 +635,38 @@ app.put('/api/tax-shield', requirePortfolioWebAccess, async (req, res) => {
     const status = err.status ?? 500;
     res.status(status).json({
       error: err instanceof Error ? err.message : 'Failed to save Tax Shield preferences',
+    });
+  }
+});
+
+app.get('/api/capital-deploy', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await getCapitalDeployPreferences(req.supabaseUser.id);
+    res.json({ preferences, enabled: isCapitalDeployEnabled() });
+  } catch (err) {
+    console.error('GET /api/capital-deploy', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load Capital Deploy preferences',
+    });
+  }
+});
+
+app.put('/api/capital-deploy', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await upsertCapitalDeployPreferences(
+      req.supabaseUser.id,
+      req.body ?? {},
+    );
+    res.json({ preferences });
+  } catch (err) {
+    console.error('PUT /api/capital-deploy', err);
+    const status = err.status ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to save Capital Deploy preferences',
     });
   }
 });
