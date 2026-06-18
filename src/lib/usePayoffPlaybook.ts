@@ -94,10 +94,12 @@ export function usePayoffPlaybook(): UsePayoffPlaybookResult {
       const data = (await res.json()) as { playbook: PayoffPlaybookState | null };
       setCloudBacked(true);
       setPlaybook(data.playbook ?? null);
-    } catch (err) {
+    } catch {
+      // Cloud is unreachable (e.g. demo mode with no API). Fall back to local
+      // storage silently — the feature still works, so there's nothing for the
+      // user to act on.
       setCloudBacked(false);
       setPlaybook(loadLocalPlaybook());
-      setError(err instanceof Error ? err.message : 'Failed to load Payoff Playbook');
     } finally {
       setLoading(false);
     }
