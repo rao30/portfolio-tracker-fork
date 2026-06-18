@@ -98,6 +98,12 @@ export function PrincipalVelocity({
     setPreviewBudget(committedBudget);
   }, [committedBudget]);
 
+  useEffect(() => {
+    if (!loading && preferences.lastExploredBudget != null) {
+      setPreviewBudget(preferences.lastExploredBudget);
+    }
+  }, [loading, preferences.lastExploredBudget]);
+
   const deferredPreviewBudget = useDeferredValue(previewBudget);
   const isPreviewStale = previewBudget !== deferredPreviewBudget;
   const isDirty = previewBudget !== committedBudget;
@@ -325,7 +331,7 @@ export function PrincipalVelocity({
             <div className="mt-2 flex items-center gap-2">
               <NumericInput
                 value={previewBudget}
-                onChange={handleBudgetChange}
+                onChange={(value) => handleBudgetChange(value ?? 0)}
                 min={0}
                 max={budgetMax}
                 step={100}

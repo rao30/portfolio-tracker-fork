@@ -4,43 +4,44 @@ import {
   computePrincipalVelocityAnalysis,
   computePrincipalVelocityPreviewDelta,
 } from './principalVelocity';
-import type { Portfolio } from './types';
+import { normalizePortfolio } from './snowball';
 
-function minimalPortfolio(extraBudget = 2000): Portfolio {
-  return {
-    extraMonthlyBudget: extraBudget,
-    annualRentGrowthRate: 0.02,
-    annualExpenseInflationRate: 0.015,
-    reinvestSurplus: false,
-    monthlyReserveTarget: 0,
-    defaultVacancyRate: 0.05,
-    defaultCapexReserveRate: 0.1,
-    defaultCapexReserveFlat: 0,
-    simulationAnchorYear: 2026,
-    simulationAnchorMonth: 1,
+function minimalPortfolio(extraBudget = 2000) {
+  return normalizePortfolio({
+    extra_monthly_budget: extraBudget,
+    annual_rent_growth_rate: 0.02,
+    annual_expense_inflation_rate: 0.015,
+    reinvest_surplus: false,
+    monthly_reserve_target: 0,
+    default_vacancy_rate: 0.05,
+    default_capex_reserve_rate: 0.1,
+    default_capex_reserve_flat: 0,
+    simulation_anchor_year: 2026,
+    simulation_anchor_month: 1,
+    goals: [],
     properties: [
       {
         name: 'Property A',
         balance: 200_000,
-        marketValue: 300_000,
-        annualInterestRate: 0.065,
-        annualAppreciationRate: 0.03,
-        monthlyPayment: 1500,
-        monthlyRent: 2500,
-        monthlyExpenses: 400,
+        market_value: 300_000,
+        annual_interest_rate: 0.065,
+        annual_appreciation_rate: 0.03,
+        monthly_payment: 1500,
+        monthly_rent: 2500,
+        monthly_expenses: 400,
       },
       {
         name: 'Property B',
         balance: 150_000,
-        marketValue: 220_000,
-        annualInterestRate: 0.055,
-        annualAppreciationRate: 0.03,
-        monthlyPayment: 1100,
-        monthlyRent: 1800,
-        monthlyExpenses: 300,
+        market_value: 220_000,
+        annual_interest_rate: 0.055,
+        annual_appreciation_rate: 0.03,
+        monthly_payment: 1100,
+        monthly_rent: 1800,
+        monthly_expenses: 300,
       },
     ],
-  };
+  });
 }
 
 describe('principalVelocity', () => {

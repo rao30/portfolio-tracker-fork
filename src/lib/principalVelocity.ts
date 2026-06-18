@@ -4,7 +4,7 @@ import {
   runSimulationWithPayoffOrder,
   type StrategyId,
 } from './snowball';
-import { formatCurrency, formatMonths } from './format';
+import { formatMonths } from './format';
 import type {
   PrincipalVelocityAnalysis,
   PrincipalVelocityPoint,
