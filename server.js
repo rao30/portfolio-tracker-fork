@@ -86,6 +86,11 @@ import {
   isTimelinePreferencesEnabled,
   upsertTimelinePreferences,
 } from './server/timeline-preferences-store.js';
+import {
+  getRefinanceRadarPreferences,
+  isRefinanceRadarEnabled,
+  upsertRefinanceRadarPreferences,
+} from './server/refinance-radar-store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -433,6 +438,38 @@ app.put('/api/balloon-safety', requirePortfolioWebAccess, async (req, res) => {
     const status = err.status ?? 500;
     res.status(status).json({
       error: err instanceof Error ? err.message : 'Failed to save Balloon Safety preferences',
+    });
+  }
+});
+
+app.get('/api/refinance-radar', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await getRefinanceRadarPreferences(req.supabaseUser.id);
+    res.json({ preferences, enabled: isRefinanceRadarEnabled() });
+  } catch (err) {
+    console.error('GET /api/refinance-radar', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load Refinance Radar preferences',
+    });
+  }
+});
+
+app.put('/api/refinance-radar', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await upsertRefinanceRadarPreferences(
+      req.supabaseUser.id,
+      req.body ?? {},
+    );
+    res.json({ preferences });
+  } catch (err) {
+    console.error('PUT /api/refinance-radar', err);
+    const status = err.status ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to save Refinance Radar preferences',
     });
   }
 });
