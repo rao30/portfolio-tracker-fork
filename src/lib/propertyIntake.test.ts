@@ -4,8 +4,11 @@ import {
   buildIntakeDraft,
   canAdvanceFromStep,
   computeAutoPayment,
+  computeIntakePreview,
   draftFromAcquisitionTemplate,
   intakeDraftToProperty,
+  nextIntakeStep,
+  prevIntakeStep,
   validateIntakeStep,
   withAutoPayment,
 } from './propertyIntake';
@@ -105,5 +108,37 @@ describe('propertyIntake', () => {
     draft.monthlyPayment = 1500;
     draft.autoCalculatePayment = false;
     expect(canAdvanceFromStep('loan', draft)).toBe(true);
+  });
+
+  it('navigates intake steps forward and back', () => {
+    expect(nextIntakeStep('template')).toBe('identity');
+    expect(nextIntakeStep('review')).toBeNull();
+    expect(prevIntakeStep('identity')).toBe('template');
+    expect(prevIntakeStep('template')).toBeNull();
+  });
+
+  it('rejects invalid acquisition dates', () => {
+    const draft = buildIntakeDraft('blank', basePortfolio);
+    draft.name = 'Test';
+    draft.acquisitionDate = '2026-13';
+    const result = validateIntakeStep('identity', draft);
+    expect(result.ok).toBe(false);
+    expect(result.errors.acquisitionDate).toBeTruthy();
+  });
+
+  it('falls back to acquisition template when clone_last has no property', () => {
+    const draft = buildIntakeDraft('clone_last', basePortfolio);
+    expect(draft.marketValue).toBe(basePortfolio.acquisitionTemplate.purchasePrice);
+    expect(draft.monthlyRent).toBe(basePortfolio.acquisitionTemplate.monthlyRent);
+  });
+
+  it('computes live preview metrics for a complete draft', () => {
+    const draft = buildIntakeDraft('acquisition', basePortfolio);
+    draft.name = 'Preview Duplex';
+    const preview = computeIntakePreview(draft, basePortfolio);
+    expect(preview.property.name).toBe('Preview Duplex');
+    expect(preview.health.score).toBeGreaterThan(0);
+    expect(preview.ltv).toBeGreaterThan(0);
+    expect(Number.isFinite(preview.capRate)).toBe(true);
   });
 });

@@ -192,14 +192,27 @@ export function PropertyIntakeCommandCenter({
   const [templateSource, setTemplateSource] = useState<IntakeTemplateSource>(
     preferences.preferredTemplate,
   );
-  const [draft, setDraft] = useState(() =>
-    buildIntakeDraft(
-      preferences.preferredTemplate,
+  const buildDraftFromPreferences = useCallback(
+    (source: IntakeTemplateSource = preferences.preferredTemplate) =>
+      ({
+        ...buildIntakeDraft(
+          source,
+          portfolio,
+          template,
+          preferences.defaultFinancingType,
+        ),
+        autoCalculatePayment: preferences.autoCalculatePayment,
+      }),
+    [
       portfolio,
       template,
+      preferences.preferredTemplate,
       preferences.defaultFinancingType,
-    ),
+      preferences.autoCalculatePayment,
+    ],
   );
+
+  const [draft, setDraft] = useState(() => buildDraftFromPreferences());
   const [submitting, setSubmitting] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
 
@@ -213,15 +226,8 @@ export function PropertyIntakeCommandCenter({
     if (!open) return;
     setStep('template');
     setTemplateSource(preferences.preferredTemplate);
-    setDraft(
-      buildIntakeDraft(
-        preferences.preferredTemplate,
-        portfolio,
-        template,
-        preferences.defaultFinancingType,
-      ),
-    );
-  }, [open, portfolio, template, preferences.preferredTemplate, preferences.defaultFinancingType]);
+    setDraft(buildDraftFromPreferences());
+  }, [open, portfolio, template, buildDraftFromPreferences]);
 
   useEffect(() => {
     if (!open || step !== 'identity') return;
@@ -232,11 +238,9 @@ export function PropertyIntakeCommandCenter({
     (source: IntakeTemplateSource) => {
       setTemplateSource(source);
       void setPreferredTemplate(source);
-      setDraft(
-        buildIntakeDraft(source, portfolio, template, preferences.defaultFinancingType),
-      );
+      setDraft(buildDraftFromPreferences(source));
     },
-    [portfolio, template, preferences.defaultFinancingType, setPreferredTemplate],
+    [buildDraftFromPreferences, setPreferredTemplate],
   );
 
   const goNext = useCallback(() => {
