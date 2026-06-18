@@ -3,9 +3,11 @@ import type { Portfolio } from './types';
 import {
   applyPropertyEventOverlays,
   collectPropertyEvents,
+  computeTimelineCommandAnalysis,
   computeTimelineImpact,
   computeTimelinePreviewDelta,
   overlaysEqual,
+  portfolioFromEventOverlays,
   validatePropertyEvent,
 } from './timeline';
 
@@ -111,6 +113,56 @@ describe('computeTimelinePreviewDelta', () => {
     const delta = computeTimelinePreviewDelta(basePortfolio, preview, 'highestRate');
     expect(delta.eventCountDelta).toBe(1);
     expect(delta.cashflowDelta).not.toBe(0);
+  });
+});
+
+describe('portfolioFromEventOverlays', () => {
+  it('replaces committed events with preview overlays only', () => {
+    const committed = applyPropertyEventOverlays(basePortfolio, [
+      {
+        propertyName: 'Prop A',
+        events: [{ month: 6, type: 'rentChange', rent: 2100 }],
+      },
+    ]);
+    const preview = [
+      {
+        propertyName: 'Prop A',
+        events: [{ month: 12, type: 'rentChange' as const, rent: 3000 }],
+      },
+    ];
+    const next = portfolioFromEventOverlays(committed, preview);
+    expect(next.properties[0].events).toHaveLength(1);
+    expect(next.properties[0].events?.[0].rent).toBe(3000);
+  });
+});
+
+describe('computeTimelineCommandAnalysis', () => {
+  it('returns neutral verdict when preview matches committed', () => {
+    const withRent = applyPropertyEventOverlays(basePortfolio, [
+      {
+        propertyName: 'Prop A',
+        events: [{ month: 12, type: 'rentChange', rent: 3000 }],
+      },
+    ]);
+    const overlays = collectPropertyEvents(withRent);
+    const analysis = computeTimelineCommandAnalysis(withRent, overlays, 'highestRate');
+    expect(analysis.previewEventCount).toBe(1);
+    expect(analysis.committedEventCount).toBe(1);
+    expect(analysis.verdictTone).toBe('neutral');
+  });
+
+  it('returns positive verdict for strong rent bump preview', () => {
+    const preview = [
+      {
+        propertyName: 'Prop A',
+        events: [{ month: 12, type: 'rentChange' as const, rent: 5000 }],
+      },
+    ];
+    const analysis = computeTimelineCommandAnalysis(basePortfolio, preview, 'highestRate');
+    expect(analysis.previewEventCount).toBe(1);
+    expect(analysis.committedEventCount).toBe(0);
+    expect(analysis.verdictTone).toBe('positive');
+    expect(analysis.debtFreeLabel.length).toBeGreaterThan(0);
   });
 });
 

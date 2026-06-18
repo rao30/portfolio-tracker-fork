@@ -67,6 +67,11 @@ import {
   upsertGoalCommandPreferences,
 } from './server/goal-command-store.js';
 import {
+  getStressLabPreferences,
+  isStressLabEnabled,
+  upsertStressLabPreferences,
+} from './server/stress-lab-store.js';
+import {
   getTimelinePreferences,
   isTimelinePreferencesEnabled,
   upsertTimelinePreferences,
