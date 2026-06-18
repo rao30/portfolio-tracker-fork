@@ -13,6 +13,9 @@ interface NumericInputProps {
   placeholder?: string;
 }
 
+const inputBaseClass =
+  'rounded-lg border border-white/10 bg-slate-900/80 px-2 py-1 font-mono text-sm tabular-nums text-slate-100 outline-none placeholder:text-slate-500';
+
 /** Controlled numeric input that avoids leading-zero glitches from type="number". */
 export function NumericInput({
   id,
@@ -76,7 +79,7 @@ export function NumericInput({
           (e.target as HTMLInputElement).blur();
         }
       }}
-      className={className}
+      className={className ? `${inputBaseClass} ${className}` : inputBaseClass}
     />
   );
 }

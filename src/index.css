@@ -6,6 +6,17 @@
   body {
     @apply min-h-screen bg-slate-950 font-sans text-slate-100 antialiased;
   }
+
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+  select,
+  textarea {
+    @apply text-slate-100;
+  }
+
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([class]),
+  textarea:not([class]) {
+    @apply rounded-lg border border-white/10 bg-slate-900/80 px-2 py-1 outline-none placeholder:text-slate-500;
+  }
 }
 
 @layer utilities {
