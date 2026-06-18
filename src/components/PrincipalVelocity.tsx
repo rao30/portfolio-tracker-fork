@@ -209,15 +209,15 @@ export function PrincipalVelocity({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold text-slate-100">Principal Velocity</h2>
+            <h2 className="text-lg font-semibold text-slate-100">Equity Buildup</h2>
             <span className="rounded bg-violet-500/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-300">
               Hidden income
             </span>
           </div>
           <p className="mt-1 max-w-2xl text-sm text-slate-400">
-            Principal paydown is forced equity — an under-appreciated monthly income stream that
-            accelerates as your snowball compounds. Scrub extra budget to preview velocity before
-            applying.
+            Every loan payment chips away at what you owe — that's equity you're quietly earning each
+            month, and it speeds up as loans get paid off. Drag the budget slider to see how much
+            faster extra payments build it.
           </p>
         </div>
         <button

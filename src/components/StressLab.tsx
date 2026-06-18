@@ -286,7 +286,7 @@ export function StressLab({
         >
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-violet-400">
-              Stress Lab
+              Stress Test
             </p>
             <p className="truncate text-sm text-slate-200">{committedAnalysis.verdict}</p>
           </div>
@@ -306,23 +306,24 @@ export function StressLab({
     <section
       ref={sectionRef}
       className={shell}
-      aria-label="Stress Lab scenario command center"
+      aria-label="Stress Test"
       data-stress-lab
     >
       <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-violet-400">
-            Stress Lab
+            Stress Test
           </h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            Live stress-test preview · safe apply-only · vacancy, rates, exits
+            See how bad times — higher vacancy, rising rates, a big repair, or selling a property —
+            would change your debt-free date, equity, and cashflow. Preview before you apply.
           </p>
         </div>
         <button
           type="button"
           onClick={() => void setCollapsed(true)}
           className="rounded-lg border border-white/10 px-2 py-1 text-xs text-slate-400 hover:bg-white/5"
-          title="Collapse Stress Lab"
+          title="Collapse Stress Test"
         >
           Collapse
         </button>

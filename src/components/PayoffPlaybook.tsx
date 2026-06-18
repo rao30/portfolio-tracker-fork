@@ -267,13 +267,13 @@ export function PayoffPlaybook({
   const shell = embedded ? 'space-y-4' : 'glass-card space-y-4 p-4';
 
   return (
-    <section className={shell} aria-label="Payoff Playbook">
+    <section className={shell} aria-label="Custom payoff order">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-slate-100">Payoff Playbook</h2>
+          <h2 className="text-base font-semibold text-slate-100">Custom Payoff Order</h2>
           <p className="mt-0.5 max-w-xl text-xs text-slate-400">
-            Drag or use ↑↓ to rank which property gets your snowball next. Live rationale
-            surfaces balloon risk, rate, and cashflow freed — no spreadsheet required.
+            Drag (or use ↑↓) to set exactly which loan gets your extra payment first, second, and so
+            on. As you reorder, it shows the effect on balloon risk, interest, and freed-up cashflow.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

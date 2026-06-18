@@ -232,7 +232,7 @@ export function BalloonSafety({
         >
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-amber-400">
-              Balloon Safety
+              Balloon Deadline Check
             </p>
             <p className="truncate text-sm text-slate-200">{analysis.verdict}</p>
           </div>
@@ -269,21 +269,22 @@ export function BalloonSafety({
   };
 
   return (
-    <section className={shell} aria-label="Balloon Safety Command Center">
+    <section className={shell} aria-label="Balloon Deadline Check">
       <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-400">
-            Balloon Safety
+            Balloon Deadline Check
           </h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            Payoff vs balloon deadline — will your strategy clear seller notes in time?
+            For seller-financed loans with a balloon payment due, checks whether your plan pays them
+            off in time — and flags any that won't.
           </p>
         </div>
         <button
           type="button"
           onClick={() => void setCollapsed(true)}
           className="shrink-0 rounded-lg border border-white/10 px-2 py-1 text-xs text-slate-400 hover:bg-white/5"
-          aria-label="Collapse Balloon Safety"
+          aria-label="Collapse Balloon Deadline Check"
         >
           ▲
         </button>

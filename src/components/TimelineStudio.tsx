@@ -353,7 +353,7 @@ export function TimelineStudio({
         >
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-cyan-400">
-              Timeline Command Center
+              Event Planner
             </p>
             <p className="truncate text-sm text-slate-200">{analysis.verdict}</p>
           </div>
@@ -375,7 +375,7 @@ export function TimelineStudio({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-base font-semibold text-white">Timeline Command Center</h2>
+              <h2 className="text-base font-semibold text-white">Event Planner</h2>
               {isDirty && (
                 <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
                   Preview
@@ -386,8 +386,9 @@ export function TimelineStudio({
               )}
             </div>
             <p className="mt-0.5 max-w-2xl text-xs text-slate-400">
-              Stage rent bumps, refis, capex, and exits safely — preview impact before applying to
-              your portfolio. Enter to apply · Esc to discard.
+              Schedule future events — rent increases, refinances, big repairs, or selling — on a
+              timeline and preview how each one shifts your debt-free date and equity before applying.
+              Enter to apply · Esc to discard.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">

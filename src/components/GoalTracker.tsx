@@ -253,16 +253,17 @@ export function GoalTracker({
     <section
       ref={sectionRef}
       className={embedded ? 'space-y-4' : 'glass-card overflow-hidden border-emerald-500/20'}
-      aria-label="Freedom Date Command Center"
+      aria-label="Debt-Free Goal"
       data-goal-command
     >
       <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-emerald-400">
-            Freedom Date
+            Debt-Free Goal
           </h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            Calendar goal · safe budget preview · one-click apply
+            Pick a target debt-free date or equity goal and instantly see if you're on track — plus
+            the extra monthly budget it would take to get there.
           </p>
         </div>
         {!embedded && (
@@ -566,7 +567,7 @@ export function GoalTracker({
           >
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wide text-emerald-400">
-                Freedom Date
+                Debt-Free Goal
               </p>
               <p className="truncate text-sm text-slate-200">{analysis.statusHeadline}</p>
             </div>
@@ -595,7 +596,7 @@ export function GoalTracker({
           >
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wide text-emerald-400">
-                Freedom Date
+                Debt-Free Goal
               </p>
               <p className="truncate text-sm text-slate-200">{analysis.statusHeadline}</p>
             </div>

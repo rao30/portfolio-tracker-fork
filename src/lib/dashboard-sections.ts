@@ -1,9 +1,10 @@
 export type DashboardSection =
-  | 'command'
-  | 'strategy'
-  | 'portfolio'
+  | 'overview'
+  | 'plan'
+  | 'scenarios'
+  | 'moves'
   | 'charts'
-  | 'tax'
+  | 'taxgoals'
   | 'properties';
 
 export type MobileTab = 'overview' | 'charts' | 'portfolio' | 'settings';
@@ -34,40 +35,46 @@ export interface ChartConfig {
 
 export const DESKTOP_SECTIONS: SectionConfig[] = [
   {
-    id: 'command',
-    label: 'Command Center',
-    shortLabel: 'Command',
-    description: 'Capital deploy, exit compass, decision pulse, balloon safety, refinance radar, payoff landscape',
+    id: 'overview',
+    label: 'Overview',
+    shortLabel: 'Overview',
+    description: 'See where you stand today and your recommended next move',
   },
   {
-    id: 'strategy',
-    label: 'Strategy & Planning',
-    shortLabel: 'Strategy',
-    description: 'Budget, playbook, stress lab, timeline, lab',
+    id: 'plan',
+    label: 'Payoff Plan',
+    shortLabel: 'Plan',
+    description: 'Set your extra budget and payoff strategy, then fine-tune the order',
   },
   {
-    id: 'portfolio',
-    label: 'Portfolio Snapshot',
-    shortLabel: 'Snapshot',
-    description: 'Principal velocity, metrics, insights, and horizon views',
+    id: 'scenarios',
+    label: 'Scenarios',
+    shortLabel: 'Scenarios',
+    description: 'Stress-test your plan and map out future rent, refi, and capex events',
+  },
+  {
+    id: 'moves',
+    label: 'Big Moves',
+    shortLabel: 'Big Moves',
+    description: 'Decide where to put extra cash, when to refinance, and whether to sell',
   },
   {
     id: 'charts',
     label: 'Charts',
     shortLabel: 'Charts',
-    description: 'Visualize wealth, cashflow, and payoff paths',
+    description: 'Visualize net worth, cashflow, and payoff paths over time',
   },
   {
-    id: 'tax',
+    id: 'taxgoals',
     label: 'Tax & Goals',
-    shortLabel: 'Tax',
-    description: 'Tax Shield command center, freedom date goals, and milestones',
+    shortLabel: 'Tax & Goals',
+    description: 'Estimate tax savings and track your debt-free target date',
   },
   {
     id: 'properties',
     label: 'Properties',
     shortLabel: 'Properties',
-    description: 'Edit portfolio and per-property details',
+    description: 'Add and edit each property and its financing details',
   },
 ];
 

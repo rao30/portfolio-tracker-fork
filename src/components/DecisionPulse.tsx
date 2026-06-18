@@ -182,7 +182,7 @@ export function DecisionPulse({
         >
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-cyan-400">
-              Decision Pulse
+              Payoff Plan
             </p>
             <p className="truncate text-sm text-slate-200">{committedAnalysis.verdict}</p>
           </div>
@@ -204,23 +204,24 @@ export function DecisionPulse({
     <section
       ref={sectionRef}
       className={shell}
-      aria-label="Decision Pulse payoff command center"
+      aria-label="Payoff Plan"
       data-decision-pulse
     >
       <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-cyan-400">
-            Decision Pulse
+            Payoff Plan
           </h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            Plain-English payoff verdict · safe budget preview · monthly action
+            Your debt-free verdict, which loan to pay extra on this month, and a slider to test a
+            bigger monthly budget before you commit.
           </p>
         </div>
         <button
           type="button"
           onClick={() => void setCollapsed(true)}
           className="rounded-lg border border-white/10 px-2 py-1 text-xs text-slate-400 hover:bg-white/5"
-          title="Collapse Decision Pulse"
+          title="Collapse Payoff Plan"
         >
           Collapse
         </button>

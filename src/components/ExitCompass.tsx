@@ -342,7 +342,7 @@ export function ExitCompass({
             <span className="text-lg" aria-hidden>
               🧭
             </span>
-            <h2 className="text-base font-semibold text-slate-100">Exit Compass</h2>
+            <h2 className="text-base font-semibold text-slate-100">Hold, Sell or 1031</h2>
             {cloudBacked && (
               <span className="rounded bg-cyan-500/15 px-1.5 py-0.5 text-[10px] text-cyan-300">
                 cloud
@@ -350,7 +350,8 @@ export function ExitCompass({
             )}
           </div>
           <p className="mt-0.5 text-xs text-slate-400">
-            Hold vs sell vs 1031 — wired into your snowball payoff path
+            For each property, compares keeping it, selling it, or doing a 1031 exchange — and what
+            each choice does to your wealth, debt-free date, and taxes.
           </p>
         </div>
         <button

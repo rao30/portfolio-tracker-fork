@@ -29,6 +29,7 @@ import { CapitalDeploy } from './components/CapitalDeploy';
 import { ExitCompass } from './components/ExitCompass';
 import { TaxPlanner } from './components/TaxPlanner';
 import { MobileMissionControl } from './components/MobileMissionControl';
+import { HowItWorks } from './components/HowItWorks';
 import { WealthCompositionChart } from './components/WealthCompositionChart';
 import { ChartVariantContext } from './components/chart-theme';
 import {
@@ -124,7 +125,7 @@ function DashboardApp() {
 
   const isMobile = useIsMobile();
   const [mobileTab, setMobileTab] = useState<MobileTab>('overview');
-  const [activeSection, setActiveSection] = useState<DashboardSection>('command');
+  const [activeSection, setActiveSection] = useState<DashboardSection>('overview');
   const [activeStrategy, setActiveStrategy] = useState<StrategyId>('highestRate');
   const [playbookOrder, setPlaybookOrder] = useState<string[] | null>(null);
   const [scenario, setScenario] = useState<ScenarioConfig>(SCENARIO_PRESETS[0]);
@@ -678,40 +679,10 @@ function DashboardApp() {
               />
             )}
 
-            {activeSection === 'command' && (
+            {activeSection === 'overview' && (
               <>
-                <CapitalDeploy {...capitalDeployProps} />
-                <ExitCompass {...exitCompassProps} />
+                <HowItWorks onJump={handleSectionChange} />
                 <DecisionPulse {...decisionPulseProps} />
-                <BalloonSafety {...balloonSafetyProps} />
-                <RefinanceRadar portfolio={portfolio} radarHook={refinanceRadarHook} />
-                <Controls {...controlProps} mode="advanced" embedded idPrefix="command" />
-                <PayoffLandscape {...payoffLandscapeProps} />
-              </>
-            )}
-
-            {activeSection === 'strategy' && (
-              <>
-                <Controls {...controlProps} idPrefix="strategy" />
-                <PayoffPlaybook {...playbookProps} />
-                <StressLab {...stressLabProps} />
-                <TimelineStudio
-                  portfolio={portfolio}
-                  strategyId={activeStrategy}
-                  monthsToPayoff={activeResult.monthsToPayoff}
-                  cloudEnabled={cloudEnabled}
-                  userId={user?.id}
-                  timelineHook={timelineHook}
-                  onApplyEvents={applyTimelineEvents}
-                  onClearEvents={clearTimelineEvents}
-                />
-                <StrategyLab {...strategyLabProps} />
-              </>
-            )}
-
-            {activeSection === 'portfolio' && (
-              <>
-                <PrincipalVelocity {...principalVelocityProps} />
                 <PortfolioDashboard
                   portfolio={portfolio}
                   result={activeResult}
@@ -728,9 +699,44 @@ function DashboardApp() {
               </>
             )}
 
+            {activeSection === 'plan' && (
+              <>
+                <Controls {...controlProps} idPrefix="plan" />
+                <PayoffPlaybook {...playbookProps} />
+                <PayoffLandscape {...payoffLandscapeProps} />
+                <PrincipalVelocity {...principalVelocityProps} />
+                <StrategyLab {...strategyLabProps} />
+              </>
+            )}
+
+            {activeSection === 'scenarios' && (
+              <>
+                <StressLab {...stressLabProps} />
+                <TimelineStudio
+                  portfolio={portfolio}
+                  strategyId={activeStrategy}
+                  monthsToPayoff={activeResult.monthsToPayoff}
+                  cloudEnabled={cloudEnabled}
+                  userId={user?.id}
+                  timelineHook={timelineHook}
+                  onApplyEvents={applyTimelineEvents}
+                  onClearEvents={clearTimelineEvents}
+                />
+                <BalloonSafety {...balloonSafetyProps} />
+              </>
+            )}
+
+            {activeSection === 'moves' && (
+              <>
+                <CapitalDeploy {...capitalDeployProps} />
+                <RefinanceRadar portfolio={portfolio} radarHook={refinanceRadarHook} />
+                <ExitCompass {...exitCompassProps} />
+              </>
+            )}
+
             {activeSection === 'charts' && chartsSection}
 
-            {activeSection === 'tax' && (
+            {activeSection === 'taxgoals' && (
               <>
                 <TaxPlanner
                   portfolio={portfolio}

@@ -191,12 +191,12 @@ export function PayoffLandscape({
         >
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-violet-400">
-              Payoff Landscape
+              Budget × Strategy Explorer
             </p>
             <p className="truncate text-sm text-slate-200">
               {grid.optimalCell
-                ? `Optimal: ${STRATEGY_LABELS[grid.optimalCell.strategyId]} at ${formatCurrency(grid.optimalCell.budget)}/mo`
-                : 'Explore budget × strategy heatmap'}
+                ? `Best combo: ${STRATEGY_LABELS[grid.optimalCell.strategyId]} at ${formatCurrency(grid.optimalCell.budget)}/mo`
+                : 'Compare every budget and strategy at a glance'}
             </p>
           </div>
           <span className="shrink-0 text-slate-500" aria-hidden>
@@ -208,14 +208,15 @@ export function PayoffLandscape({
   }
 
   return (
-    <section className={shell} aria-label="Payoff Landscape heatmap">
+    <section className={shell} aria-label="Budget by strategy explorer">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-violet-400">
-            Payoff Landscape
+            Budget × Strategy Explorer
           </h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            Full budget × strategy matrix · click or arrow keys + Enter to apply
+            A grid of every extra-budget and strategy combination, color-coded by debt-free speed.
+            Click a cell (or use arrow keys + Enter) to apply it.
           </p>
         </div>
         <button
