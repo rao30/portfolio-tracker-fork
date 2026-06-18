@@ -106,6 +106,11 @@ import {
   isOperatingCostsEnabled,
   upsertOperatingCostsPreferences,
 } from './server/operating-costs-store.js';
+import {
+  getExitCompassPreferences,
+  isExitCompassEnabled,
+  upsertExitCompassPreferences,
+} from './server/exit-compass-store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -741,6 +746,38 @@ app.put('/api/capital-deploy', requirePortfolioWebAccess, async (req, res) => {
     const status = err.status ?? 500;
     res.status(status).json({
       error: err instanceof Error ? err.message : 'Failed to save Capital Deploy preferences',
+    });
+  }
+});
+
+app.get('/api/exit-compass', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await getExitCompassPreferences(req.supabaseUser.id);
+    res.json({ preferences, enabled: isExitCompassEnabled() });
+  } catch (err) {
+    console.error('GET /api/exit-compass', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load Exit Compass preferences',
+    });
+  }
+});
+
+app.put('/api/exit-compass', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await upsertExitCompassPreferences(
+      req.supabaseUser.id,
+      req.body ?? {},
+    );
+    res.json({ preferences });
+  } catch (err) {
+    console.error('PUT /api/exit-compass', err);
+    const status = err.status ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to save Exit Compass preferences',
     });
   }
 });

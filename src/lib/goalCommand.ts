@@ -226,7 +226,6 @@ export function computeGoalBudgetPreview(
   portfolio: Portfolio,
   previewBudget: number,
   strategyId: StrategyId,
-  prefs: GoalCommandPreferences,
   _prefs: GoalCommandPreferences,
   customOrder?: string[] | null,
 ): SimulationResult {
@@ -234,7 +233,7 @@ export function computeGoalBudgetPreview(
   if (customOrder && customOrder.length > 0) {
     return runSimulationWithPayoffOrder(draft, customOrder);
   }
-  return runSimulation(draft, strategyId, customOrder ?? null);
+  return runSimulation(draft, strategyId);
 }
 
 export function computeGoalBudgetPreviewDelta(

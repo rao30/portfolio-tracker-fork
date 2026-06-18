@@ -26,6 +26,7 @@ import { PayoffLandscape } from './components/PayoffLandscape';
 import { PrincipalVelocity } from './components/PrincipalVelocity';
 import { RefinanceRadar } from './components/RefinanceRadar';
 import { CapitalDeploy } from './components/CapitalDeploy';
+import { ExitCompass } from './components/ExitCompass';
 import { TaxPlanner } from './components/TaxPlanner';
 import { WealthCompositionChart } from './components/WealthCompositionChart';
 import { ChartVariantContext } from './components/chart-theme';
@@ -63,6 +64,7 @@ import { useCapitalDeploy } from './lib/useCapitalDeploy';
 import { useTimelinePreferences } from './lib/useTimelinePreferences';
 import { useRefinanceRadar } from './lib/useRefinanceRadar';
 import { useTaxShield } from './lib/useTaxShield';
+import { useExitCompass } from './lib/useExitCompass';
 import { useAuth } from './context/AuthContext';
 import { useToast } from './context/ToastContext';
 
@@ -112,6 +114,7 @@ function DashboardApp() {
   const timelineHook = useTimelinePreferences();
   const refinanceRadarHook = useRefinanceRadar();
   const taxShieldHook = useTaxShield();
+  const exitCompassHook = useExitCompass();
   const { pushToast } = useToast();
 
   const isMobile = useIsMobile();
@@ -170,6 +173,18 @@ function DashboardApp() {
     if (!portfolio) return 20000;
     const piSum = portfolio.properties.reduce((s, p) => s + p.monthlyPayment, 0);
     return Math.max(20000, Math.round(piSum * 2));
+  }, [portfolio]);
+
+  const deployMax = useMemo(() => {
+    if (!portfolio) return 5000;
+    const surplus = portfolio.properties.reduce((sum, p) => {
+      const gross = p.monthlyRent * (1 - portfolio.defaultVacancyRate);
+      const capex =
+        p.monthlyRent * (p.capexReserveRate ?? portfolio.defaultCapexReserveRate) +
+        (p.capexReserveFlat ?? portfolio.defaultCapexReserveFlat);
+      return sum + Math.max(0, gross - p.monthlyExpenses - p.monthlyPayment - capex);
+    }, 0);
+    return Math.max(2000, Math.round(Math.max(surplus, portfolio.extraMonthlyBudget) * 3));
   }, [portfolio]);
 
   const {
@@ -396,24 +411,19 @@ function DashboardApp() {
     onApplyBudget: setBudget,
   };
 
-  const deployMax = useMemo(() => {
-    if (!portfolio) return 5000;
-    const surplus = portfolio.properties.reduce((sum, p) => {
-      const gross = p.monthlyRent * (1 - portfolio.defaultVacancyRate);
-      const capex =
-        p.monthlyRent * (p.capexReserveRate ?? portfolio.defaultCapexReserveRate) +
-        (p.capexReserveFlat ?? portfolio.defaultCapexReserveFlat);
-      return sum + Math.max(0, gross - p.monthlyExpenses - p.monthlyPayment - capex);
-    }, 0);
-    return Math.max(2000, Math.round(Math.max(surplus, portfolio.extraMonthlyBudget) * 3));
-  }, [portfolio]);
-
   const capitalDeployProps = {
     portfolio,
     activeStrategy,
     customOrder: playbookOrder,
     deployMax,
     deployHook: capitalDeployHook,
+  };
+
+  const exitCompassProps = {
+    portfolio,
+    activeStrategy,
+    customOrder: playbookOrder,
+    compassHook: exitCompassHook,
   };
 
   const yearLabel =
@@ -508,6 +518,7 @@ function DashboardApp() {
             <>
               <Header {...headerProps} compact />
               <CapitalDeploy {...capitalDeployProps} embedded />
+              <ExitCompass {...exitCompassProps} embedded />
               <DecisionPulse {...decisionPulseProps} embedded />
               <BalloonSafety {...balloonSafetyProps} embedded />
               <RefinanceRadar portfolio={portfolio} radarHook={refinanceRadarHook} embedded />
@@ -665,6 +676,7 @@ function DashboardApp() {
             {activeSection === 'command' && (
               <>
                 <CapitalDeploy {...capitalDeployProps} />
+                <ExitCompass {...exitCompassProps} />
                 <DecisionPulse {...decisionPulseProps} />
                 <BalloonSafety {...balloonSafetyProps} />
                 <RefinanceRadar portfolio={portfolio} radarHook={refinanceRadarHook} />
