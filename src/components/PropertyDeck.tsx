@@ -31,8 +31,9 @@ import {
 import type { PropertyDeckInspectorTab } from '../lib/propertyDeckTypes';
 import type { UsePropertyDeckResult } from '../lib/usePropertyDeck';
 import type { UsePropertyIntakeResult } from '../lib/usePropertyIntake';
+import type { UseOperatingCostsResult } from '../lib/useOperatingCosts';
 import { AddPropertyModal } from './AddPropertyModal';
-import { ExpenseBreakdownEditor } from './ExpenseBreakdownEditor';
+import { OperatingCostsCommandCenter } from './OperatingCostsCommandCenter';
 import { FinancingEditor } from './FinancingEditor';
 import { PropertyTable } from './PropertyTable';
 
@@ -76,6 +77,7 @@ interface PropertyDeckProps {
   onAdd: (property: PropertyDraft) => number;
   onRemove: (index: number) => void;
   intakeHook: UsePropertyIntakeResult;
+  operatingCostsHook: UseOperatingCostsResult;
   asOfMonth?: number;
   isDirty?: boolean;
   saving?: boolean;
@@ -316,6 +318,8 @@ function PropertyInspectorPanel({
   onFinancingChange,
   onRemove,
   onInspectorTab,
+  operatingCostsHook,
+  onFocusProperty,
 }: {
   focusedProperty: Property;
   focusedHealth: ReturnType<typeof buildPropertyHealth>;
@@ -331,6 +335,8 @@ function PropertyInspectorPanel({
   onFinancingChange?: (index: number, patch: PropertyFinancingPatch) => void;
   onRemove: (index: number) => void;
   onInspectorTab: (tab: PropertyDeckInspectorTab) => void;
+  operatingCostsHook: UseOperatingCostsResult;
+  onFocusProperty: (index: number) => void;
 }) {
   return (
     <div className="deck-inspector-enter flex flex-col">
@@ -483,9 +489,15 @@ function PropertyInspectorPanel({
         ) : null}
 
         {preferences.inspectorTab === 'expenses' && onExpenseBreakdownChange ? (
-          <ExpenseBreakdownEditor
+          <OperatingCostsCommandCenter
+            portfolio={portfolio}
             property={focusedProperty}
-            onChange={(b) => onExpenseBreakdownChange(focusedIndex, b)}
+            propertyIndex={focusedIndex}
+            propertyCount={propertiesCount}
+            costsHook={operatingCostsHook}
+            onApply={(b) => onExpenseBreakdownChange(focusedIndex, b)}
+            onFocusProperty={onFocusProperty}
+            embedded
           />
         ) : null}
 
@@ -570,6 +582,7 @@ export function PropertyDeck({
   onAdd,
   onRemove,
   intakeHook,
+  operatingCostsHook,
   asOfMonth = 1,
   isDirty = false,
   saving = false,
@@ -727,6 +740,7 @@ export function PropertyDeck({
           onAdd={onAdd}
           onRemove={onRemove}
           intakeHook={intakeHook}
+          operatingCostsHook={operatingCostsHook}
           asOfMonth={asOfMonth}
           isDirty={isDirty}
           saving={saving}
@@ -756,6 +770,8 @@ export function PropertyDeck({
         onFinancingChange,
         onRemove,
         onInspectorTab: (tab: PropertyDeckInspectorTab) => void setInspectorTab(tab),
+        operatingCostsHook,
+        onFocusProperty: (index: number) => void setFocusedIndex(index),
       }
     : null;
 
