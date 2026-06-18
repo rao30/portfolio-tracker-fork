@@ -30,6 +30,7 @@ import {
 } from '../lib/propertyFieldValidation';
 import type { PropertyDeckInspectorTab } from '../lib/propertyDeckTypes';
 import type { UsePropertyDeckResult } from '../lib/usePropertyDeck';
+import type { UsePropertyIntakeResult } from '../lib/usePropertyIntake';
 import { AddPropertyModal } from './AddPropertyModal';
 import { ExpenseBreakdownEditor } from './ExpenseBreakdownEditor';
 import { FinancingEditor } from './FinancingEditor';
@@ -72,8 +73,9 @@ interface PropertyDeckProps {
   onUpdateAcquisitionDate?: (index: number, value: string) => void;
   onExpenseBreakdownChange?: (index: number, breakdown: ExpenseBreakdown) => void;
   onFinancingChange?: (index: number, patch: PropertyFinancingPatch) => void;
-  onAdd: (property: PropertyDraft) => void;
+  onAdd: (property: PropertyDraft) => number;
   onRemove: (index: number) => void;
+  intakeHook: UsePropertyIntakeResult;
   asOfMonth?: number;
   isDirty?: boolean;
   saving?: boolean;
@@ -567,6 +569,7 @@ export function PropertyDeck({
   onFinancingChange,
   onAdd,
   onRemove,
+  intakeHook,
   asOfMonth = 1,
   isDirty = false,
   saving = false,
@@ -593,6 +596,13 @@ export function PropertyDeck({
 
   const { properties } = portfolio;
   const lastProperty = properties[properties.length - 1];
+
+  const handleFocusNewProperty = useCallback(
+    (index: number) => {
+      void setFocusedIndex(index);
+    },
+    [setFocusedIndex],
+  );
 
   useEffect(() => {
     setLocalSearch(preferences.searchQuery);
@@ -716,6 +726,7 @@ export function PropertyDeck({
           onFinancingChange={onFinancingChange}
           onAdd={onAdd}
           onRemove={onRemove}
+          intakeHook={intakeHook}
           asOfMonth={asOfMonth}
           isDirty={isDirty}
           saving={saving}
@@ -883,7 +894,10 @@ export function PropertyDeck({
           open={modalOpen}
           onClose={() => setModalOpen(false)}
           onAdd={onAdd}
+          portfolio={portfolio}
           template={lastProperty}
+          intakeHook={intakeHook}
+          onFocusNewProperty={handleFocusNewProperty}
         />
       </>
     );
@@ -1018,7 +1032,10 @@ export function PropertyDeck({
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         onAdd={onAdd}
+        portfolio={portfolio}
         template={lastProperty}
+        intakeHook={intakeHook}
+        onFocusNewProperty={handleFocusNewProperty}
       />
     </div>
   );
