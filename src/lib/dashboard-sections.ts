@@ -37,7 +37,7 @@ export const DESKTOP_SECTIONS: SectionConfig[] = [
     id: 'command',
     label: 'Command Center',
     shortLabel: 'Command',
-    description: 'Decision pulse, balloon safety, payoff landscape',
+    description: 'Capital deploy, decision pulse, balloon safety, payoff landscape',
   },
   {
     id: 'strategy',

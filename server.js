@@ -81,6 +81,11 @@ import {
   isTimelinePreferencesEnabled,
   upsertTimelinePreferences,
 } from './server/timeline-preferences-store.js';
+import {
+  getCapitalDeployPreferences,
+  isCapitalDeployEnabled,
+  upsertCapitalDeployPreferences,
+} from './server/capital-deploy-store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -556,6 +561,38 @@ app.put('/api/principal-velocity', requirePortfolioWebAccess, async (req, res) =
     const status = err.status ?? 500;
     res.status(status).json({
       error: err instanceof Error ? err.message : 'Failed to save Principal Velocity preferences',
+    });
+  }
+});
+
+app.get('/api/capital-deploy', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await getCapitalDeployPreferences(req.supabaseUser.id);
+    res.json({ preferences, enabled: isCapitalDeployEnabled() });
+  } catch (err) {
+    console.error('GET /api/capital-deploy', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to load Capital Deploy preferences',
+    });
+  }
+});
+
+app.put('/api/capital-deploy', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await upsertCapitalDeployPreferences(
+      req.supabaseUser.id,
+      req.body ?? {},
+    );
+    res.json({ preferences });
+  } catch (err) {
+    console.error('PUT /api/capital-deploy', err);
+    const status = err.status ?? 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Failed to save Capital Deploy preferences',
     });
   }
 });
