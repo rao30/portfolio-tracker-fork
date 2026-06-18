@@ -98,16 +98,16 @@ export async function getMobileMissionControlPreferences(userId) {
 }
 
 export async function upsertMobileMissionControlPreferences(userId, body) {
-  const client = getSupabase();
-  if (!client) {
-    throw new Error('Cloud storage is not configured');
-  }
-
   const errors = validatePayload(body);
   if (errors.length > 0) {
     const err = new Error(errors.join('; '));
     err.status = 400;
     throw err;
+  }
+
+  const client = getSupabase();
+  if (!client) {
+    throw new Error('Cloud storage is not configured');
   }
 
   const row = {
