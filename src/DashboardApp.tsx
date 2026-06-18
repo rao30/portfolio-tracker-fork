@@ -170,6 +170,18 @@ function DashboardApp() {
     return Math.max(20000, Math.round(piSum * 2));
   }, [portfolio]);
 
+  const deployMax = useMemo(() => {
+    if (!portfolio) return 5000;
+    const surplus = portfolio.properties.reduce((sum, p) => {
+      const gross = p.monthlyRent * (1 - portfolio.defaultVacancyRate);
+      const capex =
+        p.monthlyRent * (p.capexReserveRate ?? portfolio.defaultCapexReserveRate) +
+        (p.capexReserveFlat ?? portfolio.defaultCapexReserveFlat);
+      return sum + Math.max(0, gross - p.monthlyExpenses - p.monthlyPayment - capex);
+    }, 0);
+    return Math.max(2000, Math.round(Math.max(surplus, portfolio.extraMonthlyBudget) * 3));
+  }, [portfolio]);
+
   const {
     comparisons,
     activeResult,
@@ -393,18 +405,6 @@ function DashboardApp() {
     velocityHook: principalVelocityHook,
     onApplyBudget: setBudget,
   };
-
-  const deployMax = useMemo(() => {
-    if (!portfolio) return 5000;
-    const surplus = portfolio.properties.reduce((sum, p) => {
-      const gross = p.monthlyRent * (1 - portfolio.defaultVacancyRate);
-      const capex =
-        p.monthlyRent * (p.capexReserveRate ?? portfolio.defaultCapexReserveRate) +
-        (p.capexReserveFlat ?? portfolio.defaultCapexReserveFlat);
-      return sum + Math.max(0, gross - p.monthlyExpenses - p.monthlyPayment - capex);
-    }, 0);
-    return Math.max(2000, Math.round(Math.max(surplus, portfolio.extraMonthlyBudget) * 3));
-  }, [portfolio]);
 
   const capitalDeployProps = {
     portfolio,

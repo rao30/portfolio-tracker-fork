@@ -278,7 +278,11 @@ export function PayoffLandscape({
         <button
           type="button"
           onClick={() => {
-            setRangeDraft(suggestedRange);
+            setRangeDraft({
+              min: suggestedRange.budgetMin,
+              max: suggestedRange.budgetMax,
+              step: suggestedRange.budgetStep,
+            });
             void setBudgetRange(
               suggestedRange.budgetMin,
               suggestedRange.budgetMax,
