@@ -14,8 +14,9 @@ import {
   resolveMonthlyUtilities,
 } from '../lib/snowball';
 import { AddPropertyModal } from './AddPropertyModal';
-import { ExpenseBreakdownEditor } from './ExpenseBreakdownEditor';
+import { OperatingCostsCommandCenter } from './OperatingCostsCommandCenter';
 import { SellerFinancingCommandCenter } from './SellerFinancingCommandCenter';
+import type { UseOperatingCostsResult } from '../lib/useOperatingCosts';
 import {
   financingBadgeLabel,
   resolveFinancingType,
@@ -35,6 +36,7 @@ interface PropertyTableProps {
   onAdd: (property: PropertyDraft) => number;
   onRemove: (index: number) => void;
   intakeHook: UsePropertyIntakeResult;
+  operatingCostsHook: UseOperatingCostsResult;
   mobileCards?: boolean;
   /** Simulation month for totals / active rows (matches portfolio year slider). */
   asOfMonth?: number;
@@ -315,6 +317,7 @@ export function PropertyTable({
   onAdd,
   onRemove,
   intakeHook,
+  operatingCostsHook,
   mobileCards = false,
   asOfMonth = 1,
   isDirty = false,
@@ -652,7 +655,7 @@ export function PropertyTable({
                           {activePanel === 'financing' ? '▾' : '◈'}
                         </button>
                       )}
-                      {showAdvanced && onExpenseBreakdownChange && (
+                      {onExpenseBreakdownChange && (
                         <button
                           type="button"
                           onClick={() =>
@@ -665,9 +668,9 @@ export function PropertyTable({
                           className={`text-xs hover:text-cyan-300 ${
                             activePanel === 'expenses' ? 'text-cyan-300' : 'text-slate-400'
                           }`}
-                          title="Expense breakdown"
+                          title="Operating costs"
                         >
-                          {activePanel === 'expenses' ? '▾' : '▸'}
+                          {activePanel === 'expenses' ? '▾' : '◎'}
                         </button>
                       )}
                       <button
@@ -703,9 +706,15 @@ export function PropertyTable({
                 {isExpanded && activePanel === 'expenses' && onExpenseBreakdownChange ? (
                   <tr key={`${p.name}-${i}-breakdown`}>
                     <td colSpan={columns.length + 3} className="pb-3 pl-8 pr-2">
-                      <ExpenseBreakdownEditor
+                      <OperatingCostsCommandCenter
+                        portfolio={portfolio}
                         property={p}
-                        onChange={(b) => onExpenseBreakdownChange(i, b)}
+                        propertyIndex={i}
+                        propertyCount={properties.length}
+                        costsHook={operatingCostsHook}
+                        onApply={(b) => onExpenseBreakdownChange(i, b)}
+                        onFocusProperty={(index) => setExpandPanel({ index, panel: 'expenses' })}
+                        embedded
                       />
                     </td>
                   </tr>

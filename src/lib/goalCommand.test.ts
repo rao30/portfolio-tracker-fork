@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   clampGoalTargetMonth,
+  computeGoalBudgetPreview,
   computeGoalBudgetPreviewDelta,
   computeGoalCommandAnalysis,
   defaultGoalPreferences,
   portfolioGoalsFromPreferences,
   simMonthFromCalendarYear,
 } from './goalCommand';
-import { normalizePortfolio, runSimulation } from './snowball';
+import { normalizePortfolio, runSimulation, runSimulationWithPayoffOrder } from './snowball';
 
 const portfolio = normalizePortfolio({
   extra_monthly_budget: 2000,
@@ -89,5 +90,20 @@ describe('goalCommand', () => {
       prefs,
     );
     expect(delta.payoffMonthPreview).toBeLessThanOrEqual(delta.payoffMonthCommitted);
+  });
+
+  it('preview with custom payoff order uses playbook simulation path', () => {
+    const prefs = defaultGoalPreferences(portfolio);
+    const customOrder = ['LowRate', 'HighRate'];
+    const preview = computeGoalBudgetPreview(
+      portfolio,
+      portfolio.extraMonthlyBudget,
+      'highestRate',
+      prefs,
+      customOrder,
+    );
+    const expected = runSimulationWithPayoffOrder(portfolio, customOrder);
+    expect(preview.monthsToPayoff).toBe(expected.monthsToPayoff);
+    expect(preview.totalInterest).toBe(expected.totalInterest);
   });
 });
