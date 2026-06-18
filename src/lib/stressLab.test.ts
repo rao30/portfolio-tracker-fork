@@ -128,4 +128,32 @@ describe('stressLab', () => {
       ).not.toThrow();
     }
   });
+
+  it('extreme custom stress that never pays off does not crash', () => {
+    const seeded = normalizePortfolio(
+      JSON.parse(
+        readFileSync(join(process.cwd(), 'public/data/portfolio.json'), 'utf-8'),
+      ),
+    );
+    // Max out every stress knob (the slider extremes in the Scenarios UI).
+    // These can push loan rates past the scheduled payment so the portfolio
+    // never reaches debt-free within the horizon. The analysis must report a
+    // capped result rather than throwing and white-screening the dashboard.
+    const extreme = buildCustomScenario({
+      vacancy: 0.25,
+      capex: 0.2,
+      rateShock: 0.03,
+      pauseMonths: 60,
+    });
+
+    let analysis: ReturnType<typeof analyzeStressScenario> | undefined;
+    expect(() => {
+      analysis = analyzeStressScenario(seeded, 'highestRate', extreme);
+    }).not.toThrow();
+    expect(analysis!.impact.monthsToPayoff).toBeGreaterThan(0);
+
+    expect(() =>
+      computeStressPreviewDelta(seeded, 'highestRate', SCENARIO_PRESETS[0], extreme),
+    ).not.toThrow();
+  });
 });

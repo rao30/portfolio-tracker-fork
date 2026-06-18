@@ -1191,6 +1191,10 @@ export function runSimulation(
       snowballCashflow: false,
       strategyName: 'baseline',
       initialLumpSum,
+      // Exploratory scenarios (e.g. severe rate shocks) can prevent payoff
+      // within the horizon. Return the capped history instead of throwing so
+      // the what-if UIs never crash on extreme inputs.
+      allowUnresolved: true,
       ...simOpts,
     });
   }
@@ -1201,6 +1205,7 @@ export function runSimulation(
     snowballCashflow: true,
     strategyName: strategyId,
     initialLumpSum,
+    allowUnresolved: true,
     ...simOpts,
   });
 }
@@ -1248,6 +1253,8 @@ export function runSimulationWithPayoffOrder(
     snowballCashflow: true,
     strategyName: 'customPlaybook',
     initialLumpSum,
+    // See runSimulation: tolerate non-convergence for what-if exploration.
+    allowUnresolved: true,
     ...simOpts,
   });
 }
