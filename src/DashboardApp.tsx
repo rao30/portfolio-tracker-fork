@@ -25,6 +25,7 @@ import { BalloonSafety } from './components/BalloonSafety';
 import { PayoffLandscape } from './components/PayoffLandscape';
 import { PrincipalVelocity } from './components/PrincipalVelocity';
 import { TaxPlanner } from './components/TaxPlanner';
+import { MobileMissionControl } from './components/MobileMissionControl';
 import { WealthCompositionChart } from './components/WealthCompositionChart';
 import { ChartVariantContext } from './components/chart-theme';
 import {
@@ -56,6 +57,7 @@ import { useGoalCommand } from './lib/useGoalCommand';
 import { useStressLab } from './lib/useStressLab';
 import { usePrincipalVelocity } from './lib/usePrincipalVelocity';
 import { useTimelinePreferences } from './lib/useTimelinePreferences';
+import { useMobileMissionControl } from './lib/useMobileMissionControl';
 import { useAuth } from './context/AuthContext';
 import { useToast } from './context/ToastContext';
 
@@ -99,6 +101,7 @@ function DashboardApp() {
   const stressLabHook = useStressLab();
   const principalVelocityHook = usePrincipalVelocity();
   const timelineHook = useTimelinePreferences();
+  const mobileMissionHook = useMobileMissionControl();
   const { pushToast } = useToast();
 
   const isMobile = useIsMobile();
@@ -474,38 +477,37 @@ function DashboardApp() {
           {mobileTab === 'overview' && (
             <>
               <Header {...headerProps} compact />
-              <DecisionPulse {...decisionPulseProps} embedded />
-              <BalloonSafety {...balloonSafetyProps} embedded />
-              <Controls {...controlProps} mode="advanced" embedded idPrefix="overview" />
-              <PayoffLandscape {...payoffLandscapeProps} embedded />
-              <div className="app-surface space-y-4 p-4">
-                <Controls {...controlProps} mode="primary" embedded idPrefix="overview" />
-                <StressLab {...stressLabProps} embedded />
-                <div className="border-t border-white/10 pt-4">
-                  <TimelineStudio
-                    portfolio={portfolio}
-                    strategyId={activeStrategy}
-                    monthsToPayoff={activeResult.monthsToPayoff}
-                    cloudEnabled={cloudEnabled}
-                    userId={user?.id}
-                    timelineHook={timelineHook}
-                    onApplyEvents={applyTimelineEvents}
-                    onClearEvents={clearTimelineEvents}
-                    embedded
-                  />
-                </div>
-              </div>
-              <PrincipalVelocity {...principalVelocityProps} embedded />
-              <PortfolioDashboard
+              <MobileMissionControl
                 portfolio={portfolio}
-                result={activeResult}
-                year={portfolioYear}
+                activeResult={activeResult}
+                activeStrategy={activeStrategy}
+                portfolioYear={portfolioYear}
                 onYearChange={setPortfolioYear}
-                compact
+                monthsToPayoff={activeResult.monthsToPayoff}
+                cloudEnabled={cloudEnabled}
+                userId={user?.id}
+                missionHook={mobileMissionHook}
+                timelineHook={timelineHook}
+                onApplyTimelineEvents={applyTimelineEvents}
+                onClearTimelineEvents={clearTimelineEvents}
+                sync={{
+                  isDirty,
+                  saving,
+                  syncStatus,
+                  cloudEnabled,
+                  onSave: handleSave,
+                  onDiscard: discardChanges,
+                }}
+                decisionPulseProps={decisionPulseProps}
+                controlProps={controlProps}
+                balloonSafetyProps={balloonSafetyProps}
+                payoffLandscapeProps={payoffLandscapeProps}
+                stressLabProps={stressLabProps}
+                principalVelocityProps={principalVelocityProps}
+                playbookProps={playbookProps}
+                strategyLabProps={strategyLabProps}
+                goalProps={goalProps}
               />
-              <PayoffPlaybook {...playbookProps} embedded />
-              <StrategyLab {...strategyLabProps} embedded />
-              <GoalTracker {...goalProps} section="insights" />
             </>
           )}
 

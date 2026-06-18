@@ -24,8 +24,8 @@ function syncLabel(
   isDirty: boolean,
   saving: boolean,
 ): string | null {
-  if (saving) return 'Syncing…';
-  if (isDirty && cloudEnabled) return 'Unsaved — auto-save soon';
+  if (saving) return 'Saving…';
+  if (isDirty && cloudEnabled) return 'Edited · auto-saves soon';
   if (isDirty) return 'Unsaved changes';
   if (!cloudEnabled) return null;
   switch (syncStatus) {

@@ -77,6 +77,11 @@ import {
   upsertPrincipalVelocityPreferences,
 } from './server/principal-velocity-store.js';
 import {
+  getMobileMissionControlPreferences,
+  isMobileMissionControlEnabled,
+  upsertMobileMissionControlPreferences,
+} from './server/mobile-mission-control-store.js';
+import {
   getTimelinePreferences,
   isTimelinePreferencesEnabled,
   upsertTimelinePreferences,
@@ -364,6 +369,44 @@ app.put('/api/decision-pulse', requirePortfolioWebAccess, async (req, res) => {
     const status = err.status ?? 500;
     res.status(status).json({
       error: err instanceof Error ? err.message : 'Failed to save Decision Pulse preferences',
+    });
+  }
+});
+
+app.get('/api/mobile-mission-control', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await getMobileMissionControlPreferences(req.supabaseUser.id);
+    res.json({ preferences, enabled: isMobileMissionControlEnabled() });
+  } catch (err) {
+    console.error('GET /api/mobile-mission-control', err);
+    res.status(500).json({
+      error:
+        err instanceof Error
+          ? err.message
+          : 'Failed to load Mobile Mission Control preferences',
+    });
+  }
+});
+
+app.put('/api/mobile-mission-control', requirePortfolioWebAccess, async (req, res) => {
+  if (!requireAuthenticatedUser(req, res)) return;
+
+  try {
+    const preferences = await upsertMobileMissionControlPreferences(
+      req.supabaseUser.id,
+      req.body ?? {},
+    );
+    res.json({ preferences });
+  } catch (err) {
+    console.error('PUT /api/mobile-mission-control', err);
+    const status = err.status ?? 500;
+    res.status(status).json({
+      error:
+        err instanceof Error
+          ? err.message
+          : 'Failed to save Mobile Mission Control preferences',
     });
   }
 });
