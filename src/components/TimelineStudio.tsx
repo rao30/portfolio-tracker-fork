@@ -1,6 +1,5 @@
 import {
   useCallback,
-  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -11,13 +10,10 @@ import type { StrategyId } from '../lib/snowball';
 import {
   EVENT_META,
   collectPropertyEvents,
-  computeTimelineCommandAnalysis,
   computeTimelineImpact,
-  computeTimelinePreviewDelta,
   defaultEventForType,
   formatEventSummary,
   overlaysEqual,
-  portfolioFromEventOverlays,
   validatePropertyEvent,
   type PropertyEventOverlay,
 } from '../lib/timeline';
@@ -88,18 +84,13 @@ export function TimelineStudio({
   const anchorMonth = portfolio.simulationAnchorMonth ?? 1;
   const maxMonth = Math.min(600, Math.max(120, monthsToPayoff + 24));
 
-  const committedOverlays = useMemo(
-    () => collectPropertyEvents(portfolio),
-    [portfolio],
-  );
+  const overlays = useMemo(() => collectPropertyEvents(portfolio), [portfolio]);
 
-  const [previewOverlays, setPreviewOverlays] = useState<PropertyEventOverlay[]>(committedOverlays);
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [saveName, setSaveName] = useState('');
   const [saveBusy, setSaveBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [hoverMonth, setHoverMonth] = useState<number | null>(null);
-  const [previewPlanId, setPreviewPlanId] = useState<string | null>(null);
   const sectionRef = useRef<HTMLElement>(null);
 
   const {
@@ -107,50 +98,62 @@ export function TimelineStudio({
     setCollapsed,
     setFocusedPropertyIndex,
     setLastExploredPlanId,
-    setShowCommittedGhost,
   } = timelineHook;
 
-  const isDirty = useMemo(
-    () => !overlaysEqual(committedOverlays, previewOverlays),
-    [committedOverlays, previewOverlays],
-  );
-
-  useEffect(() => {
-    if (!isDirty) {
-      setPreviewOverlays(committedOverlays);
-      setPreviewPlanId(null);
-    }
-  }, [committedOverlays, isDirty]);
-
-  const deferredPreviewOverlays = useDeferredValue(previewOverlays);
-  const isPreviewStale = previewOverlays !== deferredPreviewOverlays;
-
-  const previewPortfolio = useMemo(
-    () => portfolioFromEventOverlays(portfolio, deferredPreviewOverlays),
-    [portfolio, deferredPreviewOverlays],
-  );
-
   const impact = useMemo(
-    () => computeTimelineImpact(previewPortfolio, strategyId),
-    [previewPortfolio, strategyId],
+    () => computeTimelineImpact(portfolio, strategyId),
+    [portfolio, strategyId],
   );
 
-  const previewDelta = useMemo(
-    () =>
-      isDirty
-        ? computeTimelinePreviewDelta(portfolio, deferredPreviewOverlays, strategyId)
-        : null,
-    [portfolio, deferredPreviewOverlays, strategyId, isDirty],
-  );
-
-  const analysis = useMemo(
-    () =>
-      computeTimelineCommandAnalysis(portfolio, deferredPreviewOverlays, strategyId),
-    [portfolio, deferredPreviewOverlays, strategyId],
-  );
+  const verdict = useMemo<{ text: string; tone: TimelineVerdictTone }>(() => {
+    const count = impact.eventCount;
+    if (count === 0) {
+      return {
+        text: 'No lifecycle events yet — add rent bumps, refis, capex, or exits and the dashboard updates instantly.',
+        tone: 'neutral',
+      };
+    }
+    const md = impact.monthsDelta;
+    if (md <= -6 && impact.equityDelta > 0) {
+      return {
+        text: `Strong plan — debt-free ${Math.abs(md)} months sooner with higher 10-year equity.`,
+        tone: 'positive',
+      };
+    }
+    if (md <= -1) {
+      return {
+        text: `Accelerates payoff by ${Math.abs(md)} month${Math.abs(md) === 1 ? '' : 's'} vs no events.`,
+        tone: 'positive',
+      };
+    }
+    if (md >= 6) {
+      return {
+        text: `Adds ${md} months to debt-free — review refi costs or capex timing.`,
+        tone: 'caution',
+      };
+    }
+    if (impact.cashflowDelta >= 500) {
+      return {
+        text: `Boosts 10-year cashflow by $${Math.round(impact.cashflowDelta).toLocaleString()}/mo.`,
+        tone: 'positive',
+      };
+    }
+    return {
+      text: `${count} event${count === 1 ? '' : 's'} live on your timeline.`,
+      tone: 'neutral',
+    };
+  }, [impact]);
 
   const { scenarios, loading, saveScenario, deleteScenario, canPersistCloud } =
     useTimelineScenarios(cloudEnabled, userId);
+
+  const activePlanId = useMemo(() => {
+    if (overlays.length === 0) return null;
+    const match = scenarios.find((scenario) =>
+      overlaysEqual(normalizeOverlays(portfolio, scenario.propertyEvents), overlays),
+    );
+    return match?.id ?? null;
+  }, [scenarios, overlays, portfolio]);
 
   const focusedIndex = Math.min(
     preferences.focusedPropertyIndex,
@@ -161,19 +164,22 @@ export function TimelineStudio({
     ? validatePropertyEvent(editor.draft, portfolio.properties[editor.propertyIndex])
     : [];
 
-  const updatePreviewForProperty = useCallback(
+  const updateEventsForProperty = useCallback(
     (propertyIndex: number, events: PropertyEvent[]) => {
-      const property = portfolio.properties[propertyIndex];
-      setPreviewOverlays((current) => {
-        const next = normalizeOverlays(portfolio, [
-          ...current.filter((overlay) => overlay.propertyName !== property.name),
-          { propertyName: property.name, events: [...events].sort((a, b) => a.month - b.month) },
-        ]);
-        return next;
+      const target = portfolio.properties[propertyIndex];
+      const byName = new Map(overlays.map((overlay) => [overlay.propertyName, overlay.events]));
+      const next = portfolio.properties.map((property) => {
+        if (property.name === target.name) {
+          return {
+            propertyName: property.name,
+            events: [...events].sort((a, b) => a.month - b.month),
+          };
+        }
+        return { propertyName: property.name, events: byName.get(property.name) ?? [] };
       });
-      setPreviewPlanId(null);
+      onApplyEvents(next);
     },
-    [portfolio],
+    [portfolio, overlays, onApplyEvents],
   );
 
   const openNewEvent = (propertyIndex: number, month: number, type: PropertyEventType = 'rentChange') => {
@@ -188,7 +194,7 @@ export function TimelineStudio({
 
   const openEditEvent = (propertyIndex: number, eventIndex: number) => {
     const property = portfolio.properties[propertyIndex];
-    const overlay = previewOverlays.find((entry) => entry.propertyName === property.name);
+    const overlay = overlays.find((entry) => entry.propertyName === property.name);
     const event = overlay?.events[eventIndex];
     if (!event) return;
     void setFocusedPropertyIndex(propertyIndex);
@@ -202,43 +208,25 @@ export function TimelineStudio({
   const commitEditor = () => {
     if (!editor || editorErrors.length > 0) return;
     const property = portfolio.properties[editor.propertyIndex];
-    const overlay = previewOverlays.find((entry) => entry.propertyName === property.name);
+    const overlay = overlays.find((entry) => entry.propertyName === property.name);
     const events = [...(overlay?.events ?? [])];
     if (editor.eventIndex == null) {
       events.push(editor.draft);
     } else {
       events[editor.eventIndex] = editor.draft;
     }
-    updatePreviewForProperty(editor.propertyIndex, events);
+    updateEventsForProperty(editor.propertyIndex, events);
     setEditor(null);
   };
 
   const deleteEditorEvent = () => {
     if (!editor || editor.eventIndex == null) return;
     const property = portfolio.properties[editor.propertyIndex];
-    const overlay = previewOverlays.find((entry) => entry.propertyName === property.name);
+    const overlay = overlays.find((entry) => entry.propertyName === property.name);
     const events = (overlay?.events ?? []).filter((_, index) => index !== editor.eventIndex);
-    updatePreviewForProperty(editor.propertyIndex, events);
+    updateEventsForProperty(editor.propertyIndex, events);
     setEditor(null);
   };
-
-  const handleApply = useCallback(() => {
-    if (!isDirty) return;
-    onApplyEvents(deferredPreviewOverlays);
-    void setLastExploredPlanId(previewPlanId);
-  }, [deferredPreviewOverlays, isDirty, onApplyEvents, previewPlanId, setLastExploredPlanId]);
-
-  const handleDiscard = useCallback(() => {
-    setPreviewOverlays(committedOverlays);
-    setPreviewPlanId(null);
-    setEditor(null);
-  }, [committedOverlays]);
-
-  const handleClearPreview = useCallback(() => {
-    setPreviewOverlays([]);
-    setPreviewPlanId(null);
-    setEditor(null);
-  }, []);
 
   const handleSavePlan = async () => {
     const name = saveName.trim();
@@ -248,10 +236,9 @@ export function TimelineStudio({
     try {
       const scenario = await saveScenario({
         name,
-        propertyEvents: deferredPreviewOverlays,
+        propertyEvents: overlays,
       });
       setSaveName('');
-      setPreviewPlanId(scenario.id);
       void setLastExploredPlanId(scenario.id);
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : 'Save failed');
@@ -260,44 +247,23 @@ export function TimelineStudio({
     }
   };
 
-  const loadPlanPreview = useCallback(
+  const loadPlan = useCallback(
     (id: string) => {
       const plan = scenarios.find((scenario) => scenario.id === id);
       if (!plan) return;
       const byName = new Map(
         plan.propertyEvents.map((overlay) => [overlay.propertyName, overlay.events]),
       );
-      const next = normalizeOverlays(
-        portfolio,
-        portfolio.properties.map((property) => ({
-          propertyName: property.name,
-          events: byName.get(property.name) ?? [],
-        })),
-      );
-      setPreviewOverlays(next);
-      setPreviewPlanId(id);
+      const next = portfolio.properties.map((property) => ({
+        propertyName: property.name,
+        events: [...(byName.get(property.name) ?? [])].sort((a, b) => a.month - b.month),
+      }));
+      onApplyEvents(next);
       setEditor(null);
       void setLastExploredPlanId(id);
     },
-    [portfolio, scenarios, setLastExploredPlanId],
+    [portfolio, scenarios, onApplyEvents, setLastExploredPlanId],
   );
-
-  const restoredPlanRef = useRef(false);
-  useEffect(() => {
-    if (restoredPlanRef.current || !preferences.lastExploredPlanId || scenarios.length === 0) {
-      return;
-    }
-    if (committedOverlays.length > 0) return;
-    const plan = scenarios.find((scenario) => scenario.id === preferences.lastExploredPlanId);
-    if (!plan) return;
-    restoredPlanRef.current = true;
-    loadPlanPreview(plan.id);
-  }, [
-    committedOverlays.length,
-    loadPlanPreview,
-    preferences.lastExploredPlanId,
-    scenarios,
-  ]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -307,32 +273,21 @@ export function TimelineStudio({
       ) {
         return;
       }
+      if (!editor) return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         if (e.key !== 'Enter' && e.key !== 'Escape') return;
       }
-
-      if (editor) {
-        if (e.key === 'Escape') {
-          e.preventDefault();
-          setEditor(null);
-        } else if (e.key === 'Enter' && editorErrors.length === 0) {
-          e.preventDefault();
-          commitEditor();
-        }
-        return;
-      }
-
-      if (e.key === 'Enter' && isDirty) {
+      if (e.key === 'Escape') {
         e.preventDefault();
-        handleApply();
-      } else if (e.key === 'Escape' && isDirty) {
+        setEditor(null);
+      } else if (e.key === 'Enter' && editorErrors.length === 0) {
         e.preventDefault();
-        handleDiscard();
+        commitEditor();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [editor, editorErrors.length, handleApply, handleDiscard, isDirty]);
+  }, [editor, editorErrors.length]);
 
   const monthLabel = (month: number) => {
     const cal = simMonthToCalendar(month, anchorYear, anchorMonth);
@@ -355,11 +310,13 @@ export function TimelineStudio({
             <p className="text-xs font-semibold uppercase tracking-wide text-cyan-400">
               Future Events Planner
             </p>
-            <p className="truncate text-sm text-slate-200">{analysis.verdict}</p>
+            <p className="truncate text-sm text-slate-200">{verdict.text}</p>
           </div>
           <div className="shrink-0 text-right">
             <p className="text-xs text-slate-500">Debt-free</p>
-            <p className="text-sm font-medium text-slate-200">{analysis.debtFreeLabel}</p>
+            <p className="text-sm font-medium text-slate-200">
+              {formatMonths(impact.eventMonthsToPayoff)}
+            </p>
           </div>
           <span className="shrink-0 text-slate-500" aria-hidden>
             ▼
@@ -376,18 +333,10 @@ export function TimelineStudio({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-base font-semibold text-white">Future Events Planner</h2>
-              {isDirty && (
-                <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
-                  Preview
-                </span>
-              )}
-              {isPreviewStale && (
-                <span className="text-[10px] text-slate-500">Recalculating…</span>
-              )}
             </div>
             <p className="mt-0.5 max-w-2xl text-xs text-slate-400">
               Schedule things you know are coming — rent increases, refinances, big repairs, or a sale —
-              and see how they change your plan before they happen. Enter to apply · Esc to discard.
+              and the dashboard updates the moment you add them.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -398,71 +347,21 @@ export function TimelineStudio({
             >
               Collapse
             </button>
-            {impact.eventCount > 0 && (
-              <button
-                type="button"
-                onClick={handleClearPreview}
-                className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-300 hover:bg-white/5"
-              >
-                Clear preview
-              </button>
-            )}
-            {committedOverlays.length > 0 && (
+            {overlays.length > 0 && (
               <button
                 type="button"
                 onClick={onClearEvents}
                 className="rounded-lg border border-red-500/20 px-3 py-1.5 text-xs text-red-300 hover:bg-red-500/10"
               >
-                Clear committed
+                Clear events
               </button>
             )}
           </div>
         </div>
 
-        <div className={`mt-3 rounded-xl border p-3 ${verdictToneClass(analysis.verdictTone)}`}>
-          <p className="text-sm text-slate-100">{analysis.verdict}</p>
+        <div className={`mt-3 rounded-xl border p-3 ${verdictToneClass(verdict.tone)}`}>
+          <p className="text-sm text-slate-100">{verdict.text}</p>
         </div>
-
-        {isDirty && (
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2">
-            <div className="text-xs text-amber-100">
-              <span className="font-medium">Unsaved preview</span>
-              {previewDelta && (
-                <span className="ml-2 text-amber-200/80">
-                  {previewDelta.monthsDelta !== 0 && (
-                    <>
-                      {previewDelta.monthsDelta > 0 ? '+' : ''}
-                      {previewDelta.monthsDelta} mo debt-free
-                    </>
-                  )}
-                  {previewDelta.equityDelta !== 0 && (
-                    <>
-                      {previewDelta.monthsDelta !== 0 ? ' · ' : ''}
-                      {previewDelta.equityDelta > 0 ? '+' : ''}
-                      {formatCurrency(previewDelta.equityDelta)} equity @ 10 yr
-                    </>
-                  )}
-                </span>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={handleDiscard}
-                className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-200 hover:bg-white/5"
-              >
-                Discard
-              </button>
-              <button
-                type="button"
-                onClick={handleApply}
-                className="rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-cyan-500"
-              >
-                Apply to portfolio
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="grid gap-4 p-4 lg:grid-cols-[1fr_280px]">
@@ -502,13 +401,9 @@ export function TimelineStudio({
               </div>
 
               {portfolio.properties.map((property, propertyIndex) => {
-                const previewEvents = (
-                  previewOverlays.find((overlay) => overlay.propertyName === property.name)?.events ??
+                const propertyEvents = (
+                  overlays.find((overlay) => overlay.propertyName === property.name)?.events ??
                   []
-                ).sort((a, b) => a.month - b.month);
-                const committedEvents = (
-                  committedOverlays.find((overlay) => overlay.propertyName === property.name)
-                    ?.events ?? []
                 ).sort((a, b) => a.month - b.month);
                 const isFocused = propertyIndex === focusedIndex;
 
@@ -555,22 +450,7 @@ export function TimelineStudio({
                         />
                       )}
 
-                      {preferences.showCommittedGhost &&
-                        isDirty &&
-                        committedEvents.map((event, eventIndex) => {
-                          const left = `${(event.month / maxMonth) * 100}%`;
-                          return (
-                            <div
-                              key={`ghost-${event.type}-${event.month}-${eventIndex}`}
-                              className="absolute top-1/2 z-0 -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-white/20 px-2 py-0.5 text-[10px] text-slate-500 opacity-60"
-                              style={{ left }}
-                            >
-                              {EVENT_META[event.type].shortLabel}
-                            </div>
-                          );
-                        })}
-
-                      {previewEvents.map((event, eventIndex) => {
+                      {propertyEvents.map((event, eventIndex) => {
                         const meta = EVENT_META[event.type];
                         const left = `${(event.month / maxMonth) * 100}%`;
                         return (
@@ -604,15 +484,6 @@ export function TimelineStudio({
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/5 px-3 py-2 text-[10px] text-slate-500">
               <span>Click a lane to add · Click chip to edit · Quick-add uses focused property</span>
-              <label className="flex items-center gap-1.5 text-slate-400">
-                <input
-                  type="checkbox"
-                  checked={preferences.showCommittedGhost}
-                  onChange={(e) => void setShowCommittedGhost(e.target.checked)}
-                  className="accent-cyan-500"
-                />
-                Show committed ghost
-              </label>
             </div>
           </div>
 
@@ -773,7 +644,7 @@ export function TimelineStudio({
                   disabled={editorErrors.length > 0}
                   className="rounded-lg bg-cyan-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
                 >
-                  {editor.eventIndex == null ? 'Stage event' : 'Update preview'}
+                  {editor.eventIndex == null ? 'Add event' : 'Save changes'}
                 </button>
                 {editor.eventIndex != null && (
                   <button
@@ -799,7 +670,7 @@ export function TimelineStudio({
         <div className="space-y-3">
           <div className="rounded-xl border border-white/10 bg-slate-950/50 p-3">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-              Preview impact vs baseline
+              Impact vs no events
             </h3>
             <dl className="mt-2 space-y-2 text-sm">
               <div className="flex justify-between gap-2">
@@ -841,7 +712,7 @@ export function TimelineStudio({
                 </dd>
               </div>
               <div className="flex justify-between gap-2 text-xs">
-                <dt className="text-slate-500">Events staged</dt>
+                <dt className="text-slate-500">Events live</dt>
                 <dd className="text-slate-300">{impact.eventCount}</dd>
               </div>
             </dl>
@@ -863,17 +734,18 @@ export function TimelineStudio({
             ) : (
               <ul className="mt-2 max-h-32 space-y-1 overflow-y-auto">
                 {scenarios.map((scenario) => {
-                  const isPreviewing = previewPlanId === scenario.id;
+                  const isActive = activePlanId === scenario.id;
                   return (
                     <li key={scenario.id} className="flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => loadPlanPreview(scenario.id)}
+                        onClick={() => loadPlan(scenario.id)}
                         className={`min-w-0 flex-1 truncate rounded px-2 py-1 text-left text-xs hover:bg-white/5 ${
-                          isPreviewing ? 'bg-amber-500/15 text-amber-200' : 'text-cyan-300'
+                          isActive ? 'bg-cyan-500/15 text-cyan-200' : 'text-cyan-300'
                         }`}
                       >
                         {scenario.name}
+                        {isActive && <span className="ml-1 text-[10px] text-cyan-400">· live</span>}
                       </button>
                       <button
                         type="button"
@@ -908,7 +780,7 @@ export function TimelineStudio({
             </div>
             {saveError && <p className="mt-1 text-[10px] text-red-400">{saveError}</p>}
             <p className="mt-2 text-[10px] text-slate-500">
-              Loading a plan stages it in preview — apply when ready.
+              Loading a plan applies it instantly. Save your current events as a reusable plan.
             </p>
           </div>
         </div>
