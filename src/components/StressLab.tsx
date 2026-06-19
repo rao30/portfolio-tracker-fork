@@ -1,6 +1,5 @@
 import {
   useCallback,
-  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -12,13 +11,10 @@ import { SCENARIO_PRESETS, buildSellScenario } from '../lib/snowball';
 import {
   analyzeStressScenario,
   buildCustomScenario,
-  computeStressPreviewDelta,
   formatImpactCurrency,
   impactDeltaLabel,
   impactToneClass,
   presetCategoryLabel,
-  resolveScenarioFromId,
-  scenariosEqual,
 } from '../lib/stressLab';
 import type { StressLabCustomKnobs } from '../lib/stressLabTypes';
 import { CUSTOM_SCENARIO_ID } from '../lib/stressLabTypes';
@@ -39,14 +35,12 @@ interface StressLabProps {
 function PresetCard({
   analysis,
   isActive,
-  isPreview,
   isPinned,
   onSelect,
   onPin,
 }: {
   analysis: ReturnType<typeof analyzeStressScenario>;
   isActive: boolean;
-  isPreview: boolean;
   isPinned: boolean;
   onSelect: () => void;
   onPin: () => void;
@@ -58,6 +52,7 @@ function PresetCard({
     <div
       role="button"
       tabIndex={0}
+      aria-pressed={isActive}
       onClick={onSelect}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -66,11 +61,9 @@ function PresetCard({
         }
       }}
       className={`group relative flex flex-col rounded-xl border p-3 text-left transition cursor-pointer ${
-        isPreview
-          ? 'border-amber-400/60 bg-amber-500/10 ring-1 ring-amber-400/30'
-          : isActive
-            ? 'border-cyan-500/50 bg-cyan-500/10'
-            : 'border-white/10 bg-slate-900/40 hover:border-white/20 hover:bg-slate-900/60'
+        isActive
+          ? 'border-cyan-500/50 bg-cyan-500/10 ring-1 ring-cyan-400/30'
+          : 'border-white/10 bg-slate-900/40 hover:border-white/20 hover:bg-slate-900/60'
       }`}
     >
       <div className="flex items-start justify-between gap-2">
@@ -80,23 +73,30 @@ function PresetCard({
           </span>
           <p className="mt-0.5 truncate text-sm font-medium text-slate-100">{scenario.label}</p>
         </div>
-        {!isBase && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onPin();
-            }}
-            className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] ${
-              isPinned
-                ? 'bg-cyan-500/20 text-cyan-300'
-                : 'text-slate-600 opacity-0 group-hover:opacity-100 hover:bg-white/5 hover:text-slate-400'
-            }`}
-            title={isPinned ? 'Unpin preset' : 'Pin preset'}
-          >
-            {isPinned ? '★' : '☆'}
-          </button>
-        )}
+        <div className="flex shrink-0 items-center gap-1">
+          {isActive && (
+            <span className="rounded bg-cyan-500/20 px-1.5 py-0.5 text-[10px] font-medium text-cyan-300">
+              Live
+            </span>
+          )}
+          {!isBase && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onPin();
+              }}
+              className={`rounded px-1.5 py-0.5 text-[10px] ${
+                isPinned
+                  ? 'bg-cyan-500/20 text-cyan-300'
+                  : 'text-slate-600 opacity-0 group-hover:opacity-100 hover:bg-white/5 hover:text-slate-400'
+              }`}
+              title={isPinned ? 'Unpin preset' : 'Pin preset'}
+            >
+              {isPinned ? '★' : '☆'}
+            </button>
+          )}
+        </div>
       </div>
 
       {!isBase && (
@@ -139,58 +139,16 @@ export function StressLab({
     [portfolio.properties],
   );
 
-  const [previewScenarioId, setPreviewScenarioId] = useState(committedScenario.id);
   const [customKnobs, setCustomKnobsLocal] = useState<StressLabCustomKnobs>(preferences.customKnobs);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const sectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     setCustomKnobsLocal(preferences.customKnobs);
   }, [preferences.customKnobs]);
 
-  useEffect(() => {
-    if (!stressHook.loading && preferences.lastExploredScenarioId && committedScenario.id === 'base') {
-      setPreviewScenarioId(preferences.lastExploredScenarioId);
-    }
-  }, [stressHook.loading, preferences.lastExploredScenarioId, committedScenario.id]);
-
-  useEffect(() => {
-    setPreviewScenarioId(committedScenario.id);
-  }, [committedScenario.id]);
-
-  const previewScenario = useMemo(
-    () => resolveScenarioFromId(previewScenarioId, customKnobs, sellScenarios),
-    [previewScenarioId, customKnobs, sellScenarios],
-  );
-
-  const deferredPreviewScenario = useDeferredValue(previewScenario);
-  const isPreviewStale = !scenariosEqual(previewScenario, deferredPreviewScenario);
-  const isDirty = !scenariosEqual(previewScenario, committedScenario);
-
-  const committedAnalysis = useMemo(
+  const analysis = useMemo(
     () => analyzeStressScenario(portfolio, activeStrategy, committedScenario, customOrder),
     [portfolio, activeStrategy, committedScenario, customOrder],
-  );
-
-  const previewAnalysis = useMemo(
-    () => analyzeStressScenario(portfolio, activeStrategy, deferredPreviewScenario, customOrder),
-    [portfolio, activeStrategy, deferredPreviewScenario, customOrder],
-  );
-
-  const analysis = isDirty ? previewAnalysis : committedAnalysis;
-
-  const previewDelta = useMemo(
-    () =>
-      isDirty
-        ? computeStressPreviewDelta(
-            portfolio,
-            activeStrategy,
-            committedScenario,
-            deferredPreviewScenario,
-            customOrder,
-          )
-        : null,
-    [portfolio, activeStrategy, committedScenario, deferredPreviewScenario, customOrder, isDirty],
   );
 
   const presetAnalyses = useMemo(
@@ -201,78 +159,38 @@ export function StressLab({
     [portfolio, activeStrategy, customOrder],
   );
 
-  const handleSelectPreset = useCallback((scenarioId: string) => {
-    setPreviewScenarioId(scenarioId);
-  }, []);
+  const applyScenario = useCallback(
+    (scenario: ScenarioConfig) => {
+      onApplyScenario(scenario);
+      void setLastExploredScenarioId(scenario.id);
+    },
+    [onApplyScenario, setLastExploredScenarioId],
+  );
 
   const handleCustomKnobChange = useCallback(
     (patch: Partial<StressLabCustomKnobs>) => {
       const next = { ...customKnobs, ...patch };
       setCustomKnobsLocal(next);
-      setPreviewScenarioId(CUSTOM_SCENARIO_ID);
+      onApplyScenario(buildCustomScenario(next));
+      void setLastExploredScenarioId(CUSTOM_SCENARIO_ID);
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         void setCustomKnobs(next);
       }, 500);
     },
-    [customKnobs, setCustomKnobs],
+    [customKnobs, onApplyScenario, setCustomKnobs, setLastExploredScenarioId],
   );
 
-  const handleApply = useCallback(() => {
-    if (!isDirty) return;
-    onApplyScenario(previewScenario);
-    void setLastExploredScenarioId(previewScenario.id);
-    if (previewScenarioId === CUSTOM_SCENARIO_ID) {
-      void setCustomKnobs(customKnobs);
-    }
-  }, [
-    isDirty,
-    onApplyScenario,
-    previewScenario,
-    previewScenarioId,
-    setLastExploredScenarioId,
-    setCustomKnobs,
-    customKnobs,
-  ]);
-
-  const handleReset = useCallback(() => {
-    setPreviewScenarioId(committedScenario.id);
-    setCustomKnobsLocal(preferences.customKnobs);
-  }, [committedScenario.id, preferences.customKnobs]);
+  const handleApplyCustom = useCallback(() => {
+    applyScenario(buildCustomScenario(customKnobs));
+    void setCustomKnobs(customKnobs);
+  }, [applyScenario, customKnobs, setCustomKnobs]);
 
   useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!isDirty) return undefined;
-    debounceRef.current = setTimeout(() => {
-      void setLastExploredScenarioId(previewScenarioId);
-    }, 800);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [isDirty, previewScenarioId, setLastExploredScenarioId]);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (
-        !sectionRef.current?.contains(document.activeElement) &&
-        !(e.target instanceof HTMLElement && e.target.closest('[data-stress-lab]'))
-      ) {
-        return;
-      }
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        return;
-      }
-      if (e.key === 'Enter' && isDirty) {
-        e.preventDefault();
-        handleApply();
-      } else if (e.key === 'Escape' && isDirty) {
-        e.preventDefault();
-        handleReset();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [handleApply, handleReset, isDirty]);
+  }, []);
 
   const shell = embedded ? 'space-y-4' : 'glass-card overflow-hidden border-violet-500/20';
 
@@ -288,7 +206,7 @@ export function StressLab({
             <p className="text-xs font-semibold uppercase tracking-wide text-violet-400">
               Stress Test
             </p>
-            <p className="truncate text-sm text-slate-200">{committedAnalysis.verdict}</p>
+            <p className="truncate text-sm text-slate-200">{analysis.verdict}</p>
           </div>
           <div className="shrink-0 text-right">
             <p className="text-xs text-slate-500">Active scenario</p>
@@ -304,7 +222,6 @@ export function StressLab({
 
   return (
     <section
-      ref={sectionRef}
       className={shell}
       aria-label="Stress test scenarios"
       data-stress-lab
@@ -316,6 +233,7 @@ export function StressLab({
           </h2>
           <p className="mt-0.5 text-xs text-slate-500">
             See how a bad year — high vacancy, rising rates, big repairs — would change your plan.
+            Pick a scenario and the charts update instantly.
           </p>
         </div>
         <button
@@ -328,66 +246,8 @@ export function StressLab({
         </button>
       </div>
 
-      {isDirty && (
-        <div className="mx-4 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-amber-300">
-              Preview mode
-            </p>
-            <p className="mt-1 text-sm text-slate-100">
-              Exploring <span className="font-medium">{previewScenario.label}</span> — charts still
-              use <span className="font-medium">{committedScenario.label}</span> until you apply.
-            </p>
-            {previewDelta && (
-              <p className="mt-1 text-xs text-slate-400">
-                Debt-free moves from {previewDelta.debtFreeLabelCommitted} to{' '}
-                <span className="font-medium text-slate-200">{previewDelta.debtFreeLabelPreview}</span>
-                {previewDelta.monthsDelta !== 0 && (
-                  <>
-                    {' '}
-                    (
-                    <span
-                      className={
-                        previewDelta.monthsDelta < 0 ? 'text-emerald-400' : 'text-amber-400'
-                      }
-                    >
-                      {impactDeltaLabel(previewDelta.monthsDelta)}
-                    </span>
-                    )
-                  </>
-                )}
-                {previewDelta.interestDelta !== 0 && (
-                  <>
-                    {' '}
-                    · interest {formatImpactCurrency(previewDelta.interestDelta)}
-                  </>
-                )}
-              </p>
-            )}
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={handleReset}
-              className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-slate-300 hover:bg-white/5"
-            >
-              Reset
-            </button>
-            <button
-              type="button"
-              onClick={handleApply}
-              className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-500"
-            >
-              Apply scenario
-            </button>
-          </div>
-        </div>
-      )}
-
       <div
-        className={`mx-4 mt-4 rounded-xl border px-4 py-3 transition-opacity ${impactToneClass(analysis.verdictTone)} ${
-          isPreviewStale ? 'opacity-60' : 'opacity-100'
-        }`}
+        className={`mx-4 mt-4 rounded-xl border px-4 py-3 ${impactToneClass(analysis.verdictTone)}`}
       >
         <p className="text-sm leading-relaxed text-slate-100">{analysis.verdict}</p>
         <dl className="mt-3 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
@@ -435,10 +295,9 @@ export function StressLab({
             <PresetCard
               key={presetAnalysis.scenario.id}
               analysis={presetAnalysis}
-              isActive={committedScenario.id === presetAnalysis.scenario.id && !isDirty}
-              isPreview={previewScenarioId === presetAnalysis.scenario.id && isDirty}
+              isActive={committedScenario.id === presetAnalysis.scenario.id}
               isPinned={preferences.pinnedPresetId === presetAnalysis.scenario.id}
-              onSelect={() => handleSelectPreset(presetAnalysis.scenario.id)}
+              onSelect={() => applyScenario(presetAnalysis.scenario)}
               onPin={() =>
                 void setPinnedPresetId(
                   preferences.pinnedPresetId === presetAnalysis.scenario.id
@@ -513,14 +372,14 @@ export function StressLab({
         </div>
         <button
           type="button"
-          onClick={() => handleSelectPreset(CUSTOM_SCENARIO_ID)}
+          onClick={handleApplyCustom}
           className={`mt-3 w-full rounded-lg border px-3 py-2 text-xs transition ${
-            previewScenarioId === CUSTOM_SCENARIO_ID
-              ? 'border-violet-500/50 bg-violet-500/10 text-violet-200'
+            committedScenario.id === CUSTOM_SCENARIO_ID
+              ? 'border-cyan-500/50 bg-cyan-500/10 text-cyan-200'
               : 'border-white/10 text-slate-400 hover:bg-white/5'
           }`}
         >
-          Preview custom scenario
+          {committedScenario.id === CUSTOM_SCENARIO_ID ? 'Custom scenario is live' : 'Apply custom scenario'}
         </button>
       </div>
 
@@ -546,10 +405,9 @@ export function StressLab({
                 <PresetCard
                   key={sell.id}
                   analysis={sellAnalysis}
-                  isActive={committedScenario.id === sell.id && !isDirty}
-                  isPreview={previewScenarioId === sell.id && isDirty}
+                  isActive={committedScenario.id === sell.id}
                   isPinned={preferences.pinnedPresetId === sell.id}
-                  onSelect={() => handleSelectPreset(sell.id)}
+                  onSelect={() => applyScenario(sell)}
                   onPin={() =>
                     void setPinnedPresetId(
                       preferences.pinnedPresetId === sell.id ? null : sell.id,
