@@ -1,6 +1,5 @@
 import {
   useCallback,
-  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -17,12 +16,9 @@ import {
   computeStrategyLabAnalysis,
   computeStrategyLabMetrics,
   findMatchingPinId,
-  impactDeltaLabel,
   impactToneClass,
-  pinToSnapshot,
   resolveScenarioConfig,
   resolveStrategyId,
-  snapshotsMatch,
 } from '../lib/strategyLab';
 import type { StrategyLabScenario } from '../lib/strategyLabTypes';
 import type { UseStrategyLabResult } from '../lib/useStrategyLab';
@@ -54,12 +50,10 @@ function slotLabel(order: number): string {
 
 function PinCard({
   pin,
-  scenario,
   metrics,
   monthsDelta,
   interestDelta,
   isCommitted,
-  isPreview,
   isFastest,
   showComparison,
   renamingId,
@@ -72,12 +66,10 @@ function PinCard({
   onSelect,
 }: {
   pin: StrategyLabScenario;
-  scenario: ScenarioConfig;
   metrics: ReturnType<typeof computeStrategyLabMetrics>;
   monthsDelta: number;
   interestDelta: number;
   isCommitted: boolean;
-  isPreview: boolean;
   isFastest: boolean;
   showComparison: boolean;
   renamingId: string | null;
@@ -93,6 +85,7 @@ function PinCard({
     <article
       role="button"
       tabIndex={0}
+      aria-pressed={isCommitted}
       onClick={onSelect}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -101,11 +94,9 @@ function PinCard({
         }
       }}
       className={`group relative rounded-xl border p-3 transition cursor-pointer ${
-        isPreview
-          ? 'border-amber-400/60 bg-amber-500/10 ring-1 ring-amber-400/30'
-          : isCommitted
-            ? 'border-cyan-400/60 bg-cyan-950/30 shadow-lg shadow-cyan-900/20'
-            : 'border-white/10 bg-slate-900/50 hover:border-white/20'
+        isCommitted
+          ? 'border-cyan-400/60 bg-cyan-950/30 shadow-lg shadow-cyan-900/20'
+          : 'border-white/10 bg-slate-900/50 hover:border-white/20'
       }`}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
@@ -144,11 +135,6 @@ function PinCard({
             {isCommitted && (
               <span className="shrink-0 rounded bg-cyan-500/20 px-1.5 py-0.5 text-[10px] font-medium text-cyan-300">
                 Live
-              </span>
-            )}
-            {isPreview && !isCommitted && (
-              <span className="shrink-0 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
-                Preview
               </span>
             )}
             {isFastest && showComparison && (
@@ -213,7 +199,7 @@ function PinCard({
         </div>
       </dl>
 
-      {showComparison && interestDelta !== 0 && (
+      {showComparison && interestDelta !== 0 && !isCommitted && (
         <p className="mt-2 text-[10px] text-slate-500">
           vs live: {interestDelta > 0 ? '+' : ''}
           {formatCurrency(interestDelta)} interest saved
@@ -228,7 +214,6 @@ export function StrategyLab({
   activeBudget,
   activeStrategy,
   activeScenario,
-  activeScenarioId,
   customOrder,
   lab,
   onApply,
@@ -240,10 +225,8 @@ export function StrategyLab({
   const [pinOpen, setPinOpen] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
-  const [previewPinId, setPreviewPinId] = useState<string | null>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const pinInputRef = useRef<HTMLInputElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const committedPinId = useMemo(
     () =>
@@ -262,24 +245,6 @@ export function StrategyLab({
     [portfolio, activeBudget, activeStrategy, activeScenario],
   );
 
-  const previewPin = useMemo(
-    () => lab.scenarios.find((p) => p.id === previewPinId) ?? null,
-    [lab.scenarios, previewPinId],
-  );
-
-  const previewSnapshot = useMemo(
-    () => (previewPin ? pinToSnapshot(portfolio, previewPin) : null),
-    [portfolio, previewPin],
-  );
-
-  const deferredPreviewSnapshot = useDeferredValue(previewSnapshot);
-  const isPreviewStale = previewSnapshot !== deferredPreviewSnapshot;
-
-  const isDirty = useMemo(() => {
-    if (!previewSnapshot) return false;
-    return !snapshotsMatch(committedSnapshotState, previewSnapshot);
-  }, [committedSnapshotState, previewSnapshot]);
-
   const committedAnalysis = useMemo(
     () =>
       computeStrategyLabAnalysis(
@@ -289,26 +254,6 @@ export function StrategyLab({
         customOrder,
       ),
     [portfolio, committedSnapshotState, customOrder],
-  );
-
-  const previewAnalysis = useMemo(
-    () =>
-      deferredPreviewSnapshot && isDirty
-        ? computeStrategyLabAnalysis(
-            portfolio,
-            committedSnapshotState,
-            deferredPreviewSnapshot,
-            customOrder,
-          )
-        : committedAnalysis,
-    [
-      portfolio,
-      committedSnapshotState,
-      deferredPreviewSnapshot,
-      isDirty,
-      customOrder,
-      committedAnalysis,
-    ],
   );
 
   const pinnedWithMetrics = useMemo(() => {
@@ -324,7 +269,7 @@ export function StrategyLab({
       );
       const monthsDelta = metrics.monthsToPayoff - committedMetrics.monthsToPayoff;
       const interestDelta = metrics.interestSaved - committedMetrics.interestSaved;
-      return { pin, scenario, metrics, monthsDelta, interestDelta };
+      return { pin, metrics, monthsDelta, interestDelta };
     });
   }, [lab.scenarios, portfolio, committedAnalysis.metrics, customOrder]);
 
@@ -333,40 +278,19 @@ export function StrategyLab({
     return all.length > 0 ? Math.min(...all) : null;
   }, [pinnedWithMetrics]);
 
-  const handleSelectPreview = useCallback(
-    (pinId: string) => {
-      if (pinId === committedPinId) {
-        setPreviewPinId(null);
-        return;
-      }
-      setPreviewPinId(pinId);
+  const applyPin = useCallback(
+    (pin: StrategyLabScenario) => {
+      const scenario = resolveScenarioConfig(portfolio, pin.scenario);
+      onApply({
+        budget: pin.extraMonthlyBudget,
+        strategy: resolveStrategyId(pin.strategyId),
+        scenario,
+      });
+      void setCommittedPinId(pin.id);
+      void setLastExploredPinId(pin.id);
     },
-    [committedPinId],
+    [portfolio, onApply, setCommittedPinId, setLastExploredPinId],
   );
-
-  const handleApply = useCallback(() => {
-    if (!previewPin || !isDirty) return;
-    const scenario = resolveScenarioConfig(portfolio, previewPin.scenario);
-    onApply({
-      budget: previewPin.extraMonthlyBudget,
-      strategy: resolveStrategyId(previewPin.strategyId),
-      scenario,
-    });
-    void setCommittedPinId(previewPin.id);
-    void setLastExploredPinId(previewPin.id);
-    setPreviewPinId(null);
-  }, [
-    previewPin,
-    isDirty,
-    portfolio,
-    onApply,
-    setCommittedPinId,
-    setLastExploredPinId,
-  ]);
-
-  const handleReset = useCallback(() => {
-    setPreviewPinId(null);
-  }, []);
 
   const handlePinCurrent = useCallback(async () => {
     const name =
@@ -397,17 +321,6 @@ export function StrategyLab({
   }, [pinOpen]);
 
   useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!isDirty || !previewPinId) return undefined;
-    debounceRef.current = setTimeout(() => {
-      void setLastExploredPinId(previewPinId);
-    }, 800);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [isDirty, previewPinId, setLastExploredPinId]);
-
-  useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (
         !sectionRef.current?.contains(document.activeElement) &&
@@ -427,19 +340,13 @@ export function StrategyLab({
         const entry = pinnedWithMetrics.find((p) => p.pin.sortOrder === num);
         if (entry) {
           e.preventDefault();
-          handleSelectPreview(entry.pin.id);
+          applyPin(entry.pin);
         }
-      } else if (e.key === 'Enter' && isDirty) {
-        e.preventDefault();
-        handleApply();
-      } else if (e.key === 'Escape' && isDirty) {
-        e.preventDefault();
-        handleReset();
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [pinnedWithMetrics, handleSelectPreview, handleApply, handleReset, isDirty]);
+  }, [pinnedWithMetrics, applyPin]);
 
   const shell = embedded ? 'space-y-4' : 'glass-card space-y-4 p-4';
 
@@ -479,11 +386,10 @@ export function StrategyLab({
         <div>
           <h2 className="text-base font-semibold text-slate-100">Saved Scenarios</h2>
           <p className="mt-1 max-w-2xl text-xs text-slate-400">
-            Save different plans (budget + strategy) and compare them side by side without changing
-            your live numbers. Select one to preview — press <kbd className="rounded bg-slate-800 px-1">Enter</kbd>{' '}
-            to apply or <kbd className="rounded bg-slate-800 px-1">Esc</kbd> to reset. Keys{' '}
-            <kbd className="rounded bg-slate-800 px-1">1</kbd>–
-            <kbd className="rounded bg-slate-800 px-1">9</kbd> preview pins.
+            Save different plans (budget + strategy) and compare them side by side. Click a card
+            (or press <kbd className="rounded bg-slate-800 px-1">1</kbd>–
+            <kbd className="rounded bg-slate-800 px-1">9</kbd>) to make it live — the dashboard
+            updates instantly.
             {!lab.cloudBacked && ' Saved locally on this device.'}
           </p>
         </div>
@@ -508,66 +414,33 @@ export function StrategyLab({
         </div>
       </div>
 
-      {isDirty && previewAnalysis.previewDelta && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-amber-300">
-              Preview pending — dashboard unchanged
-            </p>
-            <p className="mt-1 text-sm text-slate-200">
-              {impactDeltaLabel(previewAnalysis.previewDelta.monthsDelta)} debt-free ·{' '}
-              {previewAnalysis.previewDelta.interestSavedDelta >= 0 ? '+' : ''}
-              {formatCurrency(previewAnalysis.previewDelta.interestSavedDelta)} interest saved
-            </p>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={handleReset}
-              className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-slate-300 hover:bg-white/5"
-            >
-              Reset
-            </button>
-            <button
-              type="button"
-              onClick={handleApply}
-              className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-500"
-            >
-              Apply to dashboard
-            </button>
-          </div>
-        </div>
-      )}
-
       <div
-        className={`rounded-xl border px-4 py-3 transition-opacity ${impactToneClass(previewAnalysis.verdictTone)} ${
-          isPreviewStale ? 'opacity-60' : 'opacity-100'
-        }`}
+        className={`rounded-xl border px-4 py-3 ${impactToneClass(committedAnalysis.verdictTone)}`}
       >
-        <p className="text-sm leading-relaxed text-slate-100">{previewAnalysis.verdict}</p>
+        <p className="text-sm leading-relaxed text-slate-100">{committedAnalysis.verdict}</p>
         <dl className="mt-3 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
           <div>
             <dt className="text-slate-500">Debt-free</dt>
             <dd className="font-mono tabular-nums text-slate-200">
-              {formatMonths(previewAnalysis.metrics.monthsToPayoff)}
+              {formatMonths(committedAnalysis.metrics.monthsToPayoff)}
             </dd>
           </div>
           <div>
             <dt className="text-slate-500">Interest saved</dt>
             <dd className="font-mono tabular-nums text-cyan-300">
-              {formatCurrency(previewAnalysis.metrics.interestSaved)}
+              {formatCurrency(committedAnalysis.metrics.interestSaved)}
             </dd>
           </div>
           <div>
             <dt className="text-slate-500">Year 10 equity</dt>
             <dd className="font-mono tabular-nums text-slate-200">
-              {formatCurrency(previewAnalysis.metrics.equityYear10)}
+              {formatCurrency(committedAnalysis.metrics.equityYear10)}
             </dd>
           </div>
           <div>
             <dt className="text-slate-500">Final equity</dt>
             <dd className="font-mono tabular-nums text-emerald-400">
-              {formatCurrency(previewAnalysis.metrics.finalEquity)}
+              {formatCurrency(committedAnalysis.metrics.finalEquity)}
             </dd>
           </div>
         </dl>
@@ -632,23 +505,20 @@ export function StrategyLab({
           <p className="text-sm text-slate-300">No pinned scenarios yet</p>
           <p className="mt-1 text-xs text-slate-500">
             Adjust budget, strategy, and stress test — then pin to build a comparison workspace.
-            Spreadsheets require manual copy-paste for each what-if; competitors apply changes
-            instantly with no undo.
+            Click any saved card to make it live instantly.
           </p>
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {pinnedWithMetrics.map(
-            ({ pin, scenario, metrics, monthsDelta, interestDelta }) => (
+            ({ pin, metrics, monthsDelta, interestDelta }) => (
               <PinCard
                 key={pin.id}
                 pin={pin}
-                scenario={scenario}
                 metrics={metrics}
                 monthsDelta={monthsDelta}
                 interestDelta={interestDelta}
-                isCommitted={pin.id === committedPinId && !isDirty}
-                isPreview={pin.id === previewPinId && isDirty}
+                isCommitted={pin.id === committedPinId}
                 isFastest={
                   fastestMonths !== null && metrics.monthsToPayoff === fastestMonths
                 }
@@ -668,7 +538,7 @@ export function StrategyLab({
                 }}
                 onRenameCancel={() => setRenamingId(null)}
                 onDelete={() => void lab.deleteScenario(pin.id)}
-                onSelect={() => handleSelectPreview(pin.id)}
+                onSelect={() => applyPin(pin)}
               />
             ),
           )}
