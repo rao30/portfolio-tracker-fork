@@ -71,10 +71,10 @@ describe('buildScheduleOfRealEstate', () => {
     expect(shady116?.interestRate).toBe(0.07);
     expect(shady116?.dateAcquired).toBe('Jun 2026');
     expect(shady116?.loanBalance).toBeCloseTo(288_000, -3);
-    expect(shady144?.purchasePrice).toBe(344_050);
+    expect(shady144?.purchasePrice).toBeCloseTo(344_057.87, 0);
     expect(shady144?.dateAcquired).toBe('Jun 2026');
-    expect(shady144?.loanBalance).toBeGreaterThan(343_000);
-    expect(shady144?.loanBalance).toBeLessThanOrEqual(344_050);
+    expect(shady144?.loanBalance).toBeCloseTo(344_057.87, 0);
+    expect(shady144?.monthlyPi).toBeCloseTo(2464.94, 1);
     expect(shady144?.cashInvested).toBe(0);
   });
 
