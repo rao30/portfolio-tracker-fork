@@ -151,11 +151,10 @@ app.get('/api/health', (_req, res) => {
 
 app.get('/api/client-config', (_req, res) => {
   const config = getSupabaseClientConfig();
+  res.set('Cache-Control', 'no-store');
   res.json({
     supabaseUrl: config.supabaseUrl,
     supabaseAnonKey: config.supabaseAnonKey,
-    portfolioApiKey: config.portfolioApiKey,
-    portfolioWriteKey: config.portfolioWriteKey,
   });
 });
 

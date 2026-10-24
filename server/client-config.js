@@ -37,7 +37,5 @@ export function getSupabaseClientConfig() {
   return {
     supabaseUrl,
     supabaseAnonKey,
-    portfolioApiKey: envOrNull('VITE_PORTFOLIO_API_KEY') || envOrNull('PORTFOLIO_API_KEY'),
-    portfolioWriteKey: envOrNull('VITE_PORTFOLIO_WRITE_KEY'),
   };
 }
